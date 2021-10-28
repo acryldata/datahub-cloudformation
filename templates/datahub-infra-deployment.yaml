@@ -1,0 +1,827 @@
+# Datahub Infrastructure Deployment AWS
+
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Master template that set up Datahub platform in AWS"
+Metadata:
+    AWS::CloudFormation::Interface:
+      ParameterGroups:
+        - Label:
+            default: Nested CFN Templates Location
+          Parameters:
+            - TemplateBucketName
+            - TemplateBucketKeyPrefix
+        - Label:
+            default: VPC Stack Configuration
+          Parameters:
+            - CreateVPC
+            - VPCCIDR
+            - AvailabilityZones
+            - PrivateSubnet1CIDR
+            - PrivateSubnet2CIDR
+            - PrivateSubnet3CIDR
+            - PublicSubnet1CIDR
+            - PublicSubnet2CIDR
+            - PublicSubnet3CIDR
+        - Label:
+            default: ElasticSearch Stack Configuration
+          Parameters:
+            - CreateElasticSearch
+            - ESDataNodeCount
+            - ESInstanceType
+            - ESVolumeSize
+            - ESMasterNodeCount
+            - ESMasterInstanceType
+            - ESDomainName
+            - ElasticsearchVersion
+        - Label:
+            default: MySQL Stack Configuration
+          Parameters:
+            - CreateMySQL
+            - DBClusterIdentifier
+            - DBInstanceClass
+            - EngineVersion
+        - Label:
+            default: MSK Stack Configuration
+          Parameters:
+            - CreateMSK
+            - MSKClusterName
+            - KafkaVersion
+            - MSKInstanceType
+        - Label:
+            default: EKS Cluster Stack Configuration
+          Parameters:
+            - CreateEKS
+            - KeyPairName
+            - RemoteAccessCIDR
+            - BastionInstanceType
+            - MaxNumberOfBastionNodes
+            - MinNumberOfBastionNodes
+            - DesiredNumberOfBastionNodes
+            - NodeInstanceType
+            - MaxNumberOfNodes
+            - MinNumberOfNodes
+            - DesiredNumberOfNodes
+            - EksExternalUserArn
+            - EksMgmtIamRoleArn
+        - Label:
+            default: Ingress Controller Stack Configuration
+          Parameters:
+            - ControllerHostNetwork
+        - Label:
+            default: Admin Stack Configuration
+          Parameters:
+            - DomainName
+            - KeyPairName
+            - RemoteAccessCIDR
+            - BastionInstanceType
+            - MaxNumberOfBastionNodes
+            - MinNumberOfBastionNodes
+            - DesiredNumberOfBastionNodes
+            - K8sNamespace
+            - ElbCertArn 
+
+      ParameterLabels:
+        AvailabilityZones:
+          default: The AZ's to deploy to.
+        PrivateSubnet1CIDR:
+          default: The CIDR block for the first private subnet
+        PrivateSubnet2CIDR:
+          default: The CIDR block for the second private subnet
+        PrivateSubnet3CIDR:
+          default: The CIDR block for the third private subnet
+        PublicSubnet1CIDR:
+          default: The CIDR block for the first public subnet
+        PublicSubnet2CIDR:
+          default: The CIDR block for the second public subnet
+        PublicSubnet3CIDR:
+          default: The CIDR block for the third public subnet
+        KeyPairName:
+          default: The key pair name to use to access the instances
+        RemoteAccessCIDR:
+          default: The CIDR block to allow remote access
+        BastionInstanceType:
+          default: The instance type to deploy Bastion to
+        MaxNumberOfBastionNodes:
+          default: The maximum number of nodes to scale up to for Bastion
+        MinNumberOfBastionNodes:
+          default: The minimum number of nodes to scale down to for Bastion
+        DesiredNumberOfBastionNodes:
+          default: The desired number of nodes to keep running for Bastion
+        NodeInstanceType:
+          default: The instance type to deploy EKS Worker Node to
+        MaxNumberOfNodes:
+          default: The maximum number of nodes to scale up to for EKS Worker Node
+        MinNumberOfNodes:
+          default: The minimum number of nodes to scale down to for EKS Worker Node
+        DesiredNumberOfNodes:
+          default: The desired number of nodes to keep running for EKS Worker Node
+        TemplateBucketName:
+          default: The name of the S3 bucket that holds the templates
+        TemplateBucketKeyPrefix:
+          default: The Key prefix for the templates in the S3 template bucket
+        EksMgmtIamRoleArn:
+          default: The AWS IAM Role name that will be allowed to manage EKS. Note do not include path just name of role like "my-role"
+        EksExternalUserArn:
+          default: The AWS IAM user arn who will be authorised to connect the cluster externally
+        K8sNamespace:
+          default: The namespace in EKS to deploy kots and datahub app 
+        CreateElasticSearch:
+          default: Enable Creation of ElasticSearch
+        CreateVPC:
+          default: Enable Creation of VPC
+        CreateMSK:
+          default: Enable Creation of MSK
+        CreateMySQL:
+          default: Enable Creation of Aurora RDS
+        CreateEKS:
+          default: Enable Creation of EKS
+        ESDataNodeCount:
+          default: ES Data Node Instance Count 
+        ESMasterNodeCount:
+          default: ES Master Node Instance Count 
+        ESInstanceType:
+          default: The ElasticSearch Data Node Instance Type
+        ESVolumeSize:
+          default: The ElasticSearch Data Node Volume Size
+        ESMasterInstanceType:
+          default: The ElasticSearch Master Node Instance Type
+        ESDomainName:
+          default: The ElasticSearch Domain Name
+        ElasticsearchVersion:
+          default: The ElasticSearch Version
+        DBClusterIdentifier:
+          default: Aurora Cluster Identifier
+        DBInstanceClass:
+          default: Aurora Instance Type
+        EngineVersion:
+          default: Aurora Engine Version
+        MSKClusterName:
+          default: MSK Cluster Name
+        KafkaVersion:
+          default: Kafka Version
+        MSKInstanceType:
+          default: MSK Instance Type
+        ControllerHostNetwork:
+          default: Deploy EKS load balancer controller
+        ElbCertArn:
+          default: ELB cert arn
+        DomainName:
+          default: The FQDN to access acryl
+
+Parameters:
+    AvailabilityZones:
+      Description: "List of Availability Zones to use for the subnets in the VPC. Please choose three zones."
+      Type: "List<AWS::EC2::AvailabilityZone::Name>"
+    PrivateSubnet1CIDR:
+      AllowedPattern: "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$"
+      ConstraintDescription: "CIDR block parameter must be in the form x.x.x.x/16-28"
+      Default: "10.0.0.0/23"
+      Description: "CIDR block for private subnet 1 located in Availability Zone 1"
+      Type: "String"
+    PrivateSubnet2CIDR:
+      AllowedPattern: "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$"
+      ConstraintDescription: "CIDR block parameter must be in the form x.x.x.x/16-28"
+      Default: "10.0.2.0/23"
+      Description: "CIDR block for private subnet 2 located in Availability Zone 2"
+      Type: "String"
+    PrivateSubnet3CIDR:
+      AllowedPattern: "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$"
+      ConstraintDescription: "CIDR block parameter must be in the form x.x.x.x/16-28"
+      Default: "10.0.4.0/23"
+      Description: "CIDR block for private subnet 3 located in Availability Zone 3"
+      Type: "String"
+    PublicSubnet1CIDR:
+      AllowedPattern: "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$"
+      ConstraintDescription: "CIDR block parameter must be in the form x.x.x.x/16-28"
+      Default: "10.0.100.0/24"
+      Description: "CIDR block for the public (DMZ) subnet 1 located in Availability Zone 1"
+      Type: "String"
+    PublicSubnet2CIDR:
+      AllowedPattern: "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$"
+      ConstraintDescription: "CIDR block parameter must be in the form x.x.x.x/16-28"
+      Default: "10.0.102.0/24"
+      Description: "CIDR block for the public (DMZ) subnet 2 located in Availability Zone 2"
+      Type: "String"
+    PublicSubnet3CIDR:
+      AllowedPattern: "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$"
+      ConstraintDescription: "CIDR block parameter must be in the form x.x.x.x/16-28"
+      Default: "10.0.104.0/24"
+      Description: "CIDR block for the public (DMZ) subnet 3 located in Availability Zone 3"
+      Type: "String"
+    VPCCIDR:
+      AllowedPattern: "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$"
+      ConstraintDescription: "CIDR block parameter must be in the form x.x.x.x/16-28"
+      Default: "10.0.0.0/16"
+      Description: "CIDR block for the VPC"
+      Type: "String"
+    KeyPairName:
+      Description: "The name of an existing public/private key pair, which allows you to securely connect to your instance after it launches"
+      Type: "AWS::EC2::KeyPair::KeyName"
+    RemoteAccessCIDR:
+      AllowedPattern: "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/([0-9]|[1-2][0-9]|3[0-2]))$"
+      ConstraintDescription: "CIDR block parameter must be in the form x.x.x.x/x"
+      Description: "The CIDR IP range that is permitted to access the AWS resources. It is recommended that you set this value to a trusted IP range. For example <my_ip>/32"
+      Type: "String"
+      Default: "108.21.195.33/32"
+    BastionInstanceType:
+      Type: "String"
+      Default: "t2.micro"
+      Description: "The type of EC2 instance to be launched for Bastion Host"
+      AllowedValues:
+        # Add more instance types if needed
+        - t2.micro
+        - t2.medium
+        - t2.large
+      ConstraintDescription: "Must contain a valid instance type"
+    DesiredNumberOfBastionNodes:
+      Type: String
+      MinLength: 1
+      Description: "The desired number of Bastion instance to run"
+      Default: "1"
+    MaxNumberOfBastionNodes:
+      Type: String
+      MinLength: 1
+      Description: "The maximum number of Bastion instances to run"
+      Default: "1"
+    MinNumberOfBastionNodes:
+      Type: String
+      MinLength: 1
+      Description: "The minimum number of Bastion instances to run"
+      Default: "1"
+    NodeInstanceType:
+      Type: "String"
+      Default: "m5.large"
+      Description: "The type of EC2 instance to be launched for EKS Worker Node"
+      AllowedValues:
+        # Add more instance types if needed
+        - t2.xlarge
+        - t2.2xlarge
+        - m3.xlarge
+        - m3.2xlarge
+        - m4.xlarge
+        - m4.2xlarge
+        - m5.large
+        - m5.xlarge
+        - m5.2xlarge
+      ConstraintDescription: "Must contain a valid instance type"
+    DesiredNumberOfNodes:
+      Type: String
+      MinLength: 1
+      Description: "The desired number of EKS Worker Nodes to run"
+      Default: "2"
+    MaxNumberOfNodes:
+      Type: String
+      MinLength: 1
+      Description: "The maximum number of EKS Worker Nodes to run"
+      Default: "3"
+    MinNumberOfNodes:
+      Type: String
+      MinLength: 1
+      Description: "The minimum number of EKS Worker Nodes to run"
+      Default: "2"
+    TemplateBucketName:
+      AllowedPattern: "^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$"
+      ConstraintDescription: "Bucket name can include numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen (-)."
+      Description: "S3 bucket name that contains the CFN templates (VPC, Bastion etc). This string can include numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen (-)."
+      Type: "String"
+      Default: "cf-templates-blrxgroup-us-west-2"
+    TemplateBucketKeyPrefix:
+      AllowedPattern: "^[0-9a-zA-Z-/]*$"
+      ConstraintDescription: "Template bucket key prefix can include numbers, lowercase letters, uppercase letters, hyphens (-), and forward slash (/)."
+      Type: "String"
+      Default: "development"
+    EksMgmtIamRoleArn:
+      Type: String
+      Description: The AWS IAM role that will have manage access to EKS
+      Default: "arn:aws:iam::1234567:role/admin"
+    EksExternalUserArn:
+      Type: String
+      Description: The AWS IAM user arn who will be authorised to connect the cluster externally
+      Default: "arn:aws:iam::577660233792:user/blrxgroup-dev-admin"
+    K8sNamespace:
+      AllowedPattern: ".+"
+      ConstraintDescription: The K8s namespace can not be empty
+      Type: String
+      Description: The namespace in EKS to deploy kots and datahub app
+      Default: "datahub"
+    CreateVPC:
+      Description: "Set to true if you want to create VPC"
+      Type: String
+      Default: "true"
+      AllowedValues:
+        - "true"
+        - "false"
+    CreateElasticSearch:
+      Description: "Set to true if you want to create ElasticSearch"
+      Type: String
+      Default: "true"
+      AllowedValues:
+        - "true"
+        - "false"
+    CreateMySQL:
+      Description: "Set to true if you want to create MySQL"
+      Type: String
+      Default: "true"
+      AllowedValues:
+        - "true"
+        - "false"
+    CreateMSK:
+      Description: "Set to true if you want to create MSK"
+      Type: String
+      Default: "true"
+      AllowedValues:
+        - "true"
+        - "false"
+    CreateEKS:
+      Description: "Set to true if you want to create EKS"
+      Type: String
+      Default: "true"
+      AllowedValues:
+        - "true"
+        - "false"
+    ESVolumeSize:
+      Default: 50
+      Description: Data Node Volume Size in GB
+      Type: String
+    ESDataNodeCount:
+      Default: 3
+      Type: String
+    ESMasterNodeCount:
+      Default: 3
+      Type: String
+    ESInstanceType:
+      Type: "String"
+      Default: "t3.small.elasticsearch"
+      Description: "The type of EC2 instance to be launched for ElasticSearch Data Node"
+      AllowedValues:
+        - t3.small.elasticsearch
+        - t3.large.elasticsearch
+        - m5.large.elasticsearch
+    ESMasterInstanceType:
+      Type: "String"
+      Default: "t3.small.elasticsearch"
+      Description: "The type of EC2 instance to be launched for ElasticSearch Master Node"
+      AllowedValues:
+        - t3.small.elasticsearch
+        - t3.large.elasticsearch
+        - c5.large.elasticsearch
+    ESDomainName:
+      Default: "datahub"
+      Description: Elasticsearch Domain Name
+      Type: String
+    ElasticsearchVersion:
+      Type: "String"
+      Default: "7.9"
+      Description: "The Elasticsearch Version"
+      AllowedValues:
+        - 7.9
+    DBClusterIdentifier:
+      Description: "The Aurora Cluster Identifier"
+      Type: String
+      Default: datahub
+    DBInstanceClass:
+      AllowedValues:
+        - db.t3.small
+        - db.t3.large
+      ConstraintDescription: Must contain valid RDS instance type
+      Default: db.t3.small
+      Description: instance type for the Amazon Aurora
+      Type: String
+    EngineVersion:
+      AllowedValues:
+        - 5.7.mysql_aurora.2.09.1
+      Default: 5.7.mysql_aurora.2.09.1
+      Description: Aurora Engine Version
+      Type: String
+    MSKInstanceType:
+      AllowedValues:
+        - kafka.t3.small
+        - kafka.t3.large
+        - kafka.m5.large
+      ConstraintDescription: Must contain valid MSK instance type
+      Default: kafka.t3.small
+      Description: EC2 instance type for the Amazon MSK instances
+      Type: String
+    KafkaVersion:
+      AllowedValues:
+        - 2.4.1.1
+      Default: 2.4.1.1
+      Description: Kafka version
+      Type: String
+    MSKClusterName:
+      Default: "datahub"
+      Description: MSK Cluster Name
+      Type: String
+    ControllerHostNetwork:
+      Description: Enables Ingress Controller IAM
+      Type: String
+      Default: "Enabled"
+      AllowedValues:
+      - "Disabled"
+      - "Enabled"
+    ElbCertArn:
+      ConstraintDescription: The Elastic Load Balancer Cert Arn can not be empty
+      Type: String
+      Default: "arn:aws:acm:us-west-2:577660233792:certificate/66b92cc0-c78f-4a11-99f3-a6f8586d744f"
+    DomainName:
+      Default: "datahub.dev.blrxgroup.com"
+      Description: The FQDN to access Acryl
+      Type: String
+
+
+
+Conditions:
+  isCreateVPC:           !Equals [!Ref CreateVPC, "true"]
+  isCreateElasticSearch: !Equals [!Ref CreateElasticSearch, "true"]
+  isCreateMySQL:         !Equals [!Ref CreateMySQL, "true"]
+  isCreateMSK:           !Equals [!Ref CreateMSK, "true"]
+  isCreateEKS:           !Equals [!Ref CreateEKS, "true"]
+
+Resources:
+
+    ESServiceRole:
+        Condition: isCreateElasticSearch
+        Type: 'AWS::IAM::ServiceLinkedRole'
+        Properties:
+            AWSServiceName: es.amazonaws.com
+            Description: 'Role for ES to access resources in my VPC'
+
+    RDSSecret:
+      Type: AWS::SecretsManager::Secret
+      Properties:
+        Description: Secrets for RDS
+        GenerateSecretString:
+          SecretStringTemplate: '{"username": "admin"}'
+          GenerateStringKey: password
+          PasswordLength: 16
+          ExcludeCharacters: "\"@/\\"
+        Tags:
+          -
+            Key: CloudFormation
+            Value: "true"
+
+    ESSecret:
+      Type: AWS::SecretsManager::Secret
+      Properties:
+        Description: Secrets for RDS
+        GenerateSecretString:
+          SecretStringTemplate: '{"username": "admin"}'
+          GenerateStringKey: password
+          PasswordLength: 16
+          ExcludeCharacters: "\"@/\\"
+        Tags:
+          -
+            Key: CloudFormation
+            Value: "true"
+
+    VPCStack:
+      Condition: isCreateVPC
+      Type: AWS::CloudFormation::Stack
+      Properties:
+        Tags:
+          - Key: Name
+            Value: !Sub "${AWS::StackName}"
+          - Key: Component
+            Value: !Sub "${AWS::StackName}-vpc"
+        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${TemplateBucketKeyPrefix}/templates/nested/vpc.yaml"
+        Parameters:
+          AvailabilityZones: !Join [",", !Ref AvailabilityZones]
+          PrivateSubnet1ACIDR: !Ref PrivateSubnet1CIDR
+          PrivateSubnet2ACIDR: !Ref PrivateSubnet2CIDR
+          PrivateSubnet3ACIDR: !Ref PrivateSubnet3CIDR
+          PrivateSubnetATag1: kubernetes.io/role/internal-elb=1
+          PublicSubnet1CIDR: !Ref PublicSubnet1CIDR
+          PublicSubnet2CIDR: !Ref PublicSubnet2CIDR
+          PublicSubnet3CIDR: !Ref PublicSubnet3CIDR
+          PublicSubnetTag1: kubernetes.io/role/elb=1
+          CreatePrivateSubnets: "true"
+          VPCCIDR: !Ref VPCCIDR
+
+    EC2LogGroup:
+      Type: AWS::Logs::LogGroup
+
+    NodeInstanceRole:
+      Type: AWS::IAM::Role
+      Properties:
+        Policies:
+          - PolicyName: cloudwatch-logs-policy
+            PolicyDocument:
+              Version: 2012-10-17
+              Statement:
+                - Action:
+                    - logs:CreateLogStream
+                    - logs:GetLogEvents
+                    - logs:PutLogEvents
+                    - logs:DescribeLogGroups
+                    - logs:DescribeLogStreams
+                    - logs:PutRetentionPolicy
+                    - logs:PutMetricFilter
+                    - logs:CreateLogGroup
+                  Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:${EC2LogGroup}:*"
+                  Effect: Allow
+          - PolicyName: ebs-volume-policy
+            PolicyDocument:
+              Version: 2012-10-17
+              Statement:
+                - Action:
+                    - ec2:AttachVolume
+                    - ec2:DetachVolume
+                  Resource: "arn:aws:ec2:*:*:volume/*"
+                  Effect: Allow
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - ec2.amazonaws.com
+            Action:
+            - sts:AssumeRole
+        Path: /
+        ManagedPolicyArns:
+          - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+          - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+          - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+          - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM
+
+    NodeSecurityGroup:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupDescription: Security group for all nodes in the cluster
+        VpcId: !GetAtt VPCStack.Outputs.VPCID
+        Tags:
+          - Key: Name
+            Value: !Sub "${AWS::StackName}-WorkerNodes-SG"
+          - Key: Component
+            Value: !Sub "${AWS::StackName}-NodeSG"
+          - Key: !Sub "kubernetes.io/cluster/${AWS::StackName}"
+            Value: 'owned'
+          - Key: KubernetesCluster
+            Value: !Sub "${AWS::StackName}"
+
+    ElasticSearchStack:
+      Condition: isCreateElasticSearch
+      Type: AWS::CloudFormation::Stack
+      DependsOn:
+        - VPCStack
+      Properties:
+        Tags:
+          - Key: Name
+            Value: !Sub "${AWS::StackName}"
+          - Key: Component
+            Value: Datahub-ElasticSearch
+        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${TemplateBucketKeyPrefix}/templates/nested/elasticsearch.yaml"
+        Parameters:
+          # ES stack params
+          VPCID: !GetAtt VPCStack.Outputs.VPCID
+          VPCCIDR: !Ref VPCCIDR
+          PrivateSubnet1: !GetAtt VPCStack.Outputs.PrivateSubnet1AID
+          PrivateSubnet2: !GetAtt VPCStack.Outputs.PrivateSubnet2AID
+          PrivateSubnet3: !GetAtt VPCStack.Outputs.PrivateSubnet3AID
+          NodeSecurityGroup: !Ref NodeSecurityGroup
+          ESDataNodeCount: !Ref ESDataNodeCount
+          ESInstanceType: !Ref ESInstanceType
+          ESVolumeSize: !Ref ESVolumeSize
+          ESMasterNodeCount: !Ref ESMasterNodeCount
+          ESMasterInstanceType: !Ref ESMasterInstanceType
+          ESDomainName: !Ref ESDomainName
+          ElasticsearchVersion: !Ref ElasticsearchVersion
+          ESMasterUserPassword:
+            Fn::Sub: "{{resolve:secretsmanager:${ESSecret}::password}}"
+
+    MySQLStack:
+      Condition: isCreateMySQL
+      Type: AWS::CloudFormation::Stack
+      DependsOn:
+        - VPCStack
+      Properties:
+        Tags:
+          - Key: Name
+            Value: !Sub "${AWS::StackName}"
+          - Key: Component
+            Value: Datahub-MySQL
+        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${TemplateBucketKeyPrefix}/templates/nested/mysql.yaml"
+        Parameters:
+          # ES stack params
+          AvailabilityZones: !Join [",", !Ref AvailabilityZones]
+          VPCID: !GetAtt VPCStack.Outputs.VPCID
+          VPCCIDR: !Ref VPCCIDR
+          DBSubnet1: !GetAtt VPCStack.Outputs.PrivateSubnet1AID
+          DBSubnet2: !GetAtt VPCStack.Outputs.PrivateSubnet2AID
+          DBSubnet3: !GetAtt VPCStack.Outputs.PrivateSubnet3AID
+          NodeSecurityGroup: !Ref NodeSecurityGroup
+          MasterUser:
+            Fn::Sub: "{{resolve:secretsmanager:${RDSSecret}::username}}"
+          MasterUserPassword:
+            Fn::Sub: "{{resolve:secretsmanager:${RDSSecret}::password}}"
+          DBClusterIdentifier: !Ref DBClusterIdentifier
+          DBInstanceClass: !Ref DBInstanceClass
+          EngineVersion: !Ref EngineVersion
+
+    MSKStack:
+      Condition: isCreateMSK
+      Type: AWS::CloudFormation::Stack
+      DependsOn:
+        - VPCStack
+      Properties:
+        Tags:
+          - Key: Name
+            Value: !Sub "${AWS::StackName}"
+          - Key: Component
+            Value: Datahub-MSK
+        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${TemplateBucketKeyPrefix}/templates/nested/msk.yaml"
+        Parameters:
+          # MSK stack params
+          VPCID: !GetAtt VPCStack.Outputs.VPCID
+          VPCCIDR: !Ref VPCCIDR
+          DBSubnet1: !GetAtt VPCStack.Outputs.PrivateSubnet1AID
+          DBSubnet2: !GetAtt VPCStack.Outputs.PrivateSubnet2AID
+          DBSubnet3: !GetAtt VPCStack.Outputs.PrivateSubnet3AID
+          NodeSecurityGroup: !Ref NodeSecurityGroup
+          MSKClusterName: !Ref MSKClusterName
+          MSKInstanceType: !Ref MSKInstanceType
+          KafkaVersion: !Ref KafkaVersion
+
+    EKSStack:
+      Condition: isCreateEKS
+      Type: AWS::CloudFormation::Stack
+      DependsOn:
+        - VPCStack
+      Properties:
+        Tags:
+          - Key: Name
+            Value: !Sub "${AWS::StackName}"
+          - Key: Component
+            Value: !Sub "${AWS::StackName}-Bastion"
+          - Key: KubernetesCluster
+            Value: !Sub "${AWS::StackName}"
+        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${TemplateBucketKeyPrefix}/templates/nested/eks.yaml"
+        Parameters:
+          # Bastion stack params
+          KeyPairName: !Ref KeyPairName
+          PublicSubnet1ID: !GetAtt VPCStack.Outputs.PublicSubnet1ID
+          PublicSubnet2ID: !GetAtt VPCStack.Outputs.PublicSubnet2ID
+          PublicSubnet3ID: !GetAtt VPCStack.Outputs.PublicSubnet3ID
+          PrivateSubnet1ID: !GetAtt VPCStack.Outputs.PrivateSubnet1AID
+          PrivateSubnet2ID: !GetAtt VPCStack.Outputs.PrivateSubnet2AID
+          PrivateSubnet3ID: !GetAtt VPCStack.Outputs.PrivateSubnet3AID
+          RemoteAccessCIDR: !Ref RemoteAccessCIDR
+          VPCID: !GetAtt VPCStack.Outputs.VPCID
+          BastionInstanceType: !Ref BastionInstanceType
+          MaxNumberOfBastionNodes: !Ref MaxNumberOfBastionNodes
+          MinNumberOfBastionNodes: !Ref MinNumberOfBastionNodes
+          DesiredNumberOfBastionNodes: !Ref DesiredNumberOfBastionNodes
+          # EKS Worker Node stack params
+          TemplateBucketName: !Ref TemplateBucketName
+          TemplateBucketKeyPrefix: !Ref TemplateBucketKeyPrefix
+          EC2LogGroup: !Ref EC2LogGroup
+          NodeSecurityGroup: !Ref NodeSecurityGroup
+          NodeInstanceRole: !Ref NodeInstanceRole
+          NodeInstanceRoleArn: !GetAtt NodeInstanceRole.Arn
+          NodeInstanceType: !Ref NodeInstanceType
+          MaxNumberOfNodes: !Ref MaxNumberOfNodes
+          MinNumberOfNodes: !Ref MinNumberOfNodes
+          DesiredNumberOfNodes: !Ref DesiredNumberOfNodes
+          EksMgmtIamRoleArn: !Ref EksMgmtIamRoleArn
+          EksExternalUserArn: !Ref EksExternalUserArn
+          EKSClusterName: !Sub "${AWS::StackName}"
+
+    IngressControllerStack:
+      Type: AWS::CloudFormation::Stack
+      DependsOn:
+        - EKSStack
+      Properties:
+        Tags:
+          - Key: Name
+            Value: !Sub "${AWS::StackName}"
+          - Key: Component
+            Value: !Sub "${AWS::StackName}-Admin"
+        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${TemplateBucketKeyPrefix}/templates/nested/ingress-controller.yaml"
+        Parameters:
+          VpcId: !GetAtt VPCStack.Outputs.VPCID
+          EksClusterName: !Sub "${AWS::StackName}"
+          ControllerHostNetwork: !Ref ControllerHostNetwork
+
+    AdminStack:
+      Type: AWS::CloudFormation::Stack
+      DependsOn: 
+          - IngressControllerStack
+          - MSKStack
+          - ElasticSearchStack
+          - MySQLStack
+      Properties:
+        Tags:
+          - Key: Name
+            Value: !Sub "${AWS::StackName}"
+          - Key: Component
+            Value: !Sub "${AWS::StackName}-Admin"
+        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${TemplateBucketKeyPrefix}/templates/nested/admin.yaml"
+        Parameters:
+          # Bastion stack params
+          KeyPairName: !Ref KeyPairName
+          PublicSubnet1ID: !GetAtt VPCStack.Outputs.PublicSubnet1ID
+          PublicSubnet2ID: !GetAtt VPCStack.Outputs.PublicSubnet2ID
+          PrivateSubnet1ID: !GetAtt VPCStack.Outputs.PrivateSubnet1AID
+          PrivateSubnet2ID: !GetAtt VPCStack.Outputs.PrivateSubnet2AID
+          RemoteAccessCIDR: !Ref RemoteAccessCIDR
+          VPCID: !GetAtt VPCStack.Outputs.VPCID
+          BastionInstanceRole: !GetAtt EKSStack.Outputs.BastionInstanceRole
+          BastionInstanceProfile: !GetAtt EKSStack.Outputs.BastionInstanceProfile
+          BastionInstanceType: !Ref BastionInstanceType
+          BastionSecurityGroup: !GetAtt EKSStack.Outputs.BastionSecurityGroup
+          NodeInstanceRoleArn: !GetAtt EKSStack.Outputs.NodeInstanceRoleArn
+          MaxNumberOfBastionNodes: !Ref MaxNumberOfBastionNodes
+          MinNumberOfBastionNodes: !Ref MinNumberOfBastionNodes
+          DesiredNumberOfBastionNodes: !Ref DesiredNumberOfBastionNodes
+          # EKS Worker Node stack params
+          TemplateBucketName: !Ref TemplateBucketName
+          TemplateBucketKeyPrefix: !Ref TemplateBucketKeyPrefix
+          EC2LogGroup: !Ref EC2LogGroup
+          EKSClusterName: !Sub "${AWS::StackName}"
+          K8sNamespace: !Ref K8sNamespace
+          # pass other stack info
+          DomainName: !Ref DomainName
+          MySQLEndpoint: !GetAtt MySQLStack.Outputs.ClusterEndpoint
+          ElasticSearchEndpoint: !GetAtt ElasticSearchStack.Outputs.DomainEndpoint
+          MSKClusterName: !Ref MSKClusterName
+          ElbCertArn: !Ref ElbCertArn
+          MasterUserPassword:
+            Fn::Sub: "{{resolve:secretsmanager:${RDSSecret}::password}}"
+          ESMasterUserPassword:
+            Fn::Sub: "{{resolve:secretsmanager:${ESSecret}::password}}"
+
+#    PrivateLinkStack:
+#      Type: AWS::CloudFormation::Stack
+#      DependsOn:
+#        - AdminStack
+#      Properties:
+#        Tags:
+#          - Key: Name
+#            Value: !Sub "${AWS::StackName}"
+#          - Key: Component
+#            Value: !Sub "${AWS::StackName}-PrivateLink"
+#        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${TemplateBucketKeyPrefix}/templates/nested/privatelink.yaml"
+
+Outputs:
+  # VPC stack
+  VPCID:
+    Value: !GetAtt VPCStack.Outputs.VPCID
+    Condition: isCreateVPC
+  RemoteAccessCIDR:
+    Value: !Ref RemoteAccessCIDR
+    Condition: isCreateEKS
+
+  # Bastion stack
+  BastionSubstackName:
+    Value: !GetAtt EKSStack.Outputs.SubstackName
+    Condition: isCreateEKS
+  BastionSecurityGroup:
+    Value: !GetAtt EKSStack.Outputs.BastionSecurityGroup
+    Condition: isCreateEKS
+  BastionLaunchConfiguration:
+    Value: !GetAtt EKSStack.Outputs.BastionLaunchConfiguration
+    Condition: isCreateEKS
+  BastionAutoScalingGroup:
+    Value: !GetAtt EKSStack.Outputs.BastionAutoScalingGroup
+    Condition: isCreateEKS
+  BastionInstanceRole:
+    Value: !GetAtt EKSStack.Outputs.BastionInstanceRole
+    Condition: isCreateEKS
+  BastionInstanceProfile:
+    Value: !GetAtt EKSStack.Outputs.BastionInstanceProfile
+    Condition: isCreateEKS
+  BastionInstanceRole:
+    Value: !GetAtt EKSStack.Outputs.BastionInstanceRole
+    Condition: isCreateEKS
+  EC2LogGroup:
+    Value: !Ref EC2LogGroup
+    Condition: isCreateEKS
+  BastionSecurityGroup:
+    Value: !GetAtt EKSStack.Outputs.BastionSecurityGroup
+    Condition: isCreateEKS
+
+  # ElasticSearch
+  DomainEndpoint:
+   Value: !GetAtt ElasticSearchStack.Outputs.DomainEndpoint
+   Condition: isCreateElasticSearch
+  
+
+  # EKS Cluster
+  ControlPlaneSecurityGroup:
+    Value: !GetAtt EKSStack.Outputs.ControlPlaneSecurityGroup
+    Condition: isCreateEKS
+  EksClusterName:
+    Value: !GetAtt EKSStack.Outputs.EksClusterName
+    Condition: isCreateEKS
+  EksServiceRoleArn:
+    Value: !GetAtt EKSStack.Outputs.EksServiceRoleArn
+    Condition: isCreateEKS
+  NodeInstanceRoleArn:
+    Value: !GetAtt NodeInstanceRole.Arn
+    Condition: isCreateEKS
+  NodeSecurityGroupId:
+    Value: !Ref NodeSecurityGroup
+    Condition: isCreateEKS
+  AvailabilityZones:
+    Value: !Join [",", !Ref AvailabilityZones]
+    Condition: isCreateVPC

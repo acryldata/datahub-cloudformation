@@ -1,0 +1,35 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: VPC Endpoint service stack.
+
+Parameters:
+  EndpointServiceNetworkLoadBalancer:
+    Type: String
+    Default: '{{resolve:ssm:/datahub/admin/nlbarn}}'
+    #Type: 'AWS::SSM::Parameter::Value<String>'
+    #Default: '/datahub/admin/nlbarn'
+
+Resources:
+  EndpointService:
+    Type: AWS::EC2::VPCEndpointService
+#    CreationPolicy: 
+#      ResourceSignal: 1
+#      Timeout: PT10M # Specify the time here
+    Properties:
+      AcceptanceRequired: False
+      NetworkLoadBalancerArns:
+        - !Ref EndpointServiceNetworkLoadBalancer
+
+  EndpointServicePermissions:
+    Type: AWS::EC2::VPCEndpointServicePermissions
+    Properties:
+      AllowedPrincipals:
+        - arn:aws:iam::795586375822:root
+      ServiceId: !Ref EndpointService
+
+Outputs:
+  SubstackName:
+    Description: The privatelink stack name
+    Value: !Sub "${AWS::StackName}"
+  VPCEndpointServiceID:
+      Description: 'VPC Endpoint Service'
+      Value: !Ref EndpointService
