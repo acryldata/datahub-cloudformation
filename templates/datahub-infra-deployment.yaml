@@ -447,6 +447,7 @@ Resources:
             Description: 'Role for ES to access resources in my VPC'
 
     RDSSecret:
+      Condition: isCreateMySQL
       Type: AWS::SecretsManager::Secret
       Properties:
         Description: Secrets for RDS
@@ -461,6 +462,7 @@ Resources:
             Value: "true"
 
     ESSecret:
+      Condition: isCreateElasticSearch
       Type: AWS::SecretsManager::Secret
       Properties:
         Description: Secrets for RDS
@@ -564,6 +566,7 @@ Resources:
       Type: AWS::CloudFormation::Stack
       DependsOn:
         - VPCStack
+        - ESServiceRole
       Properties:
         Tags:
           - Key: Name
@@ -750,17 +753,6 @@ Resources:
           ESMasterUserPassword:
             Fn::Sub: "{{resolve:secretsmanager:${ESSecret}::password}}"
 
-#    PrivateLinkStack:
-#      Type: AWS::CloudFormation::Stack
-#      DependsOn:
-#        - AdminStack
-#      Properties:
-#        Tags:
-#          - Key: Name
-#            Value: !Sub "${AWS::StackName}"
-#          - Key: Component
-#            Value: !Sub "${AWS::StackName}-PrivateLink"
-#        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${TemplateBucketKeyPrefix}/templates/nested/privatelink.yaml"
 
 Outputs:
   # VPC stack
