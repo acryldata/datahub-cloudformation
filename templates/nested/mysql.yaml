@@ -1,0 +1,206 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: MySQL stack that creates Aurora RDS
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: MySQL Stack Configuration
+        Parameters:
+          - AvailabilityZones
+          - VPCID
+          - VPCCIDR
+          - DBSubnet1
+          - DBSubnet2
+          - DBSubnet3
+          - DBClusterIdentifier
+          - DBInstanceClass
+          - EngineVersion
+          - MasterUser
+          - MasterUserPassword
+
+    ParameterLabels:
+      AvailabilityZones:
+        default: Availability Zones
+      NodeSecurityGroup:
+        default: The Node Security Group ID to use for Aurora RDS
+      DBSubnet1:
+        default: The ID of Private Subnet 1
+      DBSubnet2:
+        default: The ID of Private Subnet 2
+      DBSubnet3:
+        default: The ID of Private Subnet 3
+      VPCID:
+        default: VPC ID
+      VPCCIDR:
+        default: VPC CIDR
+      DBClusterIdentifier:
+        default: Aurora Cluster Identifier
+      DBInstanceClass:
+        default: Aurora Instance Type
+      EngineVersion:
+        default: Aurora Engine Version
+      MasterUser:
+        default: Aurora admin account
+      MasterUserPassword:
+        default: Aurora admin password
+
+Parameters:
+  AvailabilityZones:
+    Description: 'List of Availability Zones to use for the subnets in the VPC. Note: The logical order is preserved.'
+    Type: List<AWS::EC2::AvailabilityZone::Name>
+  NodeSecurityGroup:
+    Description: ID for the VPC, This will be used to get the node security group
+    Type: AWS::EC2::SecurityGroup::Id
+  DBSubnet1:
+    Description: ID of Private Subnet 1
+    Type: AWS::EC2::Subnet::Id
+  DBSubnet2:
+    Description: ID of Private Subnet 2
+    Type: AWS::EC2::Subnet::Id
+  DBSubnet3:
+    Description: ID of Private Subnet 3
+    Type: AWS::EC2::Subnet::Id
+  VPCID:
+    Description: ID for the VPC
+    Type: AWS::EC2::VPC::Id
+  VPCCIDR:
+    AllowedPattern: "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$"
+    ConstraintDescription: "CIDR block parameter must be in the form x.x.x.x/16-28"
+    Default: "10.0.0.0/16"
+    Description: "CIDR block for the VPC"
+    Type: "String"
+  DBClusterIdentifier:
+    Description: "The Aurora Cluster Identifier"
+    Type: String
+    Default: datahub
+  DBInstanceClass:
+    AllowedValues:
+      - db.t3.small
+      - db.t3.large
+    ConstraintDescription: Must contain valid RDS instance type
+    Default: db.t3.small
+    Description: instance type for the Amazon Aurora
+    Type: String
+  EngineVersion:
+    AllowedValues:
+      - 5.7.mysql_aurora.2.09.1
+    Default: 5.7.mysql_aurora.2.09.1
+    Description: Aurora Engine Version
+    Type: String
+  MasterUser:
+    Description: "The Aurora MySQL RDS admin account"
+    Type: String
+    Default: admin
+  MasterUserPassword:
+    Description: "The Aurora MySQL RDS admin account password"
+    NoEcho: true
+    Type: String
+    MinLength: 6
+    MaxLength: 41
+
+
+Resources:
+    RDSSecurityGroup:
+        Type: "AWS::EC2::SecurityGroup"
+        Properties:
+            GroupDescription: "Allow inbound traffic to Aurora from VPC CIDR"
+            GroupName: !Sub "${DBClusterIdentifier}-aurora-sg"
+            VpcId: !Ref VPCID
+            SecurityGroupIngress:
+              -
+                CidrIp: !Ref VPCCIDR
+                FromPort: 3306
+                IpProtocol: "tcp"
+                ToPort: 3306
+
+    RDSSecurityGroupIngress01:
+        Type: "AWS::EC2::SecurityGroupIngress"
+        Properties:
+            GroupId: !Ref RDSSecurityGroup
+            SourceSecurityGroupId: !Ref NodeSecurityGroup
+            SourceSecurityGroupOwnerId: !Ref AWS::AccountId
+            FromPort: 3306
+            IpProtocol: "tcp"
+            ToPort: 3306
+
+    RDSDBCluster:
+        Type: "AWS::RDS::DBCluster"
+        DependsOn: RDSSecurityGroup
+        Properties:
+            AvailabilityZones:
+              - !Select ['0', !Ref 'AvailabilityZones']
+              - !Select ['1', !Ref 'AvailabilityZones']
+              - !Select ['2', !Ref 'AvailabilityZones']
+            BackupRetentionPeriod: 8
+            DBClusterIdentifier: !Ref DBClusterIdentifier
+            DBClusterParameterGroupName: "default.aurora-mysql5.7"
+            DBSubnetGroupName: !Ref RDSDBSubnetGroup
+            Engine: "aurora-mysql"
+            Port: 3306
+            MasterUsername: !Ref MasterUser
+            MasterUserPassword: !Ref MasterUserPassword
+            PreferredBackupWindow: "02:00-03:00"
+            PreferredMaintenanceWindow: "sun:05:00-sun:06:00"
+            VpcSecurityGroupIds:
+              - !Ref RDSSecurityGroup
+            StorageEncrypted: true
+            EngineVersion: !Ref EngineVersion
+            EnableIAMDatabaseAuthentication: true
+            EnableCloudwatchLogsExports:
+              - "error"
+              - "general"
+              - "slowquery"
+            EngineMode: "provisioned"
+            DeletionProtection: false
+            EnableHttpEndpoint: false
+            Tags:
+              -
+                Key: "CloudFormation"
+                Value: "true"
+              -
+                Key: "Environment"
+                Value: !Ref DBClusterIdentifier
+
+    RDSDBInstance:
+        Type: "AWS::RDS::DBInstance"
+        DependsOn: RDSDBCluster
+        Properties:
+            DBInstanceIdentifier: !Sub "${DBClusterIdentifier}-1"
+            DBInstanceClass: "db.t3.small"
+            Engine: "aurora-mysql"
+            AvailabilityZone: !Select ['0', !Ref 'AvailabilityZones']
+            PubliclyAccessible: false
+            DBClusterIdentifier: !Ref RDSDBCluster
+            DBSubnetGroupName: !Ref RDSDBSubnetGroup
+            DBParameterGroupName: "default.aurora-mysql5.7"
+            Tags:
+              -
+                Key: "CloudFormation"
+                Value: "true"
+              -
+                Key: "Environment"
+                Value: !Sub "${DBClusterIdentifier}"
+
+    RDSDBSubnetGroup:
+        Type: "AWS::RDS::DBSubnetGroup"
+        Properties:
+            DBSubnetGroupDescription: !Sub "For Aurora cluster ${DBClusterIdentifier}"
+            DBSubnetGroupName: !Ref DBClusterIdentifier
+            SubnetIds:
+              - !Ref DBSubnet1
+              - !Ref DBSubnet2
+              - !Ref DBSubnet3
+
+    RDSEndpointSSM:
+        Type: AWS::SSM::Parameter
+        Properties:
+          Description: Aurora RDS Endpoint
+          Name: '/datahub/mysql/endpoint'
+          Type: String
+          Value: !GetAtt 'RDSDBCluster.Endpoint.Address'
+
+Outputs:
+  ClusterEndpoint:
+      Description: 'Aurora Cluster/Writer Endpoint'
+      Value: !GetAtt 'RDSDBCluster.Endpoint.Address'

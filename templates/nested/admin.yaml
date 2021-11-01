@@ -1,0 +1,552 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Admin Stack that deploys apps to EKS
+
+Metadata:
+    AWS::CloudFormation::Interface:
+      ParameterGroups:
+        - Label:
+            default: Cluster Configuration
+          Parameters:
+            - EKSClusterName
+            - K8sNamespace
+            - TemplateBucketName
+            - TemplateBucketKeyPrefix
+        - Label:
+            default: Provision Stack Configuration
+          Parameters:
+            - VPCID
+            - PrivateSubnet1ID
+            - PrivateSubnet2ID
+            - PublicSubnet1ID
+            - PublicSubnet2ID
+            - EC2LogGroup
+            - ProvisionInstanceType
+
+      ParameterLabels:
+        TemplateBucketName:
+          default: The name of the S3 bucket that holds the templates
+        TemplateBucketKeyPrefix:
+          default: The Key prefix for the templates in the S3 template bucket
+        VPCID:
+          default: The ID of the VPC to deploy the Provision and EKS Cluster into
+        PrivateSubnet1ID:
+          default: The ID of the first private subnet to deploy EKS Workers into
+        PrivateSubnet2ID:
+          default: The ID of the second private subnet to deploy EKS Workers into
+        PublicSubnet1ID:
+          default: The ID of the first public subet to deploy EKS into
+        PublicSubnet2ID:
+          default: The ID of the second public subnet to deploy EKS into
+        EC2LogGroup:
+          default: The provision log group name
+        ProvisionInstanceType:
+          default: The instance type to deploy Provision to
+        EKSClusterName:
+          default: The EKS cluster name
+        K8sNamespace:
+          default: The namespace in EKS to deploy kots and datahub app
+
+Parameters:
+    TemplateBucketName:
+      AllowedPattern: "^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$"
+      ConstraintDescription: "Bucket name can include numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen (-)."
+      Description: "S3 bucket name that contains the CFN templates (VPC, Provision etc). This string can include numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen (-)."
+      Type: "String"
+    TemplateBucketKeyPrefix:
+      AllowedPattern: "^[0-9a-zA-Z-/]*$"
+      ConstraintDescription: "Template bucket key prefix can include numbers, lowercase letters, uppercase letters, hyphens (-), and forward slash (/)."
+      Type: "String"
+    VPCID:
+      Description: "ID for the VPC"
+      Type: "AWS::EC2::VPC::Id"
+    PublicSubnet1ID:
+      Description: "ID of Public Subnet 1"
+      Type: "AWS::EC2::Subnet::Id"
+    PublicSubnet2ID:
+      Description: "ID of Public Subnet 2"
+      Type: "AWS::EC2::Subnet::Id"
+    PrivateSubnet1ID:
+      Description: "ID of Private Subnet 1"
+      Type: "AWS::EC2::Subnet::Id"
+    PrivateSubnet2ID:
+      Description: "ID of Private Subnet 2"
+      Type: "AWS::EC2::Subnet::Id"
+    EC2LogGroup:
+      Description: The provision log group name
+      Type: "String"
+    ProvisionInstanceType:
+      Type: "String"
+      Description: "The type of EC2 instance to be launched for Provision Host"
+      AllowedValues:
+        # Add more instance types if needed
+        - t2.micro
+        - t2.medium
+        - t2.large
+      ConstraintDescription: "Must contain a valid instance type"
+    EKSClusterName:
+      Type: String
+      Description: The name of the eks cluster
+    ProvisionSecurityGroup:
+      Type: String
+    ProvisionInstanceRole:
+      Type: String
+    ProvisionInstanceProfile:
+      Type: String
+    NodeInstanceRoleArn:
+      Type: String
+    K8sNamespace:
+      AllowedPattern: ".+"
+      ConstraintDescription: The K8s namespace can not be empty
+      Type: String
+      Description: The namespace in EKS to deploy kots and datahub app
+      Default: "datahub"
+    EKSProvisionAutoScalingGroup:
+      Type: String
+    DomainName:
+      Type: String
+    MySQLEndpoint:
+      Type: String
+    ElasticSearchEndpoint:
+      Type: String
+    MSKClusterName: 
+      Type: String
+    ElbCertArn:
+      Type: String
+    Application:
+      Type: String
+    ApplicationReleaseChannel:
+      Type: String
+    MasterUserPassword:
+      Type: String
+    ESMasterUserPassword:
+      Type: String
+
+
+Mappings:
+  # Use Amazon 2 Linux
+  ProvisionLatestAmiRegionMap:
+    us-west-2:
+      AmiId: ami-0873b46c45c11058d
+    us-west-1:
+      AmiId: ami-05655c267c89566dd
+    us-east-1:
+      AmiId: ami-02354e95b39ca8dec
+    us-east-2:
+      AmiId: ami-07c8bc5c1ce9598c3
+    eu-central-1:
+      AmiId: ami-0c115dbd34c69a004
+    eu-west-1:
+      AmiId: ami-07d9160fa81ccffb5
+
+Resources:
+
+  AdminProvisionAutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      LaunchConfigurationName: !Ref AdminProvisionLaunchConfiguration
+      VPCZoneIdentifier:
+        - !Ref PublicSubnet1ID
+        - !Ref PublicSubnet2ID
+      MinSize: 1
+      MaxSize: 1
+      Cooldown: "300"
+      DesiredCapacity: 1
+      Tags:
+        - Key: Name
+          Value: !Sub "${EKSClusterName}-admin-provision-node"
+          PropagateAtLaunch: true
+        - Key: Component
+          Value: !Sub "${EKSClusterName}-Provision-AutoScaling-Group"
+          PropagateAtLaunch: true
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT30M
+
+  AdminProvisionLaunchConfiguration:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Metadata:
+      AWS::CloudFormation::Authentication:
+        S3AccessCreds:
+          type: S3
+          roleName: !Ref ProvisionInstanceRole
+          buckets: !Ref TemplateBucketName
+      AWS::CloudFormation::Init:
+        config:
+          packages:
+            yum:
+              awslogs: []
+          files:
+            '/etc/awslogs/awscli.conf':
+              content: !Sub |
+                [default]
+                region = ${AWS::Region}
+                [plugins]
+                cwlogs = cwlogs
+              mode: '000644'
+              owner: root
+              group: root
+            '/etc/awslogs/awslogs.conf':
+              content: !Sub |
+                [general]
+                state_file = /var/lib/awslogs/agent-state
+                [/var/log/provision/provision.log]
+                file = /var/log/provision/provision.log
+                datetime_format = %b %d %H:%M:%S
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/provision/provision.log
+                log_group_name = ${EC2LogGroup}
+                [/var/log/dmesg]
+                file = /var/log/dmesg
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/dmesg
+                log_group_name = ${EC2LogGroup}
+                [/var/log/messages]
+                datetime_format = %b %d %H:%M:%S
+                file = /var/log/messages
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/messages
+                log_group_name = ${EC2LogGroup}
+                [/var/log/secure]
+                datetime_format = %b %d %H:%M:%S
+                file = /var/log/secure
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/secure
+                log_group_name = ${EC2LogGroup}
+                [/var/log/audit/audit.log]
+                datetime_format =
+                file = /var/log/audit/audit.log
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/audit/audit.log
+                log_group_name = ${EC2LogGroup}
+                [/var/log/cron]
+                datetime_format = %b %d %H:%M:%S
+                file = /var/log/cron
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/cron
+                log_group_name = ${EC2LogGroup}
+                [/var/log/cfn-init.log]
+                datetime_format = %Y-%m-%d %H:%M:%S
+                file = /var/log/cfn-init.log
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/cfn-init.log
+                log_group_name = ${EC2LogGroup}
+                [/var/log/cfn-hup.log]
+                datetime_format = %Y-%m-%d %H:%M:%S
+                file = /var/log/cfn-hup.log
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/cfn-hup.log
+                log_group_name = ${EC2LogGroup}
+                [/var/log/cfn-init-cmd.log]
+                datetime_format = %Y-%m-%d %H:%M:%S
+                file = /var/log/cfn-init-cmd.log
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/cfn-init-cmd.log
+                log_group_name = ${EC2LogGroup}
+                [/var/log/cloud-init-output.log]
+                file = /var/log/cloud-init-output.log
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/cloud-init-output.log
+                log_group_name = ${EC2LogGroup}
+                [/var/log/amazon/ssm/amazon-ssm-agent.log]
+                datetime_format = %Y-%m-%d %H:%M:%S
+                file = /var/log/amazon/ssm/amazon-ssm-agent.log
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/amazon/ssm/amazon-ssm-agent.log
+                log_group_name = ${EC2LogGroup}
+                [/var/log/amazon/ssm/errors.log]
+                datetime_format = %Y-%m-%d %H:%M:%S
+                file = /var/log/amazon/ssm/errors.log
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/amazon/ssm/errors.log
+                log_group_name = ${EC2LogGroup}
+                [/var/log/maillog]
+                datetime_format = %b %d %H:%M:%S
+                file = /var/log/maillog
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/maillog
+                log_group_name = ${EC2LogGroup}
+                [/var/log/yum.log]
+                datetime_format = %b %d %H:%M:%S
+                file = /var/log/yum.log
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/yum.log
+                log_group_name = ${EC2LogGroup}
+                [/var/log/awslogs.log]
+                datetime_format = %Y-%m-%d %H:%M:%S
+                file = /var/log/awslogs.log
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/awslogs.log
+                log_group_name = ${EC2LogGroup}
+                [/var/log/boot.log]
+                file = /var/log/boot.log
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/boot.log
+                log_group_name = ${EC2LogGroup}
+                [/var/log/cfn-wire.log]
+                datetime_format = %Y-%m-%d %H:%M:%S
+                file = /var/log/cfn-wire.log
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/cfn-wire.log
+                log_group_name = ${EC2LogGroup}
+              mode: '000644'
+              owner: root
+              group: root
+            /tmp/python-jwt.tar.gz:
+              source: !Sub "https://s3.${AWS::Region}.amazonaws.com/${TemplateBucketName}/${TemplateBucketKeyPrefix}/scripts/python-jwt.tar.gz"
+              mode: "000550"
+              owner: root
+              group: root
+              authentication: S3AccessCreds
+            /tmp/license.yaml:
+              source: !Sub "https://s3.${AWS::Region}.amazonaws.com/${TemplateBucketName}/${TemplateBucketKeyPrefix}/license/license.yaml"
+              mode: "000550"
+              owner: root
+              group: root
+            /tmp/admin_bootstrap.sh:
+              content: !Sub |
+                #!/bin/bash
+                set -x
+                echo "Checking whether cluster exists..."
+                aws eks describe-cluster --region ${AWS::Region} --name ${EKSClusterName} &> /dev/null
+                if [ $? -eq 0 ]; then
+                  echo Updating kubeconfig file...
+                  ENDPOINT=$(aws eks describe-cluster --region ${AWS::Region}  --name ${EKSClusterName} --query cluster.endpoint --output text)
+                  CERT_DATA=$(aws eks describe-cluster --region ${AWS::Region}  --name ${EKSClusterName} --query cluster.certificateAuthority.data --output text)
+                  sed -i s,ENDPOINT,$ENDPOINT,g /home/ec2-user/.kube/config
+                  sed -i s,CERTIFICATE_DATA,$CERT_DATA,g /home/ec2-user/.kube/config
+                  export KUBECONFIG=/home/ec2-user/.kube/config
+                  chmod 600 /home/ec2-user/.kube/config
+                fi
+                echo Install Ingress Controller...
+                curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+                mv /tmp/eksctl /usr/local/bin
+                eksctl utils associate-iam-oidc-provider --cluster ${EKSClusterName} --approve
+                helm repo add eks https://aws.github.io/eks-charts
+                helm repo update
+                echo "        serviceAccount:" > values.yaml
+                echo "          annotations:" >> values.yaml
+                echo "            eks.amazonaws.com/role-arn: arn:aws:iam::${AWS::AccountId}:role/datahub-aws-load-balancer-controller" >> values.yaml
+                helm install aws-load-balancer-controller eks/aws-load-balancer-controller --set region=${AWS::Region} -n kube-system --set clusterName=${EKSClusterName} --set serviceAccount.name=datahub-aws-load-balancer-controller --set image.tag=v2.2.0 --version 1.2.7 -f values.yaml
+                echo prepare configvalues.yaml...
+                ZOOKEEPER_CONNECT=$(aws kafka --region ${AWS::Region} list-clusters --cluster-name-filter ${MSKClusterName} --no-paginate --query 'ClusterInfoList[0].ZookeeperConnectString' --output text)
+                CLUSTER_ARN=$(aws kafka --region ${AWS::Region} list-clusters --cluster-name-filter ${MSKClusterName} --no-paginate --query 'ClusterInfoList[0].ClusterArn' --output text)
+                BOOTSTRAP_BROKERS=$(aws kafka --region ${AWS::Region} get-bootstrap-brokers --cluster-arn $CLUSTER_ARN --no-paginate --query 'BootstrapBrokerString' --output text)
+                sed -i "s|BOOTSTRAP_BROKERS|$BOOTSTRAP_BROKERS|g" /home/ec2-user/configvalues.yaml
+                sed -i "s|ZOOKEEPER_CONNECT|$ZOOKEEPER_CONNECT|g" /home/ec2-user/configvalues.yaml
+                parameter='/datahub/msk/bootstrap_brokers'
+                aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$BOOTSTRAP_BROKERS" --overwrite --no-paginate
+                parameter='/datahub/msk/zookeeper_connect'
+                aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$ZOOKEEPER_CONNECT" --overwrite --no-paginate
+                echo Creating namespace...
+                kubectl create ns ${K8sNamespace}
+                echo Generate UUID...
+                aws kms generate-random --region ${AWS::Region} --number-of-bytes 32  --output text --query Plaintext>uuid_secret
+                aws kms generate-random --region ${AWS::Region} --number-of-bytes 16  --output text --query Plaintext>datahub-password
+                DATAHUB_PASSWORD=$(cat datahub-password)
+                aws secretsmanager create-secret --region ${AWS::Region} --name "/datahub/admin/password" --secret-string "$DATAHUB_PASSWORD" --description "datahub: Admin password"
+                tar xzvf /tmp/python-jwt.tar.gz
+                cd python-jwt
+                pip3 install -r requirements.txt
+                export API_KEY_SECRET=$(cat /uuid_secret)
+                python3 create_jwt.py>apikey
+                APIKEY=$(cat apikey)
+                aws secretsmanager create-secret --region ${AWS::Region} --name "/datahub/admin/apikey" --secret-string "$APIKEY" --description "datahub: Admin Apikey" 
+                cd ..
+                echo prepare secrets...
+                kubectl get secret/play-secret -n ${K8sNamespace} &> /dev/null
+                if [ $? -gt 0 ]; then
+                  echo "create secret uuid_secret in namespace: ${K8sNamespace}"
+                  kubectl create secret generic play-secret --from-file=uuid_secret=uuid_secret --namespace ${K8sNamespace}
+                fi
+                kubectl get secret/apikey -n ${K8sNamespace} &> /dev/null
+                if [ $? -gt 0 ]; then
+                  echo "create secret apikey in namespace: ${K8sNamespace}"
+                  kubectl create secret generic apikey --from-file=apikey=apikey --namespace ${K8sNamespace}
+                fi
+                kubectl create secret generic datahub-secrets --from-file=datahub-password=datahub-password --namespace ${K8sNamespace}
+                echo -n "${MasterUserPassword}" > mysql-password
+                echo -n "${ESMasterUserPassword}" > elasticsearch-password
+       
+                kubectl create secret generic mysql-secrets --from-file=mysql-password=mysql-password --namespace ${K8sNamespace}
+                kubectl create secret generic elasticsearch-secrets --from-file=elasticsearch-password=elasticsearch-password --namespace ${K8sNamespace}
+                echo Install kots...
+                kubectl kots install ${Application}/${ApplicationReleaseChannel} -n ${K8sNamespace} --shared-password Passw0rd --license-file /tmp/license.yaml --config-values /home/ec2-user/configvalues.yaml --wait-duration 120s --port-forward=false
+                echo Install kotsadmin svc...
+                kubectl apply -f /home/ec2-user/kotsadm-svc.yaml
+                echo Waiting datahub-kotsadm to be Active...
+                aws elbv2 describe-load-balancers --region ${AWS::Region} --names datahub-kotsadm
+                while [ $? -gt 0 ]; do
+                  echo datahub-kotsadm is still creating, sleeping for 30 seconds...
+                  sleep 30
+                  aws elbv2 describe-load-balancers --region ${AWS::Region} --names datahub-kotsadm
+                done
+                STATUS=$(aws elbv2 describe-load-balancers --region ${AWS::Region} --names datahub-kotsadm --query LoadBalancers[0].State.Code --output text --no-paginate)
+                while [ $STATUS != 'active' ]; do
+                  echo datahub-kotsadm is still provisioning, sleeping for 10 seconds...
+                  sleep 10
+                  STATUS=$(aws elbv2 describe-load-balancers --region ${AWS::Region} --names datahub-kotsadm --query LoadBalancers[0].State.Code --output text --no-paginate)
+                done
+                NLBARN=$(aws elbv2 describe-load-balancers --region ${AWS::Region} --names datahub-kotsadm --query LoadBalancers[0].LoadBalancerArn --output text --no-paginate)
+                parameter='/datahub/admin/nlbarn'
+                aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$NLBARN" --overwrite --no-paginate
+                #ALBARN=$(aws elbv2 describe-load-balancers --region ${AWS::Region} --names datahub-kotsadm --query LoadBalancers[0].LoadBalancerArn --output text --no-paginate)
+                #parameter='/datahub/apigateway/albarn'
+                #aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$ALBARN" --overwrite --no-paginate
+              mode: "000750"
+              owner: root
+              group: root
+            /home/ec2-user/.kube/config:
+              content: !Sub |
+                apiVersion: v1
+                clusters:
+                - cluster:
+                    server: ENDPOINT
+                    certificate-authority-data: CERTIFICATE_DATA
+                  name: kubernetes
+                contexts:
+                - context:
+                    cluster: kubernetes
+                    user: aws
+                  name: aws
+                current-context: aws
+                kind: Config
+                preferences: {}
+                users:
+                - name: aws
+                  user:
+                    exec:
+                      apiVersion: client.authentication.k8s.io/v1alpha1
+                      command: aws-iam-authenticator
+                      args:
+                        - token
+                        - -i
+                        - ${EKSClusterName}
+              mode: "000666"
+              owner: ec2-user
+              group: ec2-user
+            /home/ec2-user/kotsadm-svc.yaml:
+              content: !Sub |
+                apiVersion: v1
+                kind: Service
+                metadata:
+                  annotations:
+                    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: tcp
+                    service.beta.kubernetes.io/aws-load-balancer-name: datahub-kotsadm
+                    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+                    service.beta.kubernetes.io/aws-load-balancer-scheme: internal
+                    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: "${ElbCertArn}"
+                    service.beta.kubernetes.io/aws-load-balancer-type: external
+                  labels:
+                    kots.io/kotsadm: "true"
+                  name: kotsadm-nlb
+                  namespace: datahub
+                spec:
+                  ports:
+                  - name: https
+                    port: 443
+                    targetPort: 3000
+                  selector:
+                    app: kotsadm
+                  sessionAffinity: None
+                  type: LoadBalancer
+              mode: "000666"
+              owner: ec2-user
+              group: ec2-user
+            /home/ec2-user/configvalues.yaml:
+              content: !Sub |
+                apiVersion: kots.io/v1beta1
+                kind: ConfigValues
+                metadata:
+                  name: datahub_app
+                spec:
+                  values:
+                    domain:
+                      repeatableItem: service_port
+                      value: "${DomainName}"
+                    lr_order:
+                      repeatableItem: service_port
+                      value: "200"
+                    mysql_endpoint:
+                      repeatableItem: service_port
+                      value: "${MySQLEndpoint}"
+                    elasticsearch_endpoint:
+                      repeatableItem: service_port
+                      value: "${ElasticSearchEndpoint}"
+                    bootstrap_brokers:
+                      repeatableItem: service_port
+                      value: BOOTSTRAP_BROKERS
+                    zookeeper_connect:
+                      repeatableItem: service_port
+                      value: ZOOKEEPER_CONNECT
+                    certificate_arn:
+                      repeatableItem: service_port
+                      value: "${ElbCertArn}"
+              mode: "000666"
+              owner: ec2-user
+              group: ec2-user
+          commands:
+            00_eks-bootstrap:
+              command: "./tmp/admin_bootstrap.sh |tee -a /tmp/admin_bootstrap.output 2>&1"
+            01_create_state_directory:
+              command: mkdir -p /var/awslogs/state
+            02_start_awslogsd:
+              command: systemctl start awslogsd
+            03_enable_awslogsd:
+              command: systemctl enable awslogsd
+
+    Properties:
+      AssociatePublicIpAddress: true
+      PlacementTenancy: default
+      IamInstanceProfile: !Ref ProvisionInstanceProfile
+      ImageId: !FindInMap [ProvisionLatestAmiRegionMap, !Ref "AWS::Region", AmiId]
+      SecurityGroups:
+        - !Ref ProvisionSecurityGroup
+      InstanceType: !Ref ProvisionInstanceType
+      UserData:
+        Fn::Base64: !Sub |
+            #!/bin/bash
+            export PATH=$PATH:/usr/local/bin:/opt/aws/bin
+            yum install -y https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm
+            yum install -y aws-cfn-bootstrap jq
+            CLOUDWATCHGROUP=${EC2LogGroup}
+            curl -LO https://dl.k8s.io/release/v1.20.2/bin/linux/amd64/kubectl
+            chmod +x ./kubectl
+            mv kubectl /usr/local/bin
+            kubectl version --short --client
+            curl -o aws-iam-authenticator https://amazon-eks.s3.us-west-2.amazonaws.com/1.21.2/2021-07-05/bin/linux/amd64/aws-iam-authenticator
+            chmod +x ./aws-iam-authenticator
+            mv aws-iam-authenticator /usr/local/bin
+            aws-iam-authenticator version
+            curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+            chmod +x ./get_helm.sh
+            ./get_helm.sh
+            helm version --client
+            wget https://github.com/replicatedhq/kots/releases/download/v1.55.0/kots_linux_amd64.tar.gz
+            tar xzvf kots_linux_amd64.tar.gz
+            mv -f kots /usr/local/bin/kubectl-kots
+            cfn-init -v --stack ${AWS::StackName} --resource AdminProvisionLaunchConfiguration --region ${AWS::Region}
+            cfn-signal -e $? --stack ${AWS::StackName} --resource AdminProvisionAutoScalingGroup --region ${AWS::Region}
+            #echo scale down admin provision ASG
+            #INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+            #ASG=$(aws autoscaling describe-auto-scaling-instances --region ${AWS::Region} --output text --query=AutoScalingInstances[].AutoScalingGroupName --instance-ids=$INSTANCE_ID)
+            #echo $ASG
+            #nohup aws autoscaling --region ${AWS::Region} update-auto-scaling-group --auto-scaling-group-name $ASG --desired-capacity 0 --min-size 0 --max-size 0 &>/dev/null &
+
+Outputs:
+  DatahubAppUrl:
+    Description: Datahub Application Url
+    Value: !Sub "https://${DomainName}"
+  DatahubAppCredential:
+    Description: Datahub Application Credential
+    Value: "Check Secret Manager: /datahub/admin/password"
+  DatahubAlbArn:
+    Description: Datahub Api-Gateway Alb Arn
+    Value: "Check Parameter Store: /datahub//albarn"
+  DatahubApiKey:
+    Description: Datahub APIKEY
+    Value: "Check Secret Manager: /datahub/admin/apikey"
+  AdminNlbArn:
+    Description: Datahub release Admin Nlb Arn
+    Value: "Check Parameter Store: /datahub/admin/nlbarn"
+  AuroraRDSEndpoint:
+    Description: Aurora RDS endpoint
+    Value: "Check Parameter Store: /datahub/mysql/endpoint"
+  AuroraRDSCredential:
+    Description: Aurora RDS credential
+    Value: "Check Secret Manager: /datahub/mysql/password"
+  ElasticSearchEndpoint:
+    Description: ElasticSearch endpoint
+    Value: "Check Parameter Store: /datahub/elasticsearch/endpoint"
+  ElasticSearchCredential:
+    Description: ElasticSearch credential
+    Value: "Check Secret Manager: /datahub/elasticsearch/password"
+  MSKZookeepers:
+    Description: MSK zookeepers
+    Value: "Check Parameter Store: /datahub/msk/zookeeper_connect"
+  MSKBrokers:
+    Description: MSK boostrap brokers
+    Value: "Check Parameter Store: /datahub/msk/bootstrap_broker"
+ 

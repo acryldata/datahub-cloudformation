@@ -1,0 +1,30 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: PrivateLink Stack that creates VPC Endpoint service
+
+Parameters:
+  EndpointServiceNetworkLoadBalancer:
+    Type: String
+    Default: '{{resolve:ssm:/datahub/admin/nlbarn}}'
+
+Resources:
+  EndpointService:
+    Type: AWS::EC2::VPCEndpointService
+    Properties:
+      AcceptanceRequired: True
+      NetworkLoadBalancerArns:
+        - !Ref EndpointServiceNetworkLoadBalancer
+
+  EndpointServicePermissions:
+    Type: AWS::EC2::VPCEndpointServicePermissions
+    Properties:
+      AllowedPrincipals:
+        - arn:aws:iam::795586375822:root #795586375822 is Acryl's AWS account ID
+      ServiceId: !Ref EndpointService
+
+Outputs:
+  SubstackName:
+    Description: The privatelink stack name
+    Value: !Sub "${AWS::StackName}"
+  VPCEndpointServiceID:
+      Description: 'VPC Endpoint Service'
+      Value: !Ref EndpointService

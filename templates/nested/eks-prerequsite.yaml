@@ -1,0 +1,113 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: EKSPreRequsite stack that prepares pre-requsite for EKS cluster
+
+Metadata:
+    AWS::CloudFormation::Interface:
+      ParameterGroups:
+        - Label:
+            default: EKS Control Panel Configuration
+          Parameters:
+            - TemplateBucketName
+            - TemplateBucketKeyPrefix
+            - VPCID
+            - NodeSecurityGroup
+            - ProvisionSecurityGroup
+
+      ParameterLabels:
+        TemplateBucketName:
+          default: The name of the S3 bucket that holds the templates
+        TemplateBucketKeyPrefix:
+          default: The Key prefix for the templates in the S3 template bucket
+        VPCID:
+          default: The ID of the VPC to deploy the EKS Cluster into
+        NodeSecurityGroup:
+          default: The Security Group of EKS Worker nodes
+        ProvisionSecurityGroup:
+          default: The Security Group of Provision Host
+
+Parameters:
+    TemplateBucketName:
+      AllowedPattern: "^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$"
+      ConstraintDescription: "Bucket name can include numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen (-)."
+      Description: "S3 bucket name that contains the CFN templates (VPC, Provision etc). This string can include numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen (-)."
+      Type: "String"
+    TemplateBucketKeyPrefix:
+      AllowedPattern: "^[0-9a-zA-Z-/]*$"
+      ConstraintDescription: "Template bucket key prefix can include numbers, lowercase letters, uppercase letters, hyphens (-), and forward slash (/)."
+      Type: "String"
+    VPCID:
+      Description: "ID for the VPC"
+      Type: "AWS::EC2::VPC::Id"
+    NodeSecurityGroup:
+      Description: "ID for the VPC, This will be used to get the node security group"
+      Type: "AWS::EC2::SecurityGroup::Id"
+    ProvisionSecurityGroup:
+      Description: "ID for the VPC, This will be used to get the provision security group"
+      Type: "AWS::EC2::SecurityGroup::Id"
+
+Resources:
+  EKSServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: eks.amazonaws.com
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEKSClusterPolicy
+        - arn:aws:iam::aws:policy/AmazonEKSServicePolicy
+
+  ControlPanelSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ControlPanel-SG"
+        - Key: Component
+          Value: datahub-EKS-ControlPanel
+      GroupDescription: Cluster communication with worker nodes
+      VpcId: !Ref VPCID
+
+  ControlPanelEgressToNodeSecurityGroup:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      Description: Allow the cluster control panel to communicate with worker Kubelet and pods
+      GroupId: !Ref ControlPanelSecurityGroup
+      DestinationSecurityGroupId: !Ref NodeSecurityGroup
+      IpProtocol: tcp
+      FromPort: 10250
+      ToPort: 10250
+
+  ClusterControlPanelSecurityGroupIngress01:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Allow pods to communicate with the cluster API Server
+      GroupId: !Ref ControlPanelSecurityGroup
+      SourceSecurityGroupId: !Ref NodeSecurityGroup
+      IpProtocol: tcp
+      ToPort: 443
+      FromPort: 443
+
+  ClusterControlPanelSecurityGroupIngress02:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Allow provision to communicate with the cluster API Server
+      GroupId: !Ref ControlPanelSecurityGroup
+      SourceSecurityGroupId: !Ref ProvisionSecurityGroup
+      IpProtocol: tcp
+      ToPort: 443
+      FromPort: 443
+
+Outputs:
+  SubstackName:
+    Description: The eks control panel stack name
+    Value: !Sub "${AWS::StackName}"
+  ControlPanelSecurityGroup:
+    Description: The ControlPanel security group id
+    Value: !Ref ControlPanelSecurityGroup
+  EksServiceRoleArn:
+    Value: !GetAtt EKSServiceRole.Arn

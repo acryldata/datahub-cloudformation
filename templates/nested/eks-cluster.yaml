@@ -1,0 +1,558 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: EKSCluster stack that create EKS cluster
+
+Metadata:
+    AWS::CloudFormation::Interface:
+      ParameterGroups:
+        - Label:
+            default: Cluster Configuration
+          Parameters:
+            - EksMgmtIamRoleArn
+            - NodeInstanceRoleArn
+            - EKSServiceRoleArn
+            - EKSClusterName
+            - TemplateBucketName
+            - TemplateBucketKeyPrefix
+            - ControlPanelSecurityGroup
+            - NodeSecurityGroup
+            - ProvisionSecurityGroup
+        - Label:
+            default: Provision Stack Configuration
+          Parameters:
+            - VPCID
+            - PrivateSubnet1ID
+            - PrivateSubnet2ID
+            - PrivateSubnet3ID
+            - PublicSubnet1ID
+            - PublicSubnet2ID
+            - PublicSubnet3ID
+            - EC2LogGroup
+            - ProvisionInstanceType
+
+      ParameterLabels:
+        TemplateBucketName:
+          default: The name of the S3 bucket that holds the templates
+        TemplateBucketKeyPrefix:
+          default: The Key prefix for the templates in the S3 template bucket
+        VPCID:
+          default: The ID of the VPC to deploy the Provision and EKS Cluster into
+        PrivateSubnet1ID:
+          default: The ID of the first private subnet to deploy EKS Workers into
+        PrivateSubnet2ID:
+          default: The ID of the second private subnet to deploy EKS Workers into
+        PrivateSubnet3ID:
+          default: The ID of the third private subnet to deploy EKS Workers into
+        PublicSubnet1ID:
+          default: The ID of the first public subet to deploy EKS into
+        PublicSubnet2ID:
+          default: The ID of the second public subnet to deploy EKS into
+        PublicSubnet3ID:
+          default: The ID of the third public subnet to deploy EKS into
+        EC2LogGroup:
+          default: The provision log group name
+        ProvisionInstanceType:
+          default: The instance type to deploy Provision to
+        NodeInstanceRoleArn:
+          default: The AWS IAM Role ARN to be applied to the EKS Worker Nodes
+        EKSServiceRoleArn:
+          default: The AWS IAM Role ARN to be applied to the EKS Control Panel
+        NodeSecurityGroup:
+          default: The Security Group of EKS Worker nodes
+        ProvisionSecurityGroup:
+          default: The Security Group of Provision Host
+        ControlPanelSecurityGroup:
+          default: The Security Group of EKS Control Panel
+        EksMgmtIamRoleArn:
+          default: The AWS IAM Role name that will be allowed to manage EKS. Note format is arn:aws:iam::123456789:role/admin-role
+        EKSClusterName:
+          default: The EKS cluster name
+
+Parameters:
+    TemplateBucketName:
+      AllowedPattern: "^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$"
+      ConstraintDescription: "Bucket name can include numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen (-)."
+      Description: "S3 bucket name that contains the CFN templates (VPC, Provision etc). This string can include numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen (-)."
+      Type: "String"
+    TemplateBucketKeyPrefix:
+      AllowedPattern: "^[0-9a-zA-Z-/]*$"
+      ConstraintDescription: "Template bucket key prefix can include numbers, lowercase letters, uppercase letters, hyphens (-), and forward slash (/)."
+      Type: "String"
+    VPCID:
+      Description: "ID for the VPC"
+      Type: "AWS::EC2::VPC::Id"
+    PublicSubnet1ID:
+      Description: "ID of Public Subnet 1"
+      Type: "AWS::EC2::Subnet::Id"
+    PublicSubnet2ID:
+      Description: "ID of Public Subnet 2"
+      Type: "AWS::EC2::Subnet::Id"
+    PublicSubnet3ID:
+      Description: "ID of Public Subnet 3"
+      Type: "AWS::EC2::Subnet::Id"
+    PrivateSubnet1ID:
+      Description: "ID of Private Subnet 1"
+      Type: "AWS::EC2::Subnet::Id"
+    PrivateSubnet2ID:
+      Description: "ID of Private Subnet 2"
+      Type: "AWS::EC2::Subnet::Id"
+    PrivateSubnet3ID:
+      Description: "ID of Private Subnet 3"
+      Type: "AWS::EC2::Subnet::Id"
+    EC2LogGroup:
+      Description: The provision log group name
+      Type: "String"
+    ProvisionInstanceType:
+      Type: "String"
+      Description: "The type of EC2 instance to be launched for Provision Host"
+      AllowedValues:
+        # Add more instance types if needed
+        - t2.micro
+        - t2.medium
+        - t2.large
+      ConstraintDescription: "Must contain a valid instance type"
+    NodeInstanceRoleArn:
+      Type: "String"
+      Description: "The AWS IAM Role ARN to be applied to the EKS Worker Nodes"
+    EKSServiceRoleArn:
+      Type: "String"
+      Description: "The AWS IAM Role ARN to be applied to the EKS Control Panel"
+    ControlPanelSecurityGroup:
+      Description: "ID for the VPC, This will be used to get the eks control panel security group"
+      Type: "AWS::EC2::SecurityGroup::Id"
+    NodeSecurityGroup:
+      Description: "ID for the VPC, This will be used to get the node security group"
+      Type: "AWS::EC2::SecurityGroup::Id"
+    ProvisionSecurityGroup:
+      Description: "ID for the VPC, This will be used to get the provision security group"
+      Type: "AWS::EC2::SecurityGroup::Id"
+    EksMgmtIamRoleArn:
+      Type: String
+      Description: "The AWS IAM Role name that will be allowed to manage EKS. Note format is arn:aws:iam::123456789:role/admin-role"
+    EKSClusterName:
+      Type: String
+      Description: The name of the eks cluster
+
+Mappings:
+  # Use Amazon 2 Linux
+  ProvisionLatestAmiRegionMap:
+    us-west-2:
+      AmiId: ami-0873b46c45c11058d
+    us-west-1:
+      AmiId: ami-05655c267c89566dd
+    us-east-1:
+      AmiId: ami-02354e95b39ca8dec
+    us-east-2:
+      AmiId: ami-07c8bc5c1ce9598c3
+    eu-central-1:
+      AmiId: ami-0c115dbd34c69a004
+    eu-west-1:
+      AmiId: ami-07d9160fa81ccffb5
+
+Resources:
+  ProvisionInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Policies:
+        - PolicyName: !Sub "${TemplateBucketName}-s3-policy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - s3:GetObject
+                Resource: !Sub "arn:aws:s3:::${TemplateBucketName}/${TemplateBucketKeyPrefix}/scripts/*"
+                Effect: Allow
+        - PolicyName: cloudwatch-logs-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - logs:CreateLogStream
+                  - logs:GetLogEvents
+                  - logs:PutLogEvents
+                  - logs:DescribeLogGroups
+                  - logs:DescribeLogStreams
+                  - logs:PutRetentionPolicy
+                  - logs:PutMetricFilter
+                  - logs:CreateLogGroup
+                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:${EC2LogGroup}:*"
+                Effect: Allow
+        - PolicyName: provision-eip-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - ec2:AssociateAddress
+                  - ec2:DescribeAddresses
+                  - ec2:DescribeVolumes
+                Resource: "*"
+                Effect: Allow
+        - PolicyName: provision-ssm-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - ssm:PutParameter
+                  - ssm:GetParameters
+                  - ssm:GetParameter
+                  - ssm:DeleteParameter
+                Resource: "*"
+                Effect: Allow
+        - PolicyName: provision-kms-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - kms:GenerateRandom
+                Resource: "*"
+                Effect: Allow
+        - PolicyName: provision-OpenID-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - iam:GetOpenIDConnectProvider
+                  - iam:CreateOpenIDConnectProvider
+                  - iam:TagOpenIDConnectProvider
+                  - cloudformation:ListStacks
+                  - cloudformation:CreateStack
+                  - iam:GetRole
+                  - iam:TagRole
+                  - iam:CreateRole
+                  - iam:CreatePolicy
+                  - iam:DetachRolePolicy 
+                  - iam:AttachRolePolicy 
+                  - kafka:Describe*
+                  - kafka:Get*
+                  - kafka:List*
+                  - elasticloadbalancing:DescribeLoadBalancers
+                  - autoscaling:DescribeAutoScalingInstances
+                  - autoscaling:UpdateAutoScalingGroup
+                  - autoscaling:DeleteAutoScalingGroup
+                  - secretsmanager:CreateSecret
+                  - secretsmanager:GetSecretValue
+                Resource: "*"
+                Effect: Allow
+        - PolicyName: eks-cluster-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  ### This a EKS limitation so far at deployment time
+                  ### Provision should only be able to delete or do anything to its own cluster
+                  - eks:*
+                  - sts:*
+                  - iam:PassRole
+                  - ec2:DescribeTags 
+                Resource: "*"
+                Effect: Allow
+      Path: /
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Effect: Allow
+        Version: "2012-10-17"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM
+
+  ProvisionInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref ProvisionInstanceRole
+      Path: /
+
+  EKSProvisionAutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      LaunchConfigurationName: !Ref EKSProvisionLaunchConfiguration
+      VPCZoneIdentifier:
+        - !Ref PublicSubnet1ID
+        - !Ref PublicSubnet2ID
+        - !Ref PublicSubnet3ID
+      MinSize: 1
+      MaxSize: 1
+      Cooldown: "300"
+      DesiredCapacity: 1
+      Tags:
+        - Key: Name
+          Value: !Sub "${EKSClusterName}-eks-provision-node"
+          PropagateAtLaunch: true
+        - Key: Component
+          Value: !Sub "${EKSClusterName}-Provision-AutoScaling-Group"
+          PropagateAtLaunch: true
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT20M
+
+  EKSProvisionLaunchConfiguration:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Metadata:
+      AWS::CloudFormation::Authentication:
+        S3AccessCreds:
+          type: S3
+          roleName: !Ref ProvisionInstanceRole
+          buckets: !Ref TemplateBucketName
+      AWS::CloudFormation::Init:
+        config:
+          packages:
+            yum:
+              awslogs: []
+          files:
+            '/etc/awslogs/awscli.conf':
+              content: !Sub |
+                [default]
+                region = ${AWS::Region}
+                [plugins]
+                cwlogs = cwlogs
+              mode: '000644'
+              owner: root
+              group: root
+            '/etc/awslogs/awslogs.conf':
+              content: !Sub |
+                [general]
+                state_file = /var/lib/awslogs/agent-state
+                [/var/log/provision/provision.log]
+                file = /var/log/provision/provision.log
+                datetime_format = %b %d %H:%M:%S
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/provision/provision.log
+                log_group_name = ${EC2LogGroup}
+                [/var/log/dmesg]
+                file = /var/log/dmesg
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/dmesg
+                log_group_name = ${EC2LogGroup}
+                [/var/log/messages]
+                datetime_format = %b %d %H:%M:%S
+                file = /var/log/messages
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/messages
+                log_group_name = ${EC2LogGroup}
+                [/var/log/secure]
+                datetime_format = %b %d %H:%M:%S
+                file = /var/log/secure
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/secure
+                log_group_name = ${EC2LogGroup}
+                [/var/log/audit/audit.log]
+                datetime_format =
+                file = /var/log/audit/audit.log
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/audit/audit.log
+                log_group_name = ${EC2LogGroup}
+                [/var/log/cron]
+                datetime_format = %b %d %H:%M:%S
+                file = /var/log/cron
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/cron
+                log_group_name = ${EC2LogGroup}
+                [/var/log/cfn-init.log]
+                datetime_format = %Y-%m-%d %H:%M:%S
+                file = /var/log/cfn-init.log
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/cfn-init.log
+                log_group_name = ${EC2LogGroup}
+                [/var/log/cfn-hup.log]
+                datetime_format = %Y-%m-%d %H:%M:%S
+                file = /var/log/cfn-hup.log
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/cfn-hup.log
+                log_group_name = ${EC2LogGroup}
+                [/var/log/cfn-init-cmd.log]
+                datetime_format = %Y-%m-%d %H:%M:%S
+                file = /var/log/cfn-init-cmd.log
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/cfn-init-cmd.log
+                log_group_name = ${EC2LogGroup}
+                [/var/log/cloud-init-output.log]
+                file = /var/log/cloud-init-output.log
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/cloud-init-output.log
+                log_group_name = ${EC2LogGroup}
+                [/var/log/amazon/ssm/amazon-ssm-agent.log]
+                datetime_format = %Y-%m-%d %H:%M:%S
+                file = /var/log/amazon/ssm/amazon-ssm-agent.log
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/amazon/ssm/amazon-ssm-agent.log
+                log_group_name = ${EC2LogGroup}
+                [/var/log/amazon/ssm/errors.log]
+                datetime_format = %Y-%m-%d %H:%M:%S
+                file = /var/log/amazon/ssm/errors.log
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/amazon/ssm/errors.log
+                log_group_name = ${EC2LogGroup}
+                [/var/log/maillog]
+                datetime_format = %b %d %H:%M:%S
+                file = /var/log/maillog
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/maillog
+                log_group_name = ${EC2LogGroup}
+                [/var/log/yum.log]
+                datetime_format = %b %d %H:%M:%S
+                file = /var/log/yum.log
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/yum.log
+                log_group_name = ${EC2LogGroup}
+                [/var/log/awslogs.log]
+                datetime_format = %Y-%m-%d %H:%M:%S
+                file = /var/log/awslogs.log
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/awslogs.log
+                log_group_name = ${EC2LogGroup}
+                [/var/log/boot.log]
+                file = /var/log/boot.log
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/boot.log
+                log_group_name = ${EC2LogGroup}
+                [/var/log/cfn-wire.log]
+                datetime_format = %Y-%m-%d %H:%M:%S
+                file = /var/log/cfn-wire.log
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/cfn-wire.log
+                log_group_name = ${EC2LogGroup}
+              mode: '000644'
+              owner: root
+              group: root
+            /tmp/eks_bootstrap.sh:
+              content: !Sub |
+                #!/bin/bash
+                echo "Checking whether cluster exists..."
+                aws eks describe-cluster --region ${AWS::Region} --name ${EKSClusterName} &> /dev/null
+                if [ $? -ne 0 ]; then
+                  echo Cluster does not exist, creating...
+                  aws eks create-cluster --region ${AWS::Region} \
+                  --name ${EKSClusterName} \
+                  --kubernetes-version 1.18 \
+                  --role-arn ${EKSServiceRoleArn} \
+                  --resources-vpc-config subnetIds=${PrivateSubnet1ID},${PrivateSubnet2ID},${PrivateSubnet3ID},${PublicSubnet1ID},${PublicSubnet2ID},${PublicSubnet3ID},securityGroupIds=${ControlPanelSecurityGroup},endpointPublicAccess=false,endpointPrivateAccess=true \
+                  --logging '{"clusterLogging":[{"types":["api","audit","authenticator","controllerManager","scheduler"],"enabled":true}]}'
+                  if [ $? -ne 0 ]; then
+                    exit 1
+                  fi
+                  sleep 5
+                  STATUS=$(aws eks describe-cluster --region ${AWS::Region} --name ${EKSClusterName} --query cluster.status --output text)
+                  while [ \"$STATUS\" = \"CREATING\" ]; do
+                    echo Cluster is still creating, sleeping for 30 seconds...
+                    sleep 30
+                    STATUS=$(aws eks describe-cluster --region ${AWS::Region} --name ${EKSClusterName} --query cluster.status --output text)
+                  done
+                fi
+                echo "Saving oidc info..."
+                OIDC=$(aws eks describe-cluster --region ${AWS::Region}  --name ${EKSClusterName} --query cluster.identity.oidc --output text --no-paginate |cut -c 9-)
+                parameter='/${EKSClusterName}/eks/oidc'
+                aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$OIDC" --overwrite --no-paginate
+                echo Updating kubeconfig file...
+                ENDPOINT=$(aws eks describe-cluster --region ${AWS::Region}  --name ${EKSClusterName} --query cluster.endpoint --output text)
+                CERT_DATA=$(aws eks describe-cluster --region ${AWS::Region}  --name ${EKSClusterName} --query cluster.certificateAuthority.data --output text)
+                sed -i s,ENDPOINT,$ENDPOINT,g /home/ec2-user/.kube/config
+                sed -i s,CERTIFICATE_DATA,$CERT_DATA,g /home/ec2-user/.kube/config
+                export KUBECONFIG=/home/ec2-user/.kube/config
+                echo Checking whether aws-auth configmap exists...
+                kubectl get configmaps/aws-auth -n kube-system &> /dev/null
+                if [ $? -gt 0 ]; then
+                  echo Configmap does not exist, applying...
+                  kubectl apply -f /tmp/aws-auth-cm.yaml
+                fi
+              mode: "000750"
+              owner: root
+              group: root
+            /tmp/aws-auth-cm.yaml:
+              content: !Sub |
+                apiVersion: v1
+                kind: ConfigMap
+                metadata:
+                  name: aws-auth
+                  namespace: kube-system
+                data:
+                  mapRoles: |
+                    - rolearn: ${NodeInstanceRoleArn}
+                      username: system:node:{{EC2PrivateDNSName}}
+                      groups:
+                        - system:bootstrappers
+                        - system:nodes
+                    - rolearn: ${EksMgmtIamRoleArn}
+                      groups:
+                        -system:masters
+                      username: federated-user
+              mode: "000644"
+              owner: root
+              group: root
+            /home/ec2-user/.kube/config:
+              content: !Sub |
+                apiVersion: v1
+                clusters:
+                - cluster:
+                    server: ENDPOINT
+                    certificate-authority-data: CERTIFICATE_DATA
+                  name: kubernetes
+                contexts:
+                - context:
+                    cluster: kubernetes
+                    user: aws
+                  name: aws
+                current-context: aws
+                kind: Config
+                preferences: {}
+                users:
+                - name: aws
+                  user:
+                    exec:
+                      apiVersion: client.authentication.k8s.io/v1alpha1
+                      command: aws-iam-authenticator
+                      args:
+                        - token
+                        - -i
+                        - ${EKSClusterName}
+              mode: "000666"
+              owner: ec2-user
+              group: ec2-user
+          commands:
+            00_eks-bootstrap:
+              command: "./tmp/eks_bootstrap.sh |tee -a /tmp/eks_bootstrap.out 2>&1"
+            01_create_state_directory:
+              command: mkdir -p /var/awslogs/state
+            02_start_awslogsd:
+              command: systemctl start awslogsd
+            03_enable_awslogsd:
+              command: systemctl enable awslogsd
+    Properties:
+      AssociatePublicIpAddress: true
+      PlacementTenancy: default
+      IamInstanceProfile: !Ref ProvisionInstanceProfile
+      ImageId: !FindInMap [ProvisionLatestAmiRegionMap, !Ref "AWS::Region", AmiId]
+      SecurityGroups:
+        - !Ref ProvisionSecurityGroup
+      InstanceType: !Ref ProvisionInstanceType
+      UserData:
+        Fn::Base64: !Sub |
+            #!/bin/bash
+            set -x
+            export PATH=$PATH:/usr/local/bin:/opt/aws/bin
+            yum install -y https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm
+            yum install -y aws-cfn-bootstrap
+            CLOUDWATCHGROUP=${EC2LogGroup}
+            curl -LO https://dl.k8s.io/release/v1.20.2/bin/linux/amd64/kubectl
+            chmod +x ./kubectl
+            mv kubectl /usr/local/bin
+            kubectl version --short --client
+            curl -o aws-iam-authenticator https://amazon-eks.s3.us-west-2.amazonaws.com/1.21.2/2021-07-05/bin/linux/amd64/aws-iam-authenticator
+            chmod +x ./aws-iam-authenticator
+            mv aws-iam-authenticator /usr/local/bin
+            aws-iam-authenticator version
+            cfn-init -v --stack ${AWS::StackName} --resource EKSProvisionLaunchConfiguration --region ${AWS::Region}
+            cfn-signal -e $? --stack ${AWS::StackName} --resource EKSProvisionAutoScalingGroup --region ${AWS::Region}
+            echo scale down eks provision ASG
+            INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+            ASG=$(aws autoscaling describe-auto-scaling-instances --region ${AWS::Region} --output text --query=AutoScalingInstances[].AutoScalingGroupName --instance-ids=$INSTANCE_ID)
+            echo $ASG
+            nohup aws autoscaling --region ${AWS::Region} update-auto-scaling-group --auto-scaling-group-name $ASG --desired-capacity 0 --min-size 0 --max-size 0 &>/dev/null &
+
+
+Outputs:
+  SubstackName:
+    Description: The eks stack name
+    Value: !Sub "${AWS::StackName}"
+  EksClusterName:
+    Description: EKS Cluster name
+    Value: !Ref EKSClusterName
+  EKSProvisionLaunchConfiguration:
+    Description: The provision host launch config
+    Value: !Ref EKSProvisionLaunchConfiguration
+  EKSProvisionAutoScalingGroup:
+    Description: The Provision host autoscaling group
+    Value: !Ref EKSProvisionAutoScalingGroup
+  ProvisionInstanceProfile:
+    Description: IAM Instance profile of Provision host
+    Value: !Ref ProvisionInstanceProfile
+  ProvisionInstanceRole:
+    Description: IAM Role of Provision host
+    Value: !Ref ProvisionInstanceRole
+  NodeInstanceRoleArn:
+    Value: !Ref NodeInstanceRoleArn
