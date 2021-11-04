@@ -13,6 +13,7 @@ Metadata:
           - PrivateSubnet2
           - PrivateSubnet3
           - ESDomainName
+          - Environment
           - ElasticsearchVersion
 
     ParameterLabels:
@@ -30,6 +31,8 @@ Metadata:
         default: VPC CIDR
       ESDomainName:
         default: Elasticsearch Domain
+      Environment:
+        default: The Environment
       ElasticsearchVersion:
         default: Elasticsearch Version
 
@@ -88,6 +91,9 @@ Parameters:
     Default: "datahub"
     Description: Elasticsearch Domain Name
     Type: String
+  Environment:
+    Type: String
+    Description: The Environment
   ESMasterUser:
     Default: "admin"
     Type: String
@@ -181,7 +187,7 @@ Resources:
         Type: AWS::SSM::Parameter
         Properties:
           Description: ElasticSearch Domain Endpoint
-          Name: '/datahub/elasticsearch/endpoint'
+          Name: !Sub "/${Environment}/${ESDomainName}/elasticsearch/endpoint"
           Type: String
           Value: !GetAtt 'ElasticsearchDomain.DomainEndpoint'
 

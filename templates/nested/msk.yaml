@@ -13,6 +13,7 @@ Metadata:
           - DBSubnet2
           - DBSubnet3
           - MSKClusterName
+          - Environment
           - KafkaVersion
           - MSKInstanceType
 
@@ -31,6 +32,8 @@ Metadata:
         default: VPC CIDR
       MSKClusterName:
         default: MSK Cluster Name
+      Environment:
+        default: The Environment
       KafkaVersion:
         default: Kafka Version
       MSKInstanceType:
@@ -77,6 +80,9 @@ Parameters:
     Default: "datahub"
     Description: MSK Cluster Name
     Type: String
+  Environment:
+    Type: String
+    Description: The Environment
 
 
 Resources:
@@ -181,12 +187,12 @@ Resources:
                 BrokerLogs:
                     CloudWatchLogs:
                         Enabled: true
-                        LogGroup: !Sub "${MSKClusterName}-msk-broker-logs"
+                        LogGroup: !Sub "${Environment}-${MSKClusterName}-msk-broker-logs"
 
     MSKLogGroup:
         Type: "AWS::Logs::LogGroup"
         Properties:
-            LogGroupName: !Sub "${MSKClusterName}-msk-broker-logs"
+            LogGroupName: !Sub "${Environment}-${MSKClusterName}-msk-broker-logs"
 
 Outputs:
   SubstackName:

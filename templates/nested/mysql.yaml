@@ -14,6 +14,7 @@ Metadata:
           - DBSubnet2
           - DBSubnet3
           - DBClusterIdentifier
+          - Environment
           - DBInstanceClass
           - EngineVersion
           - MasterUser
@@ -36,6 +37,8 @@ Metadata:
         default: VPC CIDR
       DBClusterIdentifier:
         default: Aurora Cluster Identifier
+      Environment:
+        default: The Environment
       DBInstanceClass:
         default: Aurora Instance Type
       EngineVersion:
@@ -74,6 +77,9 @@ Parameters:
     Description: "The Aurora Cluster Identifier"
     Type: String
     Default: datahub
+  Environment:
+    Type: String
+    Description: The Environment
   DBInstanceClass:
     AllowedValues:
       - db.t3.small
@@ -196,7 +202,7 @@ Resources:
         Type: AWS::SSM::Parameter
         Properties:
           Description: Aurora RDS Endpoint
-          Name: '/datahub/mysql/endpoint'
+          Name: !Sub '/${Environment}/${DBClusterIdentifier}/mysql/endpoint'
           Type: String
           Value: !GetAtt 'RDSDBCluster.Endpoint.Address'
 

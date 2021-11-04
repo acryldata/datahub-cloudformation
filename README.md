@@ -6,11 +6,11 @@
 
 1. upload templates/scripts/license to S3
 
-     - upload needed files to S3 bucket 'cf-templates-blrxgroup-us-west-2', under folder 'development'
+     - upload needed files to S3 bucket 'cf-templates-blrxgroup-us-west-2', under folder 'dev'
 ```console
 cd cloudformation
 export AWS_PROFILE=***
-./s3upload.sh cf-templates-blrxgroup-us-west-2 development
+./s3upload.sh cf-templates-blrxgroup-us-west-2 dev blrxgroup-customer1.yaml
 ```
 
       
@@ -18,7 +18,7 @@ export AWS_PROFILE=***
 
      - choose Oregon region -> Cloudformation -> Create stack
 
-     - Template Amazon S3 URL: https://cf-templates-blrxgroup-us-west-2.s3.us-west-2.amazonaws.com/development/templates/datahub-deployment.yaml
+     - Template Amazon S3 URL: https://cf-templates-blrxgroup-us-west-2.s3.us-west-2.amazonaws.com/dev/templates/datahub-deployment.yaml
 
      - Stack name: datahub
 
@@ -62,4 +62,4 @@ export AWS_PROFILE=***
 6. manually create VPC endpoint
      - under Acryl AWS account, us-west-2 region, find service by service name, for example com.amazonaws.vpce.us-west-2.vpce-svc-*** (get service name from step 4.), select shared vpc, choose 3    private subnets, attach default security group
 
-     - access https://{vpc_endpoint_dns} to for kotsadmin, default password: Passw0rd
+     - access https://{vpc_endpoint_dns} to for kotsadm 

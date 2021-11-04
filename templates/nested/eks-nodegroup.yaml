@@ -8,8 +8,9 @@ Metadata:
             default: EKS Worker Nodes Stack Configuration
           Parameters:
             - EKSClusterName
+            - KubernetesVersion
+            - Environment
             - TemplateBucketName
-            - TemplateBucketKeyPrefix
             - NodeInstanceRole
             - NodeInstanceRoleArn
             - NodeInstanceType
@@ -19,8 +20,6 @@ Metadata:
       ParameterLabels:
         TemplateBucketName:
           default: The name of the S3 bucket that holds the templates
-        TemplateBucketKeyPrefix:
-          default: The Key prefix for the templates in the S3 template bucket
         NodeInstanceRole:
           default: The AWS IAM Role to be applied to the EKS Worker Nodes
         NodeInstanceRoleArn:
@@ -35,8 +34,14 @@ Metadata:
           default: The minimum number of nodes to scale down to for EKS Worker Node
         DesiredNumberOfNodes:
           default: The desired number of nodes to keep running for EKS Worker Node
+        EKSNodeVolumeSize:
+          default: The Volume Size of EKS Worker node
         EKSClusterName:
           default: The EKS cluster name
+        KubernetesVersion:
+          default: The Kubernetes Version
+        Environment:
+          default: The Environment
         NodeSecurityGroup:
           default: The Security Group of EKS Worker nodes
         ControlPanelSecurityGroup:
@@ -47,10 +52,6 @@ Parameters:
       AllowedPattern: "^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$"
       ConstraintDescription: "Bucket name can include numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen (-)."
       Description: "S3 bucket name that contains the CFN templates (VPC, Provision etc). This string can include numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen (-)."
-      Type: "String"
-    TemplateBucketKeyPrefix:
-      AllowedPattern: "^[0-9a-zA-Z-/]*$"
-      ConstraintDescription: "Template bucket key prefix can include numbers, lowercase letters, uppercase letters, hyphens (-), and forward slash (/)."
       Type: "String"
     NodeSecurityGroup:
       Description: "ID for the VPC, This will be used to get the node security group"
@@ -93,6 +94,9 @@ Parameters:
       Type: "String"
       MinLength: 1
       Description: "The desired number of EKS Worker Nodes to run"
+    EKSNodeVolumeSize:
+      Type: "String"
+      Description: "The volume size of EKS Worker Node"
     MaxNumberOfNodes:
       Type: "String"
       MinLength: 1
@@ -104,6 +108,12 @@ Parameters:
     EKSClusterName:
       Type: String
       Description: The name of the eks cluster
+    KubernetesVersion:
+      Type: String
+      Description: The Kubernetes Version
+    Environment:
+      Type: String
+      Description: The Kubernetes Version
 
 Mappings:
   NodeAmiRegionMap:
@@ -175,11 +185,11 @@ Resources:
       Properties:
           NodegroupName: !Sub "${EKSClusterName}-nodegroup1"
           ClusterName: !Ref EKSClusterName
-          Version: "1.18"
+          Version: !Ref KubernetesVersion
           ScalingConfig:
-              MinSize: 1
-              MaxSize: 3
-              DesiredSize: 1
+              MinSize: !Ref MinNumberOfNodes
+              MaxSize: !Ref MaxNumberOfNodes
+              DesiredSize: !Ref DesiredNumberOfNodes
           InstanceTypes:
             - !Ref NodeInstanceType
           Subnets:
@@ -187,11 +197,10 @@ Resources:
           AmiType: "AL2_x86_64"
           NodeRole: !Ref NodeInstanceRoleArn
           Labels: {}
-          DiskSize: 50
+          DiskSize: !Ref EKSNodeVolumeSize
           Tags:
               Name: !Sub "${EKSClusterName}-nodegroup1"
               CloudFormation: "true"
-              Environment: !Sub "${AWS::StackName}"
           CapacityType: "ON_DEMAND"
 
   EKSNodegroup2:
@@ -199,11 +208,11 @@ Resources:
       Properties:
           NodegroupName: !Sub "${EKSClusterName}-nodegroup2"
           ClusterName: !Ref EKSClusterName
-          Version: "1.18"
+          Version: !Ref KubernetesVersion
           ScalingConfig:
-              MinSize: 1
-              MaxSize: 3
-              DesiredSize: 1
+              MinSize: !Ref MinNumberOfNodes
+              MaxSize: !Ref MaxNumberOfNodes
+              DesiredSize: !Ref DesiredNumberOfNodes
           InstanceTypes:
             - !Ref NodeInstanceType
           Subnets:
@@ -211,11 +220,10 @@ Resources:
           AmiType: "AL2_x86_64"
           NodeRole: !Ref NodeInstanceRoleArn
           Labels: {}
-          DiskSize: 50
+          DiskSize: !Ref EKSNodeVolumeSize
           Tags:
               Name: !Sub "${EKSClusterName}-nodegroup2"
               CloudFormation: "true"
-              Environment: !Sub "${AWS::StackName}"
           CapacityType: "ON_DEMAND"
 
   EKSNodegroup3:
@@ -223,11 +231,11 @@ Resources:
       Properties:
           NodegroupName: !Sub "${EKSClusterName}-nodegroup3"
           ClusterName: !Ref EKSClusterName
-          Version: "1.18"
+          Version: !Ref KubernetesVersion
           ScalingConfig:
-              MinSize: 1
-              MaxSize: 3
-              DesiredSize: 1
+              MinSize: !Ref MinNumberOfNodes
+              MaxSize: !Ref MaxNumberOfNodes
+              DesiredSize: !Ref DesiredNumberOfNodes
           InstanceTypes:
             - !Ref NodeInstanceType
           Subnets:
@@ -235,11 +243,10 @@ Resources:
           AmiType: "AL2_x86_64"
           NodeRole: !Ref NodeInstanceRoleArn
           Labels: {}
-          DiskSize: 50
+          DiskSize: !Ref EKSNodeVolumeSize
           Tags:
               Name: !Sub "${EKSClusterName}-nodegroup3"
               CloudFormation: "true"
-              Environment: !Sub "${AWS::StackName}"
           CapacityType: "ON_DEMAND"
 Outputs:
   SubstackName:
