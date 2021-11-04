@@ -31,9 +31,15 @@ export AWS_PROFILE=***
 
      - The AZ's to deploy to: choose 'us-west-2a, us-west-2b, us-west-2c'
 
+     - The AWS IAM Role arn: existing IAM role arn to be granted EKS access
+
+     - ELB cert arn: ACM cert arn to be attached to new create ALB
+
      - CreatePrivateLink: Choose 'true' to create private link endpoint service
 
      - RemoveTempResources: if you want to keep admin provision host, choose 'false'
+
+     - Tags, can have customized tags here, no space allowed in either Key or Value
 
      - Stack failure options: choose 'Preserve successfully provisioned resources' (useful when working on development of cloudformation)
 
@@ -43,7 +49,7 @@ export AWS_PROFILE=***
 
      - click "Create stack"
 
-     - you will see a stack 'datahub' (this is master stack), and it will invoke nested stacks in order
+     - you will see a stack 'dev-datahub' (this is master stack), and it will invoke nested stacks in order
 
 
 
@@ -52,11 +58,11 @@ export AWS_PROFILE=***
 
 
 4. manually create DNS record
-     - create datahub.dev.xxx.com to point to the datahub-frontend ALB
+     - create datahub.xxx.xxx.com to point to the datahub-frontend ALB
 
      - create new routes to reach this new VPC
 
-     - access https://datahub.dev.xxx.com to use datahub
+     - access https://datahub.xxx.xxx.com to use datahub
 
 
 ## step 5 runs on Acryl AWS account
