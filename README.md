@@ -24,10 +24,16 @@ export AWS_PROFILE=***
      - Template Amazon S3 URL: https://cf-templates-xxx-us-west-2.s3.us-west-2.amazonaws.com/dev/templates/datahub-deployment.yaml
 
      - Stack name: dev-datahub
-     
+ 
+     - TemplateBucketName: cf-templates-xxx-us-west-2     
+
      - Environment: dev
 
      - The AZ's to deploy to: choose 'us-west-2a, us-west-2b, us-west-2c'
+
+     - CreatePrivateLink: Choose 'true' to create private link endpoint service
+
+     - RemoveTempResources: if you want to keep admin provision host, choose 'false'
 
      - Stack failure options: choose 'Preserve successfully provisioned resources' (useful when working on development of cloudformation)
 
@@ -58,3 +64,6 @@ export AWS_PROFILE=***
      - under Acryl AWS account, us-west-2 region, find service by service name, for example com.amazonaws.vpce.us-west-2.vpce-svc-*** (get service name from step 4.), select shared vpc, choose 3 private subnets, attach default security group
 
      - access https://{vpc_endpoint_dns} to use manage datahub release
+
+
+## To cleanup, see CleanUp-after-Stack-Deletion.sh

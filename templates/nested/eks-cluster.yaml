@@ -7,7 +7,10 @@ Metadata:
         - Label:
             default: Cluster Configuration
           Parameters:
+            - RemoveTempResources
             - EksMgmtIamRoleArn
+            #- EksExternalUserArn
+            #- EksExternalUser
             - NodeInstanceRoleArn
             - EKSServiceRoleArn
             - EKSClusterName
@@ -31,6 +34,8 @@ Metadata:
             - ProvisionInstanceType
 
       ParameterLabels:
+        RemoveTempResources:
+          default: Enable Deletion of Temp Resources
         TemplateBucketName:
           default: The name of the S3 bucket that holds the templates
         VPCID:
@@ -63,6 +68,10 @@ Metadata:
           default: The Security Group of EKS Control Panel
         EksMgmtIamRoleArn:
           default: The AWS IAM Role name that will be allowed to manage EKS. Note format is arn:aws:iam::123456789:role/admin-role
+        #EksExternalUserArn:
+        #  default: The AWS IAM user arn who will be authorised to connect the cluster externally
+        #EksExternalUser:
+        #  default: The AWS IAM user who will be authorised to connect the cluster externally
         EKSClusterName:
           default: The EKS cluster name
         KubernetesVersion:
@@ -71,6 +80,13 @@ Metadata:
           default: The Environment
 
 Parameters:
+    RemoveTempResources:
+      Description: "Set to true if you don't want to keep provision host"
+      Type: String
+      Default: "true"
+      AllowedValues:
+        - "true"
+        - "false"
     TemplateBucketName:
       AllowedPattern: "^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$"
       ConstraintDescription: "Bucket name can include numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen (-)."
@@ -127,6 +143,14 @@ Parameters:
     EksMgmtIamRoleArn:
       Type: String
       Description: "The AWS IAM Role name that will be allowed to manage EKS. Note format is arn:aws:iam::123456789:role/admin-role"
+    #EksExternalUserArn:
+    #  Type: String
+    #  Description: The AWS IAM user arn who will be authorised to connect the cluster externally
+    #  Default: "arn:aws:iam::123456789:user/user01"
+    #EksExternalUser:
+    #  Type: String
+    #  Description: The AWS IAM user who will be authorised to connect the cluster externally
+    #  Default: "user01"
     EKSClusterName:
       Type: String
       Description: The name of the eks cluster
@@ -313,7 +337,7 @@ Resources:
           PropagateAtLaunch: true
     CreationPolicy:
       ResourceSignal:
-        Timeout: PT20M
+        Timeout: PT25M
 
   EKSProvisionLaunchConfiguration:
     Type: AWS::AutoScaling::LaunchConfiguration
@@ -387,17 +411,18 @@ Resources:
               content: !Sub |
                 #!/bin/bash
                 set -x
+                echo "Checking extra tags..."
                 EXTRA_TAGS=$(/tmp/check_extra_tags.sh ${Environment} ${EKSClusterName})
                 len=`expr length "$EXTRA_TAGS"`
                 if [ $len -gt 3 ]; then
                   EXTRA_TAGS_FLAG="true"
                 fi
+
                 echo "Checking whether cluster exists..."
-                
                 aws eks describe-cluster --region ${AWS::Region} --name ${EKSClusterName} &> /dev/null
                 if [ $? -ne 0 ]; then
                   if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
-                  echo Cluster does not exist, creating with EXTRA_TAGS...
+                  echo "Cluster does not exist, creating with EXTRA_TAGS..."
                   aws eks create-cluster --region ${AWS::Region} \
                   --name ${EKSClusterName} \
                   --tags "$EXTRA_TAGS" \
@@ -406,7 +431,7 @@ Resources:
                   --resources-vpc-config subnetIds=${PrivateSubnet1ID},${PrivateSubnet2ID},${PrivateSubnet3ID},${PublicSubnet1ID},${PublicSubnet2ID},${PublicSubnet3ID},securityGroupIds=${ControlPanelSecurityGroup},endpointPublicAccess=false,endpointPrivateAccess=true \
                   --logging '{"clusterLogging":[{"types":["api","audit","authenticator","controllerManager","scheduler"],"enabled":true}]}'
                   else
-                  echo Cluster does not exist, creating...
+                  echo "Cluster does not exist, creating..."
                   aws eks create-cluster --region ${AWS::Region} \
                   --name ${EKSClusterName} \
                   --kubernetes-version ${KubernetesVersion} \
@@ -420,7 +445,7 @@ Resources:
                   sleep 5
                   STATUS=$(aws eks describe-cluster --region ${AWS::Region} --name ${EKSClusterName} --query cluster.status --output text)
                   while [ \"$STATUS\" = \"CREATING\" ]; do
-                    echo Cluster is still creating, sleeping for 30 seconds...
+                    echo "Cluster is still creating, sleeping for 30 seconds..."
                     sleep 30
                     STATUS=$(aws eks describe-cluster --region ${AWS::Region} --name ${EKSClusterName} --query cluster.status --output text)
                   done
@@ -434,17 +459,29 @@ Resources:
                 else
                   aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$OIDC" --overwrite --no-paginate
                 fi
+                echo "Saving security group info..."
+                clusterSecurityGroupId=$(aws eks describe-cluster --region ${AWS::Region}  --name ${EKSClusterName} --query cluster.resourcesVpcConfig.clusterSecurityGroupId  --output text)
+                parameter="/${Environment}/${EKSClusterName}/eks/clusterSecurityGroupId"
+                if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
+                  EXTRA_TAGS=$(/tmp/check_extra_tags-v2.sh ${Environment} ${EKSClusterName})
+                  aws ssm put-parameter --tags $EXTRA_TAGS --region ${AWS::Region} --name "$parameter" --type "String" --value "$clusterSecurityGroupId" --no-paginate
+                else
+                  aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$clusterSecurityGroupId" --overwrite --no-paginate
+                fi
                 set +x
-                echo Updating kubeconfig file...
+                echo "Updating kubeconfig file..."
                 ENDPOINT=$(aws eks describe-cluster --region ${AWS::Region}  --name ${EKSClusterName} --query cluster.endpoint --output text)
                 CERT_DATA=$(aws eks describe-cluster --region ${AWS::Region}  --name ${EKSClusterName} --query cluster.certificateAuthority.data --output text)
                 sed -i s,ENDPOINT,$ENDPOINT,g /home/ec2-user/.kube/config
                 sed -i s,CERTIFICATE_DATA,$CERT_DATA,g /home/ec2-user/.kube/config
                 export KUBECONFIG=/home/ec2-user/.kube/config
-                echo Checking whether aws-auth configmap exists...
+                echo "Checking whether aws-auth configmap exists..."
                 kubectl get configmaps/aws-auth -n kube-system &> /dev/null
                 if [ $? -gt 0 ]; then
-                  echo Configmap does not exist, applying...
+                  echo "Configmap does not exist, applying..."
+                  curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+                  mv /tmp/eksctl /usr/local/bin
+                  eksctl create iamidentitymapping  --region ${AWS::Region} --cluster ${EKSClusterName} --arn ${EksMgmtIamRoleArn} --username admin --group system:masters
                   kubectl apply -f /tmp/aws-auth-cm.yaml
                 fi
               mode: "000750"
@@ -467,7 +504,7 @@ Resources:
                     - rolearn: ${EksMgmtIamRoleArn}
                       groups:
                         -system:masters
-                      username: federated-user
+                      username: admin
               mode: "000644"
               owner: root
               group: root
@@ -537,11 +574,13 @@ Resources:
             aws-iam-authenticator version
             cfn-init -v --stack ${AWS::StackName} --resource EKSProvisionLaunchConfiguration --region ${AWS::Region}
             cfn-signal -e $? --stack ${AWS::StackName} --resource EKSProvisionAutoScalingGroup --region ${AWS::Region}
-            echo terminating eks provision node
+            #if [ "${RemoveTempResources}" == "true" ];then
+            echo "terminating eks provision node"
             INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
             ASG=$(aws autoscaling describe-auto-scaling-instances --region ${AWS::Region} --output text --query=AutoScalingInstances[].AutoScalingGroupName --instance-ids=$INSTANCE_ID)
-            echo $ASG
+            echo "$ASG"
             nohup aws autoscaling --region ${AWS::Region} update-auto-scaling-group --auto-scaling-group-name $ASG --desired-capacity 0 --min-size 0 --max-size 0 &>/dev/null &
+            # fi
 
 
 Outputs:

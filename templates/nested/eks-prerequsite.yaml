@@ -10,7 +10,7 @@ Metadata:
             - TemplateBucketName
             - Environment
             - VPCID
-            - NodeSecurityGroup
+            #- NodeSecurityGroup
             - ProvisionSecurityGroup
 
       ParameterLabels:
@@ -20,8 +20,8 @@ Metadata:
           default: The Key prefix for the templates in the S3 template bucket
         VPCID:
           default: The ID of the VPC to deploy the EKS Cluster into
-        NodeSecurityGroup:
-          default: The Security Group of EKS Worker nodes
+        #NodeSecurityGroup:
+        #  default: The Security Group of EKS Worker nodes
         ProvisionSecurityGroup:
           default: The Security Group of Provision Host
 
@@ -38,9 +38,9 @@ Parameters:
     VPCID:
       Description: "ID for the VPC"
       Type: "AWS::EC2::VPC::Id"
-    NodeSecurityGroup:
-      Description: "ID for the VPC, This will be used to get the node security group"
-      Type: "AWS::EC2::SecurityGroup::Id"
+    #NodeSecurityGroup:
+    #  Description: "ID for the VPC, This will be used to get the node security group"
+    #  Type: "AWS::EC2::SecurityGroup::Id"
     ProvisionSecurityGroup:
       Description: "ID for the VPC, This will be used to get the provision security group"
       Type: "AWS::EC2::SecurityGroup::Id"
@@ -77,7 +77,8 @@ Resources:
     Properties:
       Description: Allow the cluster control panel to communicate with worker Kubelet and pods
       GroupId: !Ref ControlPanelSecurityGroup
-      DestinationSecurityGroupId: !Ref NodeSecurityGroup
+      #DestinationSecurityGroupId: !Ref NodeSecurityGroup
+      DestinationSecurityGroupId: !Ref ControlPanelSecurityGroup
       IpProtocol: tcp
       FromPort: 10250
       ToPort: 10250
@@ -87,7 +88,8 @@ Resources:
     Properties:
       Description: Allow pods to communicate with the cluster API Server
       GroupId: !Ref ControlPanelSecurityGroup
-      SourceSecurityGroupId: !Ref NodeSecurityGroup
+      #SourceSecurityGroupId: !Ref NodeSecurityGroup
+      SourceSecurityGroupId: !Ref ControlPanelSecurityGroup
       IpProtocol: tcp
       ToPort: 443
       FromPort: 443

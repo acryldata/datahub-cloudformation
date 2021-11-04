@@ -11,6 +11,7 @@ Metadata:
             - Environment
             - K8sNamespace
             - TemplateBucketName
+            - RemoveTempResources
         - Label:
             default: Provision Stack Configuration
           Parameters:
@@ -23,6 +24,8 @@ Metadata:
             - ProvisionInstanceType
 
       ParameterLabels:
+        RemoveTempResources:
+          default: Enable Deletion of Temp Resources
         TemplateBucketName:
           default: The name of the S3 bucket that holds the templates
         VPCID:
@@ -47,6 +50,13 @@ Metadata:
           default: The namespace in EKS to deploy kots and datahub app
 
 Parameters:
+    RemoveTempResources:
+      Description: "Set to true if you don't want to keep provision host"
+      Type: String
+      Default: "true"
+      AllowedValues:
+        - "true"
+        - "false"
     TemplateBucketName:
       AllowedPattern: "^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$"
       ConstraintDescription: "Bucket name can include numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen (-)."
@@ -246,17 +256,17 @@ Resources:
             /tmp/admin_bootstrap.sh:
               content: !Sub |
                 #!/bin/bash
-                echo "Checking whether cluster exists..."
-
-                #EXTRA_TAGS=$(/tmp/check_extra_tags.sh ${Environment})
+                echo "Checking extra tags..."
                 EXTRA_TAGS=$(/tmp/check_extra_tags-v2.sh ${Environment})
                 len=`expr length "$EXTRA_TAGS"`
                 if [ $len -gt 3 ]; then
                   EXTRA_TAGS_FLAG="true"
                 fi
+
+                echo "Checking whether cluster exists..."
                 aws eks describe-cluster --region ${AWS::Region} --name ${EKSClusterName} &> /dev/null
                 if [ $? -eq 0 ]; then
-                  echo Updating kubeconfig file...
+                  echo "Updating kubeconfig file..."
                   ENDPOINT=$(aws eks describe-cluster --region ${AWS::Region}  --name ${EKSClusterName} --query cluster.endpoint --output text)
                   CERT_DATA=$(aws eks describe-cluster --region ${AWS::Region}  --name ${EKSClusterName} --query cluster.certificateAuthority.data --output text)
                   sed -i s,ENDPOINT,$ENDPOINT,g /home/ec2-user/.kube/config
@@ -264,7 +274,7 @@ Resources:
                   export KUBECONFIG=/home/ec2-user/.kube/config
                   chmod 600 /home/ec2-user/.kube/config
                 fi
-                echo Install Ingress Controller...
+                echo "Install Ingress Controller..."
                 set -x
                 curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
                 mv /tmp/eksctl /usr/local/bin
@@ -275,7 +285,7 @@ Resources:
                 echo "          annotations:" >> values.yaml
                 echo "            eks.amazonaws.com/role-arn: arn:aws:iam::${AWS::AccountId}:role/${EKSClusterName}-aws-load-balancer-controller" >> values.yaml
                 helm install aws-load-balancer-controller eks/aws-load-balancer-controller --set region=${AWS::Region} -n kube-system --set clusterName=${EKSClusterName} --set serviceAccount.name=${EKSClusterName}-aws-load-balancer-controller --set image.tag=v2.2.0 --version 1.2.7 -f values.yaml
-                echo prepare configvalues.yaml...
+                echo "prepare configvalues.yaml..."
                 ZOOKEEPER_CONNECT=$(aws kafka --region ${AWS::Region} list-clusters --cluster-name-filter ${MSKClusterName} --no-paginate --query 'ClusterInfoList[0].ZookeeperConnectString' --output text)
                 CLUSTER_ARN=$(aws kafka --region ${AWS::Region} list-clusters --cluster-name-filter ${MSKClusterName} --no-paginate --query 'ClusterInfoList[0].ClusterArn' --output text)
                 BOOTSTRAP_BROKERS=$(aws kafka --region ${AWS::Region} get-bootstrap-brokers --cluster-arn $CLUSTER_ARN --no-paginate --query 'BootstrapBrokerString' --output text)
@@ -294,9 +304,9 @@ Resources:
                   aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$ZOOKEEPER_CONNECT" --overwrite --no-paginate
                 fi
                 set +x
-                echo Creating namespace...
+                echo "Creating namespace..."
                 kubectl create ns ${K8sNamespace}
-                echo Generate UUID...
+                echo "Generate UUID..."
                 aws kms generate-random --region ${AWS::Region} --number-of-bytes 32  --output text --query Plaintext>uuid_secret
                 aws kms generate-random --region ${AWS::Region} --number-of-bytes 16  --output text --query Plaintext>datahub-password
                 DATAHUB_PASSWORD=$(cat datahub-password)
@@ -317,7 +327,7 @@ Resources:
                   aws secretsmanager create-secret --region ${AWS::Region} --name "/${Environment}/${EKSClusterName}/admin/apikey" --secret-string "$APIKEY" --description "${Environment}: DataHub Admin Apikey" 
                 fi
                 cd ..
-                echo prepare secrets...
+                echo "prepare secrets..."
                 kubectl get secret/play-secret -n ${K8sNamespace} &> /dev/null
                 if [ $? -gt 0 ]; then
                   echo "create secret uuid_secret in namespace: ${K8sNamespace}"
@@ -334,20 +344,20 @@ Resources:
        
                 kubectl create secret generic mysql-secrets --from-file=mysql-password=mysql-password --namespace ${K8sNamespace}
                 kubectl create secret generic elasticsearch-secrets --from-file=elasticsearch-password=elasticsearch-password --namespace ${K8sNamespace}
-                echo Install kots...
+                echo "Install kots..."
                 kubectl kots install ${Application}/${ApplicationReleaseChannel} -n ${K8sNamespace} --shared-password "${KOTSUserPassword}" --license-file /tmp/license.yaml --config-values /home/ec2-user/configvalues.yaml --wait-duration 120s --port-forward=false
-                echo Install kotsadm svc...
+                echo "Install kotsadm svc..."
                 kubectl apply -f /home/ec2-user/kotsadm-svc.yaml
-                echo Waiting datahub-kotsadm to be Active...
+                echo "Waiting datahub-kotsadm to be Active..."
                 aws elbv2 describe-load-balancers --region ${AWS::Region} --names datahub-kotsadm
                 while [ $? -gt 0 ]; do
-                  echo datahub-kotsadm is still creating, sleeping for 30 seconds...
+                  echo "datahub-kotsadm is still creating, sleeping for 30 seconds..."
                   sleep 30
                   aws elbv2 describe-load-balancers --region ${AWS::Region} --names datahub-kotsadm
                 done
                 STATUS=$(aws elbv2 describe-load-balancers --region ${AWS::Region} --names datahub-kotsadm --query LoadBalancers[0].State.Code --output text --no-paginate)
                 while [ $STATUS != 'active' ]; do
-                  echo datahub-kotsadm is still provisioning, sleeping for 10 seconds...
+                  echo "datahub-kotsadm is still provisioning, sleeping for 10 seconds..."
                   sleep 10
                   STATUS=$(aws elbv2 describe-load-balancers --region ${AWS::Region} --names datahub-kotsadm --query LoadBalancers[0].State.Code --output text --no-paginate)
                 done
@@ -521,11 +531,13 @@ Resources:
             mv -f kots /usr/local/bin/kubectl-kots
             cfn-init -v --stack ${AWS::StackName} --resource AdminProvisionLaunchConfiguration --region ${AWS::Region}
             cfn-signal -e $? --stack ${AWS::StackName} --resource AdminProvisionAutoScalingGroup --region ${AWS::Region}
-            echo terminating admin provision node
-            #INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
-            #ASG=$(aws autoscaling describe-auto-scaling-instances --region ${AWS::Region} --output text --query=AutoScalingInstances[].AutoScalingGroupName --instance-ids=$INSTANCE_ID)
-            #echo $ASG
-            #nohup aws autoscaling --region ${AWS::Region} update-auto-scaling-group --auto-scaling-group-name $ASG --desired-capacity 0 --min-size 0 --max-size 0 &>/dev/null &
+            if [ "${RemoveTempResources}" == "true" ];then
+              echo "terminating admin provision node"
+              INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+              ASG=$(aws autoscaling describe-auto-scaling-instances --region ${AWS::Region} --output text --query=AutoScalingInstances[].AutoScalingGroupName --instance-ids=$INSTANCE_ID)
+              echo "$ASG"
+              nohup aws autoscaling --region ${AWS::Region} update-auto-scaling-group --auto-scaling-group-name $ASG --desired-capacity 0 --min-size 0 --max-size 0 &>/dev/null &
+             fi
 
 Outputs:
   DatahubAppUrl:
