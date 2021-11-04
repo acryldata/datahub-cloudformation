@@ -13,5 +13,5 @@ aws secretsmanager delete-secret --secret-id /${Environment}/${StackName}/admin/
 
 
 #SSM Parameter Store
-aws ssm delete-parameters --names "/${Environment}/${StackName}/eks/oidc" "/${Environment}/${StackName}/msk/bootstrap_brokers" "/${Environment}/${StackName}/msk/zookeeper_connect" "/${Environment}/${StackName}/admin/nlbarn" --region us-west-2 --no-cli-pager
+aws ssm delete-parameters --names "/${Environment}/${StackName}/eks/oidc" "/${Environment}/${StackName}/msk/bootstrap_brokers" "/${Environment}/${StackName}/msk/zookeeper_connect" "/${Environment}/${StackName}/kotsadm/nlbarn" "/${Environment}/${StackName}/kotsadm/nlbdns" "/${Environment}/${StackName}/admin/nlbarn" "/${Environment}/${StackName}/admin/nlbarn" --region us-west-2 --no-cli-pager
 

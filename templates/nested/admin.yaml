@@ -361,7 +361,7 @@ Resources:
                 NLBDNS=$(aws elbv2 describe-load-balancers --region ${AWS::Region} --names datahub-kotsadm --query LoadBalancers[0].DNSName --output text --no-paginate)
                 parameter='/${Environment}/${EKSClusterName}/kotsadm/nlbdns'
                 if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
-                  aws ssm put-parameter --tags $EXTRA_TAGS --region ${AWS::Region} --name "$parameter" --type "String" --value "$NLBARN"  --no-paginate
+                  aws ssm put-parameter --tags $EXTRA_TAGS --region ${AWS::Region} --name "$parameter" --type "String" --value "$NLBDNS"  --no-paginate
                 else
                   aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$NLBARN" --overwrite --no-paginate
                 fi
