@@ -468,7 +468,8 @@ Resources:
                   curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
                   mv /tmp/eksctl /usr/local/bin
                   eksctl create iamidentitymapping  --region ${AWS::Region} --cluster ${EKSClusterName} --arn ${EksMgmtIamRoleArn} --username admin --group system:masters
-                  kubectl apply -f /tmp/aws-auth-cm.yaml
+                  #kubectl apply -f /tmp/aws-auth-cm.yaml
+                  kubectl get cm -n kube-system aws-auth -o yaml
                 fi
               mode: "000750"
               owner: root
