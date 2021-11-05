@@ -514,6 +514,7 @@ Resources:
 
     EC2LogGroup:
       Type: AWS::Logs::LogGroup
+      DeletionPolicy: Retain
       Properties: 
         LogGroupName: !Sub "/${Environment}/${AWS::StackName}/ProvisionHost"
 
