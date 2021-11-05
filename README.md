@@ -79,6 +79,6 @@ cd cloudformation
 ```
      - follow step 0 to step 3
 
-     - type 1 to continue, Type 2 to cancel
+     - after step 0 through step 3 are completed, type 1 to continue, Type 2 to cancel
      
 
