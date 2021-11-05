@@ -24,8 +24,13 @@ aws secretsmanager delete-secret --secret-id /${Environment}/${StackName}/admin/
 
 #===SSM Parameter Store===
 aws ssm delete-parameters --names "/${Environment}/${StackName}/eks/oidc" "/${Environment}/${StackName}/eks/clusterSecurityGroupId" "/${Environment}/${StackName}/msk/bootstrap_brokers" "/${Environment}/${StackName}/msk/zookeeper_connect" "/${Environment}/${StackName}/kotsadm/nlbarn" "/${Environment}/${StackName}/kotsadm/nlbdns" "/${Environment}/${StackName}/admin/albarn" "/${Environment}/${StackName}/admin/albdns" --region us-west-2 --no-cli-pager;
+
+#===Log Group===
+aws logs delete-log-group --log-group-name "/${Environment}/${StackName}/ProvisionHost" --region us-west-2 --no-cli-pager;
 break;;
         No ) exit;;
     esac
 done
+
+
 
