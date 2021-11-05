@@ -77,4 +77,8 @@ export AWS_PROFILE=***
 cd cloudformation
 ./CleanUp-after-Stack-Deletion.sh dev dev-datahub
 ```
+     - follow step 0 to step 3
+
+     - type 1 to continue, Type 2 to cancel
+     
 
