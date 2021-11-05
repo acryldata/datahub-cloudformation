@@ -1,7 +1,7 @@
 echo "====================================================================================="
 echo "0) delete PrivateLinkStack (Acryl needs to delete private vpc endpoint if they are connected to your privatelink)"
 echo "1) run 'kubectl delete ns <StackName>' to delete ALB/NLB/target groups created by ingress controller"
-echo "2) trigger deletion of master Cloudformation Stack (i.e. dev-datahub),wait till EKSClusterStack is deleted, then manually delete EKS cluster"
+echo "2) trigger deletion of master Cloudformation Stack (i.e. dev-datahub),wait till EKSNodeGroupStack is deleted, then manually delete EKS cluster"
 echo "3) after Cloudformation Stack is deleted, run below CleanUp-after-Stack-Deletion.sh"
 echo "====================================================================================="
 if [ $# -ne 2 ]; then
