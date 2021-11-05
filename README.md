@@ -43,6 +43,8 @@ export AWS_PROFILE=***
              - The AWS IAM Role arn that will be allowed to manage EKS: aws:iam::AccountID:role/admin-role
              - DataHub Domain Name: datahub.a.b.c
              - ELB cert arn: arn: arn:aws:acm:REGION:AccountID:certificate/xx-xx-xx-xx-xx (ssl cert for datahub.a.b.c)
+             - The Elastic Load Balancer Inbound CIDRs: comma seperated CIDR list that can access DataHub ALB
+
              - Kots Admin Domain Name: kotsadm.e.f.g
              - Kots ELB cert arn: arn:aws:acm:REGION:AccountID:certificate/xx-xx-xx-xx-xx (ssl cert for kotsadm.e.f.g)
              
