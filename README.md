@@ -21,7 +21,9 @@ export AWS_PROFILE=***
 
      - choose Oregon region -> Cloudformation -> Create stack
 
-     - Template Amazon S3 URL: https://cf-templates-xxx-us-west-2.s3.us-west-2.amazonaws.com/dev/templates/datahub-deployment.yaml
+     - Template Amazon S3 URL: https://cf-templates-xxx-us-west-2.s3.us-west-2.amazonaws.com/dev/templates/datahub-deployment.yaml (will create new VPC/Subnets)
+
+     - Template Amazon S3 URL: https://cf-templates-xxx-us-west-2.s3.us-west-2.amazonaws.com/dev/templates/datahub-deployment-existing-vpc.yaml (use existing VPC/Subnets)
 
      - Stack name: dev-datahub
  

@@ -11,18 +11,6 @@ Metadata:
             - TemplateBucketName
             - Environment
         - Label:
-            default: New VPC Stack Configuration
-          Parameters:
-            - CreateVPC
-            - VPCCIDR
-            - AvailabilityZones
-            - PrivateSubnet1CIDR
-            - PrivateSubnet2CIDR
-            - PrivateSubnet3CIDR
-            - PublicSubnet1CIDR
-            - PublicSubnet2CIDR
-            - PublicSubnet3CIDR
-        - Label:
             default: Existing VPC Configuration (leave it alone when creating New VPC)
           Parameters:
             - VPCID
@@ -36,6 +24,7 @@ Metadata:
         - Label:
             default: ElasticSearch Stack Configuration
           Parameters:
+            - CreateElasticSearchServiceRole
             - CreateElasticSearch
             - ESDataNodeCount
             - ESInstanceType
@@ -80,10 +69,11 @@ Metadata:
           Parameters:
             - CreateAdmin
             - DomainName
+            - ElbCertArn 
             - KotsDomainName
+            - KotsElbCertArn 
             - KotsAdmNLBScheme
             - ProvisionInstanceType
-            - ElbCertArn 
             - ElbInboundCIDRs
             - Application
             - ApplicationReleaseChannel
@@ -116,18 +106,6 @@ Metadata:
         ### New VPC 
         AvailabilityZones:
           default: The AZ's to deploy to.
-        PrivateSubnet1CIDR:
-          default: The CIDR block for the first private subnet
-        PrivateSubnet2CIDR:
-          default: The CIDR block for the second private subnet
-        PrivateSubnet3CIDR:
-          default: The CIDR block for the third private subnet
-        PublicSubnet1CIDR:
-          default: The CIDR block for the first public subnet
-        PublicSubnet2CIDR:
-          default: The CIDR block for the second public subnet
-        PublicSubnet3CIDR:
-          default: The CIDR block for the third public subnet
         ProvisionInstanceType:
           default: The instance type to deploy Provision to
         NodeInstanceType:
@@ -150,8 +128,8 @@ Metadata:
           default: The Kubernetes Version
         CreateElasticSearch:
           default: Enable Creation of ElasticSearch
-        CreateVPC:
-          default: Enable Creation of VPC
+        CreateElasticSearchServiceRole:
+          default: Enable Creation of ElasticSearch Service Role
         CreateMSK:
           default: Enable Creation of MSK
         CreateMySQL:
@@ -188,6 +166,8 @@ Metadata:
           default: Deploy EKS load balancer controller
         ElbCertArn:
           default: ELB cert arn
+        KotsElbCertArn:
+          default: Kots ELB cert arn
         ElbInboundCIDRs:
           default: ALB Inbound CIDRs
         DomainName:
@@ -206,6 +186,9 @@ Parameters:
     VPCID: 
       Default: "vpc-1234" 
       Type: String
+    AvailabilityZones:
+      Description: "List of Availability Zones to use for the subnets in the VPC. Please choose three zones."
+      Type: "List<AWS::EC2::AvailabilityZone::Name>"
     PrivateSubnet1ID: 
       Default: "subnet-01" 
       Type: String
@@ -225,52 +208,6 @@ Parameters:
       Default: "subnet-06" 
       Type: String
 
-    ### New VPC 
-    AvailabilityZones:
-      Description: "List of Availability Zones to use for the subnets in the VPC. Please choose three zones."
-      Type: "List<AWS::EC2::AvailabilityZone::Name>"
-    PrivateSubnet1CIDR:
-      AllowedPattern: "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$"
-      ConstraintDescription: "CIDR block parameter must be in the form x.x.x.x/16-28"
-      Default: "10.0.0.0/23"
-      Description: "CIDR block for private subnet 1 located in Availability Zone 1"
-      Type: "String"
-    PrivateSubnet2CIDR:
-      AllowedPattern: "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$"
-      ConstraintDescription: "CIDR block parameter must be in the form x.x.x.x/16-28"
-      Default: "10.0.2.0/23"
-      Description: "CIDR block for private subnet 2 located in Availability Zone 2"
-      Type: "String"
-    PrivateSubnet3CIDR:
-      AllowedPattern: "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$"
-      ConstraintDescription: "CIDR block parameter must be in the form x.x.x.x/16-28"
-      Default: "10.0.4.0/23"
-      Description: "CIDR block for private subnet 3 located in Availability Zone 3"
-      Type: "String"
-    PublicSubnet1CIDR:
-      AllowedPattern: "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$"
-      ConstraintDescription: "CIDR block parameter must be in the form x.x.x.x/16-28"
-      Default: "10.0.100.0/24"
-      Description: "CIDR block for the public (DMZ) subnet 1 located in Availability Zone 1"
-      Type: "String"
-    PublicSubnet2CIDR:
-      AllowedPattern: "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$"
-      ConstraintDescription: "CIDR block parameter must be in the form x.x.x.x/16-28"
-      Default: "10.0.102.0/24"
-      Description: "CIDR block for the public (DMZ) subnet 2 located in Availability Zone 2"
-      Type: "String"
-    PublicSubnet3CIDR:
-      AllowedPattern: "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$"
-      ConstraintDescription: "CIDR block parameter must be in the form x.x.x.x/16-28"
-      Default: "10.0.104.0/24"
-      Description: "CIDR block for the public (DMZ) subnet 3 located in Availability Zone 3"
-      Type: "String"
-    VPCCIDR:
-      AllowedPattern: "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$"
-      ConstraintDescription: "CIDR block parameter must be in the form x.x.x.x/16-28"
-      Default: "10.0.0.0/16"
-      Description: "CIDR block for the VPC"
-      Type: "String"
     ProvisionInstanceType:
       Type: "String"
       Default: "t2.micro"
@@ -336,17 +273,17 @@ Parameters:
       Default: "1.18"
       AllowedValues:
         - "1.18"
-    CreateVPC:
-      Description: "Set to true if you want to create VPC"
+    CreateElasticSearch:
+      Description: "Set to true if you want to create ElasticSearch"
       Type: String
       Default: "true"
       AllowedValues:
         - "true"
         - "false"
-    CreateElasticSearch:
-      Description: "Set to true if you want to create ElasticSearch"
+    CreateElasticSearchServiceRole:
+      Description: "Set to true if IAM Role AWSServiceRoleForAmazonElasticsearchService doesn't exist"
       Type: String
-      Default: "true"
+      Default: "false"
       AllowedValues:
         - "true"
         - "false"
@@ -464,6 +401,10 @@ Parameters:
       ConstraintDescription: The Elastic Load Balancer Cert Arn can not be empty
       Type: String
       Default: ""
+    KotsElbCertArn:
+      ConstraintDescription: The Elastic Load Balancer Cert Arn can not be empty
+      Type: String
+      Default: ""
     ElbInboundCIDRs:
       ConstraintDescription: The Elastic Load Balancer Inbound CIDRs
       Type: String
@@ -502,18 +443,22 @@ Parameters:
 
 
 Conditions:
-  isCreateVPC:           !Equals [!Ref CreateVPC, "true"]
-  isCreateElasticSearch: !Equals [!Ref CreateElasticSearch, "true"]
-  isCreateMySQL:         !Equals [!Ref CreateMySQL, "true"]
-  isCreateMSK:           !Equals [!Ref CreateMSK, "true"]
-  isCreateEKS:           !Equals [!Ref CreateEKS, "true"]
-  isCreateAdmin:         !Equals [!Ref CreateAdmin, "true"]
-  isCreatePrivateLink:   !Equals [!Ref CreatePrivateLink, "true"]
+  isCreateElasticSearchServiceRole: !Equals [!Ref CreateElasticSearchServiceRole, "true"]
+  isCreateElasticSearch:            !Equals [!Ref CreateElasticSearch, "true"]
+  isCreateESServiceRole:            !And
+    - !Condition isCreateElasticSearchServiceRole
+    - !Condition isCreateElasticSearch
+  isCreateMySQL:                    !Equals [!Ref CreateMySQL, "true"]
+  isCreateMSK:                      !Equals [!Ref CreateMSK, "true"]
+  isCreateEKS:                      !Equals [!Ref CreateEKS, "true"]
+  isCreateAdmin:                    !Equals [!Ref CreateAdmin, "true"]
+  isCreatePrivateLink:              !Equals [!Ref CreatePrivateLink, "true"]
+
 
 Resources:
 
     ESServiceRole:
-        Condition: isCreateElasticSearch
+        Condition: isCreateESServiceRole
         Type: 'AWS::IAM::ServiceLinkedRole'
         Properties:
             AWSServiceName: es.amazonaws.com
@@ -568,29 +513,6 @@ Resources:
             Key: CloudFormation
             Value: "true"
 
-    VPCStack:
-      Condition: isCreateVPC
-      Type: AWS::CloudFormation::Stack
-      Properties:
-        Tags:
-          - Key: Name
-            Value: !Sub "${AWS::StackName}"
-          - Key: Component
-            Value: !Sub "${AWS::StackName}-vpc"
-        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/vpc.yaml"
-        Parameters:
-          AvailabilityZones: !Join [",", !Ref AvailabilityZones]
-          PrivateSubnet1ACIDR: !Ref PrivateSubnet1CIDR
-          PrivateSubnet2ACIDR: !Ref PrivateSubnet2CIDR
-          PrivateSubnet3ACIDR: !Ref PrivateSubnet3CIDR
-          PrivateSubnetATag1: kubernetes.io/role/internal-elb=1
-          PublicSubnet1CIDR: !Ref PublicSubnet1CIDR
-          PublicSubnet2CIDR: !Ref PublicSubnet2CIDR
-          PublicSubnet3CIDR: !Ref PublicSubnet3CIDR
-          PublicSubnetTag1: kubernetes.io/role/elb=1
-          CreatePrivateSubnets: "true"
-          VPCCIDR: !Ref VPCCIDR
-
     EC2LogGroup:
       Type: AWS::Logs::LogGroup
       Properties: 
@@ -604,7 +526,7 @@ Resources:
           - Key: Name
             Value: !Sub "${AWS::StackName}-ProvisionHost-SG"
         GroupDescription: Enables SSH Access to Provision Hosts
-        VpcId: !If [isCreateVPC, !GetAtt VPCStack.Outputs.VPCID, !Ref VPCID]
+        VpcId: !Ref VPCID
 
     NodeInstanceRole:
       Condition: isCreateEKS
@@ -655,7 +577,6 @@ Resources:
       Condition: isCreateElasticSearch
       Type: AWS::CloudFormation::Stack
       DependsOn:
-        - ESServiceRole
         - EKSClusterStack
       Properties:
         Tags:
@@ -666,10 +587,10 @@ Resources:
         TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/elasticsearch.yaml"
         Parameters:
           # ES stack params
-          VPCID: !If [isCreateVPC, !GetAtt VPCStack.Outputs.VPCID, !Ref VPCID]
-          PrivateSubnet1: !If [isCreateVPC, !GetAtt VPCStack.Outputs.PrivateSubnet1AID, !Ref PrivateSubnet1ID]
-          PrivateSubnet2: !If [isCreateVPC, !GetAtt VPCStack.Outputs.PrivateSubnet2AID, !Ref PrivateSubnet2ID]
-          PrivateSubnet3: !If [isCreateVPC, !GetAtt VPCStack.Outputs.PrivateSubnet3AID, !Ref PrivateSubnet3ID]
+          VPCID: !Ref VPCID
+          PrivateSubnet1: !Ref PrivateSubnet1ID
+          PrivateSubnet2: !Ref PrivateSubnet2ID
+          PrivateSubnet3: !Ref PrivateSubnet3ID
           NodeSecurityGroup: !GetAtt EKSPreRequsiteStack.Outputs.ControlPanelSecurityGroup
           ESDataNodeCount: !Ref ESDataNodeCount
           ESInstanceType: !Ref ESInstanceType
@@ -698,10 +619,10 @@ Resources:
         Parameters:
           # MySQL stack params
           AvailabilityZones: !Join [",", !Ref AvailabilityZones]
-          VPCID: !If [isCreateVPC, !GetAtt VPCStack.Outputs.VPCID, !Ref VPCID]
-          DBSubnet1: !If [isCreateVPC, !GetAtt VPCStack.Outputs.PrivateSubnet1AID, !Ref PrivateSubnet1ID]
-          DBSubnet2: !If [isCreateVPC, !GetAtt VPCStack.Outputs.PrivateSubnet2AID, !Ref PrivateSubnet2ID]
-          DBSubnet3: !If [isCreateVPC, !GetAtt VPCStack.Outputs.PrivateSubnet3AID, !Ref PrivateSubnet3ID]
+          VPCID: !Ref VPCID
+          DBSubnet1: !Ref PrivateSubnet1ID
+          DBSubnet2: !Ref PrivateSubnet2ID
+          DBSubnet3: !Ref PrivateSubnet3ID
           NodeSecurityGroup: !GetAtt EKSPreRequsiteStack.Outputs.ControlPanelSecurityGroup
           MasterUser:
             Fn::Sub: "{{resolve:secretsmanager:${RDSSecret}::username}}"
@@ -727,10 +648,10 @@ Resources:
         TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/msk.yaml"
         Parameters:
           # MSK stack params
-          VPCID: !If [isCreateVPC, !GetAtt VPCStack.Outputs.VPCID, !Ref VPCID]
-          DBSubnet1: !If [isCreateVPC, !GetAtt VPCStack.Outputs.PrivateSubnet1AID, !Ref PrivateSubnet1ID]
-          DBSubnet2: !If [isCreateVPC, !GetAtt VPCStack.Outputs.PrivateSubnet2AID, !Ref PrivateSubnet2ID]
-          DBSubnet3: !If [isCreateVPC, !GetAtt VPCStack.Outputs.PrivateSubnet3AID, !Ref PrivateSubnet3ID]
+          VPCID: !Ref VPCID
+          DBSubnet1: !Ref PrivateSubnet1ID
+          DBSubnet2: !Ref PrivateSubnet2ID
+          DBSubnet3: !Ref PrivateSubnet3ID
           NodeSecurityGroup: !GetAtt EKSPreRequsiteStack.Outputs.ControlPanelSecurityGroup
           MSKClusterName: !Sub "${AWS::StackName}"
           Environment: !Ref Environment
@@ -751,7 +672,7 @@ Resources:
             Value: !Sub "${AWS::StackName}"
         TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/eks-prerequsite.yaml"
         Parameters:
-          VPCID: !If [isCreateVPC, !GetAtt VPCStack.Outputs.VPCID, !Ref VPCID]
+          VPCID: !Ref VPCID
           TemplateBucketName: !Ref TemplateBucketName
           Environment: !Ref Environment
           ProvisionSecurityGroup: !Ref ProvisionSecurityGroup
@@ -772,13 +693,13 @@ Resources:
         TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/eks-cluster.yaml"
         Parameters:
           # Provision stack params
-          VPCID: !If [isCreateVPC, !GetAtt VPCStack.Outputs.VPCID, !Ref VPCID]
-          PublicSubnet1ID: !If [isCreateVPC, !GetAtt VPCStack.Outputs.PublicSubnet1ID, !Ref PublicSubnet1ID]
-          PublicSubnet2ID: !If [isCreateVPC, !GetAtt VPCStack.Outputs.PublicSubnet2ID, !Ref PublicSubnet2ID]
-          PublicSubnet3ID: !If [isCreateVPC, !GetAtt VPCStack.Outputs.PublicSubnet3ID, !Ref PublicSubnet3ID]
-          PrivateSubnet1ID: !If [isCreateVPC, !GetAtt VPCStack.Outputs.PrivateSubnet1AID, !Ref PrivateSubnet1ID]
-          PrivateSubnet2ID: !If [isCreateVPC, !GetAtt VPCStack.Outputs.PrivateSubnet2AID, !Ref PrivateSubnet2ID]
-          PrivateSubnet3ID: !If [isCreateVPC, !GetAtt VPCStack.Outputs.PrivateSubnet3AID, !Ref PrivateSubnet3ID]
+          VPCID: !Ref VPCID
+          PublicSubnet1ID: !Ref PublicSubnet1ID
+          PublicSubnet2ID: !Ref PublicSubnet2ID
+          PublicSubnet3ID: !Ref PublicSubnet3ID
+          PrivateSubnet1ID: !Ref PrivateSubnet1ID
+          PrivateSubnet2ID: !Ref PrivateSubnet2ID
+          PrivateSubnet3ID: !Ref PrivateSubnet3ID
           ProvisionInstanceType: !Ref ProvisionInstanceType
           TemplateBucketName: !Ref TemplateBucketName
           Environment: !Ref Environment
@@ -810,9 +731,9 @@ Resources:
         TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/eks-nodegroup.yaml"
         Parameters:
           # Provision stack params
-          PrivateSubnet1ID: !If [isCreateVPC, !GetAtt VPCStack.Outputs.PrivateSubnet1AID, !Ref PrivateSubnet1ID]
-          PrivateSubnet2ID: !If [isCreateVPC, !GetAtt VPCStack.Outputs.PrivateSubnet2AID, !Ref PrivateSubnet2ID]
-          PrivateSubnet3ID: !If [isCreateVPC, !GetAtt VPCStack.Outputs.PrivateSubnet3AID, !Ref PrivateSubnet3ID]
+          PrivateSubnet1ID: !Ref PrivateSubnet1ID
+          PrivateSubnet2ID: !Ref PrivateSubnet2ID
+          PrivateSubnet3ID: !Ref PrivateSubnet3ID
           TemplateBucketName: !Ref TemplateBucketName
           Environment: !Ref Environment
           NodeSecurityGroup: !GetAtt EKSPreRequsiteStack.Outputs.ControlPanelSecurityGroup
@@ -840,7 +761,7 @@ Resources:
             Value: !Sub "${AWS::StackName}-IngressControllerPreRequsite"
         TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/ingress-controller-prerequsite.yaml"
         Parameters:
-          VpcId: !If [isCreateVPC, !GetAtt VPCStack.Outputs.VPCID, !Ref VPCID]
+          VpcId: !Ref VPCID
           EksClusterName: !Sub "${AWS::StackName}"
           Environment: !Sub "${Environment}"
           ControllerHostNetwork: !Ref ControllerHostNetwork
@@ -864,11 +785,10 @@ Resources:
           # Provision stack params
           Application: !Ref Application
           ApplicationReleaseChannel: !Ref ApplicationReleaseChannel
-          VPCID: !If [isCreateVPC, !GetAtt VPCStack.Outputs.VPCID, !Ref VPCID]
-          PublicSubnet1ID: !If [isCreateVPC, !GetAtt VPCStack.Outputs.PublicSubnet1ID, !Ref PublicSubnet1ID]
-          PublicSubnet2ID: !If [isCreateVPC, !GetAtt VPCStack.Outputs.PublicSubnet2ID, !Ref PublicSubnet2ID]
-          PrivateSubnet1ID: !If [isCreateVPC, !GetAtt VPCStack.Outputs.PrivateSubnet1AID, !Ref PrivateSubnet1ID]
-          PrivateSubnet2ID: !If [isCreateVPC, !GetAtt VPCStack.Outputs.PrivateSubnet2AID, !Ref PrivateSubnet2ID]
+          VPCID: !Ref VPCID
+          PrivateSubnet1ID: !Ref PrivateSubnet1ID
+          PrivateSubnet2ID: !Ref PrivateSubnet2ID
+          PrivateSubnet3ID: !Ref PrivateSubnet3ID
           ProvisionInstanceRole: !GetAtt EKSClusterStack.Outputs.ProvisionInstanceRole
           ProvisionInstanceProfile: !GetAtt EKSClusterStack.Outputs.ProvisionInstanceProfile
           ProvisionInstanceType: !Ref ProvisionInstanceType
@@ -889,6 +809,7 @@ Resources:
           ElasticSearchEndpoint: !GetAtt ElasticSearchStack.Outputs.DomainEndpoint
           MSKClusterName: !Sub "${AWS::StackName}"
           ElbCertArn: !Ref ElbCertArn
+          KotsElbCertArn: !Ref KotsElbCertArn
           ElbInboundCIDRs: !Ref ElbInboundCIDRs
           MasterUserPassword:
             Fn::Sub: "{{resolve:secretsmanager:${RDSSecret}::password}}"
@@ -916,11 +837,6 @@ Resources:
           EKSClusterName: !Sub "${AWS::StackName}"
 
 Outputs:
-  # VPC stack
-  VPCID:
-    Value: !GetAtt VPCStack.Outputs.VPCID
-    Condition: isCreateVPC
-
   # Provision stack
   ProvisionSubstackName:
     Value: !GetAtt EKSClusterStack.Outputs.SubstackName
@@ -968,4 +884,3 @@ Outputs:
     Condition: isCreateEKS
   AvailabilityZones:
     Value: !Join [",", !Ref AvailabilityZones]
-    Condition: isCreateVPC
