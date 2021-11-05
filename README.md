@@ -73,3 +73,8 @@ export AWS_PROFILE=***
 
 
 ## To cleanup, see CleanUp-after-Stack-Deletion.sh
+```console
+cd cloudformation
+./CleanUp-after-Stack-Deletion.sh dev dev-datahub
+```
+
