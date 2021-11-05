@@ -545,44 +545,44 @@ Outputs:
     Value: !Sub "https://${DomainName}"
   DatahubAppCredential:
     Description: Datahub Application Credential
-    Value: "Secret Name: /${Environment}/${EKSClusterName}/admin/password"
+    Value: !Sub "Secret Name: /${Environment}/${EKSClusterName}/admin/password"
   DatahubAppAlbArn:
     Description: Datahub Application ALB Arn
-    Value: "SSM Parameter Store: /${Environment}/${EKSClusterName}/admin/albarn"
+    Value: !Sub "SSM Parameter Store: /${Environment}/${EKSClusterName}/admin/albarn"
   DatahubAppAlbDns:
     Description: Datahub Application ALB Dns
-    Value: "SSM Parameter Store: /${Environment}/${EKSClusterName}/admin/albdns"
+    Value: !Sub "SSM Parameter Store: /${Environment}/${EKSClusterName}/admin/albdns"
   DatahubAppApiKey:
     Description: Datahub Application APIKEY
-    Value: "Secret Name: /${Environment}/${EKSClusterName}/admin/apikey"
+    Value: !Sub "Secret Name: /${Environment}/${EKSClusterName}/admin/apikey"
   KotsAdminDomainName:
     Description: Datahub Release Admin Url
     Value: !Sub "https://${KotsDomainName}"
   KotsAdminNlbArn:
     Description: Datahub Release Admin NLB Arn
-    Value: "SSM Parameter Store: /${Environment}/${EKSClusterName}/kotsadm/nlbarn"
+    Value: !Sub "SSM Parameter Store: /${Environment}/${EKSClusterName}/kotsadm/nlbarn"
   KotsAdminNlbDns:
     Description: Datahub release Admin NLB Dns
-    Value: "SSM Parameter Store: /${Environment}/${EKSClusterName}/kotsadm/nlbdns"
+    Value: !Sub "SSM Parameter Store: /${Environment}/${EKSClusterName}/kotsadm/nlbdns"
   KotsAdminCredential:
     Description: Datahub Release Admin Credential
-    Value: "Secret Name: /${Environment}/ahub/kotsadm/password"
+    Value: !Sub "Secret Name: /${Environment}/${EKSClusterName}/kotsadm/password"
   AuroraRDSEndpoint:
     Description: Aurora RDS Endpoint
-    Value: "SSM Parameter Store: /${Environment}/${EKSClusterName}/mysql/endpoint"
+    Value: !Sub "SSM Parameter Store: /${Environment}/${EKSClusterName}/mysql/endpoint"
   AuroraRDSCredential:
     Description: Aurora RDS Credential
-    Value: "Secret Name: /${Environment}/${EKSClusterName}/mysql/password"
+    Value: !Sub "Secret Name: /${Environment}/${EKSClusterName}/mysql/password"
   ElasticSearchEndpoint:
     Description: ElasticSearch Endpoint
-    Value: "SSM Parameter Store: /${Environment}/${EKSClusterName}/elasticsearch/endpoint"
+    Value: !Sub "SSM Parameter Store: /${Environment}/${EKSClusterName}/elasticsearch/endpoint"
   ElasticSearchCredential:
     Description: ElasticSearch Credential
-    Value: "Secret Name: /${Environment}/${EKSClusterName}/elasticsearch/password"
+    Value: !Sub "Secret Name: /${Environment}/${EKSClusterName}/elasticsearch/password"
   MSKZookeepers:
     Description: MSK Zookeepers
-    Value: "SSM Parameter Store: /${Environment}/${EKSClusterName}/msk/zookeeper_connect"
+    Value: !Sub "SSM Parameter Store: /${Environment}/${EKSClusterName}/msk/zookeeper_connect"
   MSKBrokers:
     Description: MSK Bootstrap Brokers
-    Value: "SSM Parameter Store: /${Environment}/${EKSClusterName}/msk/bootstrap_broker"
+    Value: !Sub "SSM Parameter Store: /${Environment}/${EKSClusterName}/msk/bootstrap_broker"
  

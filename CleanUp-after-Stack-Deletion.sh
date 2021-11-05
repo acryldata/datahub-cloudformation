@@ -13,11 +13,19 @@ else
   StackName=$2
 fi
 
+echo "Did you complete above step 0 to 3?"
+select yn in "Yes" "No"; do
+    case $yn in
 #===Secrets===
-aws secretsmanager delete-secret --secret-id /${Environment}/${StackName}/admin/password --force-delete-without-recovery --region us-west-2 --no-cli-pager
-aws secretsmanager delete-secret --secret-id /${Environment}/${StackName}/admin/apikey --force-delete-without-recovery --region us-west-2 --no-cli-pager
+        Yes )  
+aws secretsmanager delete-secret --secret-id /${Environment}/${StackName}/admin/password --force-delete-without-recovery --region us-west-2 --no-cli-pager;
+aws secretsmanager delete-secret --secret-id /${Environment}/${StackName}/admin/apikey --force-delete-without-recovery --region us-west-2 --no-cli-pager;
 
 
 #===SSM Parameter Store===
-aws ssm delete-parameters --names "/${Environment}/${StackName}/eks/oidc" "/${Environment}/${StackName}/eks/clusterSecurityGroupId" "/${Environment}/${StackName}/msk/bootstrap_brokers" "/${Environment}/${StackName}/msk/zookeeper_connect" "/${Environment}/${StackName}/kotsadm/nlbarn" "/${Environment}/${StackName}/kotsadm/nlbdns" "/${Environment}/${StackName}/admin/albarn" "/${Environment}/${StackName}/admin/albdns" --region us-west-2 --no-cli-pager
+aws ssm delete-parameters --names "/${Environment}/${StackName}/eks/oidc" "/${Environment}/${StackName}/eks/clusterSecurityGroupId" "/${Environment}/${StackName}/msk/bootstrap_brokers" "/${Environment}/${StackName}/msk/zookeeper_connect" "/${Environment}/${StackName}/kotsadm/nlbarn" "/${Environment}/${StackName}/kotsadm/nlbdns" "/${Environment}/${StackName}/admin/albarn" "/${Environment}/${StackName}/admin/albdns" --region us-west-2 --no-cli-pager;
+break;;
+        No ) exit;;
+    esac
+done
 
