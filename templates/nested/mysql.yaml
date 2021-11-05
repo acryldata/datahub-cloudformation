@@ -15,6 +15,7 @@ Metadata:
           - DBClusterIdentifier
           - Environment
           - EksClusterName
+          - EksClusterName
           - DBInstanceClass
           - EngineVersion
           - MasterUser
@@ -37,6 +38,8 @@ Metadata:
         default: Aurora Cluster Identifier
       Environment:
         default: The Environment
+      EksClusterName:
+        default: The EksClusterName
       DBInstanceClass:
         default: Aurora Instance Type
       EngineVersion:
@@ -72,6 +75,9 @@ Parameters:
   Environment:
     Type: String
     Description: The Environment
+  EksClusterName:
+    Type: String
+    Description: The EksClusterName
   DBInstanceClass:
     AllowedValues:
       - db.t3.small

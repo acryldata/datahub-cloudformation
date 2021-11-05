@@ -678,6 +678,7 @@ Resources:
           ESMasterInstanceType: !Ref ESMasterInstanceType
           ESDomainName: !Sub "${AWS::StackName}"
           Environment: !Ref Environment
+          EksClusterName: !Sub "${AWS::StackName}"
           ElasticsearchVersion: !Ref ElasticsearchVersion
           ESMasterUserPassword:
             Fn::Sub: "{{resolve:secretsmanager:${ESSecret}::password}}"
@@ -707,6 +708,7 @@ Resources:
           MasterUserPassword:
             Fn::Sub: "{{resolve:secretsmanager:${RDSSecret}::password}}"
           Environment: !Ref Environment
+          EksClusterName: !Sub "${AWS::StackName}"
           DBClusterIdentifier: !Sub "${AWS::StackName}"
           DBInstanceClass: !Ref DBInstanceClass
           EngineVersion: !Ref EngineVersion
@@ -732,6 +734,7 @@ Resources:
           NodeSecurityGroup: !GetAtt EKSPreRequsiteStack.Outputs.ControlPanelSecurityGroup
           MSKClusterName: !Sub "${AWS::StackName}"
           Environment: !Ref Environment
+          EksClusterName: !Sub "${AWS::StackName}"
           MSKInstanceType: !Ref MSKInstanceType
           KafkaVersion: !Ref KafkaVersion
 

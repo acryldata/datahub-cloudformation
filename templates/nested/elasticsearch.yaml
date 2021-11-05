@@ -13,6 +13,7 @@ Metadata:
           - PrivateSubnet3
           - ESDomainName
           - Environment
+          - EksClusterName
           - ElasticsearchVersion
 
     ParameterLabels:
@@ -30,6 +31,8 @@ Metadata:
         default: Elasticsearch Domain
       Environment:
         default: The Environment
+      EksClusterName:
+        default: The EksClusterName
       ElasticsearchVersion:
         default: Elasticsearch Version
 
@@ -85,6 +88,9 @@ Parameters:
   Environment:
     Type: String
     Description: The Environment
+  EksClusterName:
+    Type: String
+    Description: The EksClusterName
   ESMasterUser:
     Default: "admin"
     Type: String

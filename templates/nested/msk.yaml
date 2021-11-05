@@ -13,6 +13,7 @@ Metadata:
           - DBSubnet3
           - MSKClusterName
           - Environment
+          - EksClusterName
           - KafkaVersion
           - MSKInstanceType
 
@@ -31,6 +32,8 @@ Metadata:
         default: MSK Cluster Name
       Environment:
         default: The Environment
+      EksClusterName:
+        default: The EksClusterName
       KafkaVersion:
         default: Kafka Version
       MSKInstanceType:
@@ -74,6 +77,9 @@ Parameters:
   Environment:
     Type: String
     Description: The Environment
+  EksClusterName:
+    Type: String
+    Description: The EksClusterName
 
 
 Resources:
@@ -108,7 +114,7 @@ Resources:
         Type: "AWS::EC2::SecurityGroupIngress"
         Properties:
             GroupId: !Ref MSKSecurityGroup
-            SourceSecurityGroupId: !Sub {{resolve:ssm:/${Environment}/${EksClusterName}/eks/clusterSecurityGroupId}}
+            SourceSecurityGroupId: !Sub "{{resolve:ssm:/${Environment}/${EksClusterName}/eks/clusterSecurityGroupId}}"
             SourceSecurityGroupOwnerId: !Ref AWS::AccountId
             FromPort: 9092
             IpProtocol: "tcp"
