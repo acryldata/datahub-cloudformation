@@ -26,6 +26,7 @@ Metadata:
             default: Existing VPC Configuration (leave it alone when creating New VPC)
           Parameters:
             - VPCID
+            - AvailabilityZones
             - PrivateSubnet1ID
             - PrivateSubnet2ID
             - PrivateSubnet3ID
