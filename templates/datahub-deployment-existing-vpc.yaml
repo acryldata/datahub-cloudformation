@@ -68,12 +68,12 @@ Metadata:
           Parameters:
             - CreateAdmin
             - DomainName
+            - ElbInboundCIDRs
             - ElbCertArn 
             - KotsDomainName
             - KotsElbCertArn 
             - KotsAdmNLBScheme
             - ProvisionInstanceType
-            - ElbInboundCIDRs
             - Application
             - ApplicationReleaseChannel
         - Label:
@@ -164,11 +164,11 @@ Metadata:
         ControllerHostNetwork:
           default: Deploy EKS load balancer controller
         ElbCertArn:
-          default: ELB cert arn
+          default: DataHub ALB cert arn
         KotsElbCertArn:
-          default: Kots ELB cert arn
+          default: KotsAdmin NLB cert arn
         ElbInboundCIDRs:
-          default: ALB Inbound CIDRs
+          default: DataHub ALB Inbound CIDRs
         DomainName:
           default: DataHub Domain Name
         KotsDomainName:
