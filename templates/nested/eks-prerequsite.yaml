@@ -8,20 +8,17 @@ Metadata:
             default: EKS Control Panel Configuration
           Parameters:
             - TemplateBucketName
-            - TemplateBucketKeyPrefix
+            - Environment
             - VPCID
-            - NodeSecurityGroup
             - ProvisionSecurityGroup
 
       ParameterLabels:
         TemplateBucketName:
           default: The name of the S3 bucket that holds the templates
-        TemplateBucketKeyPrefix:
+        Environment:
           default: The Key prefix for the templates in the S3 template bucket
         VPCID:
           default: The ID of the VPC to deploy the EKS Cluster into
-        NodeSecurityGroup:
-          default: The Security Group of EKS Worker nodes
         ProvisionSecurityGroup:
           default: The Security Group of Provision Host
 
@@ -31,16 +28,13 @@ Parameters:
       ConstraintDescription: "Bucket name can include numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen (-)."
       Description: "S3 bucket name that contains the CFN templates (VPC, Provision etc). This string can include numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen (-)."
       Type: "String"
-    TemplateBucketKeyPrefix:
+    Environment:
       AllowedPattern: "^[0-9a-zA-Z-/]*$"
       ConstraintDescription: "Template bucket key prefix can include numbers, lowercase letters, uppercase letters, hyphens (-), and forward slash (/)."
       Type: "String"
     VPCID:
       Description: "ID for the VPC"
       Type: "AWS::EC2::VPC::Id"
-    NodeSecurityGroup:
-      Description: "ID for the VPC, This will be used to get the node security group"
-      Type: "AWS::EC2::SecurityGroup::Id"
     ProvisionSecurityGroup:
       Description: "ID for the VPC, This will be used to get the provision security group"
       Type: "AWS::EC2::SecurityGroup::Id"
@@ -77,7 +71,7 @@ Resources:
     Properties:
       Description: Allow the cluster control panel to communicate with worker Kubelet and pods
       GroupId: !Ref ControlPanelSecurityGroup
-      DestinationSecurityGroupId: !Ref NodeSecurityGroup
+      DestinationSecurityGroupId: !Ref ControlPanelSecurityGroup
       IpProtocol: tcp
       FromPort: 10250
       ToPort: 10250
@@ -87,7 +81,7 @@ Resources:
     Properties:
       Description: Allow pods to communicate with the cluster API Server
       GroupId: !Ref ControlPanelSecurityGroup
-      SourceSecurityGroupId: !Ref NodeSecurityGroup
+      SourceSecurityGroupId: !Ref ControlPanelSecurityGroup
       IpProtocol: tcp
       ToPort: 443
       FromPort: 443

@@ -8,11 +8,12 @@ Metadata:
           default: MSK Stack Configuration
         Parameters:
           - VPCID
-          - VPCCIDR
           - DBSubnet1
           - DBSubnet2
           - DBSubnet3
           - MSKClusterName
+          - Environment
+          - EksClusterName
           - KafkaVersion
           - MSKInstanceType
 
@@ -27,10 +28,12 @@ Metadata:
         default: The ID of Private Subnet 3
       VPCID:
         default: VPC ID
-      VPCCIDR:
-        default: VPC CIDR
       MSKClusterName:
         default: MSK Cluster Name
+      Environment:
+        default: The Environment
+      EksClusterName:
+        default: The EksClusterName
       KafkaVersion:
         default: Kafka Version
       MSKInstanceType:
@@ -52,12 +55,6 @@ Parameters:
   VPCID:
     Description: ID for the VPC
     Type: AWS::EC2::VPC::Id
-  VPCCIDR:
-    AllowedPattern: "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$"
-    ConstraintDescription: "CIDR block parameter must be in the form x.x.x.x/16-28"
-    Default: "10.0.0.0/16"
-    Description: "CIDR block for the VPC"
-    Type: "String"
   MSKInstanceType:
     AllowedValues:
       - kafka.t3.small
@@ -77,6 +74,12 @@ Parameters:
     Default: "datahub"
     Description: MSK Cluster Name
     Type: String
+  Environment:
+    Type: String
+    Description: The Environment
+  EksClusterName:
+    Type: String
+    Description: The EksClusterName
 
 
 Resources:
@@ -91,17 +94,8 @@ Resources:
         Type: "AWS::EC2::SecurityGroupIngress"
         Properties:
             GroupId: !Ref MSKSecurityGroup
-            SourceSecurityGroupId: !Ref NodeSecurityGroup
+            SourceSecurityGroupId: !Sub "{{resolve:ssm:/${Environment}/${EksClusterName}/eks/clusterSecurityGroupId}}"
             SourceSecurityGroupOwnerId: !Ref AWS::AccountId
-            FromPort: 9094
-            IpProtocol: "tcp"
-            ToPort: 9094
-
-    MSKSecurityGroupIngress01vpc:
-        Type: "AWS::EC2::SecurityGroupIngress"
-        Properties:
-            GroupId: !Ref MSKSecurityGroup
-            CidrIp: !Ref VPCCIDR
             FromPort: 9094
             IpProtocol: "tcp"
             ToPort: 9094
@@ -110,17 +104,8 @@ Resources:
         Type: "AWS::EC2::SecurityGroupIngress"
         Properties:
             GroupId: !Ref MSKSecurityGroup
-            SourceSecurityGroupId: !Ref NodeSecurityGroup
+            SourceSecurityGroupId: !Sub "{{resolve:ssm:/${Environment}/${EksClusterName}/eks/clusterSecurityGroupId}}"
             SourceSecurityGroupOwnerId: !Ref AWS::AccountId
-            FromPort: 2181
-            IpProtocol: "tcp"
-            ToPort: 2181
-
-    MSKSecurityGroupIngress02vpc:
-        Type: "AWS::EC2::SecurityGroupIngress"
-        Properties:
-            GroupId: !Ref MSKSecurityGroup
-            CidrIp: !Ref VPCCIDR
             FromPort: 2181
             IpProtocol: "tcp"
             ToPort: 2181
@@ -129,17 +114,8 @@ Resources:
         Type: "AWS::EC2::SecurityGroupIngress"
         Properties:
             GroupId: !Ref MSKSecurityGroup
-            SourceSecurityGroupId: !Ref NodeSecurityGroup
+            SourceSecurityGroupId: !Sub "{{resolve:ssm:/${Environment}/${EksClusterName}/eks/clusterSecurityGroupId}}"
             SourceSecurityGroupOwnerId: !Ref AWS::AccountId
-            FromPort: 9092
-            IpProtocol: "tcp"
-            ToPort: 9092
-
-    MSKSecurityGroupIngress03vpc:
-        Type: "AWS::EC2::SecurityGroupIngress"
-        Properties:
-            GroupId: !Ref MSKSecurityGroup
-            CidrIp: !Ref VPCCIDR
             FromPort: 9092
             IpProtocol: "tcp"
             ToPort: 9092
@@ -181,12 +157,12 @@ Resources:
                 BrokerLogs:
                     CloudWatchLogs:
                         Enabled: true
-                        LogGroup: !Sub "${MSKClusterName}-msk-broker-logs"
+                        LogGroup: !Sub "${Environment}-${MSKClusterName}-msk-broker-logs"
 
     MSKLogGroup:
         Type: "AWS::Logs::LogGroup"
         Properties:
-            LogGroupName: !Sub "${MSKClusterName}-msk-broker-logs"
+            LogGroupName: !Sub "${Environment}-${MSKClusterName}-msk-broker-logs"
 
 Outputs:
   SubstackName:

@@ -8,11 +8,12 @@ Metadata:
           default: ES Stack Configuration
         Parameters:
           - VPCID
-          - VPCCIDR
           - PrivateSubnet1
           - PrivateSubnet2
           - PrivateSubnet3
           - ESDomainName
+          - Environment
+          - EksClusterName
           - ElasticsearchVersion
 
     ParameterLabels:
@@ -26,10 +27,12 @@ Metadata:
         default: The ID of Private Subnet 3
       VPCID:
         default: VPC ID
-      VPCCIDR:
-        default: VPC CIDR
       ESDomainName:
         default: Elasticsearch Domain
+      Environment:
+        default: The Environment
+      EksClusterName:
+        default: The EksClusterName
       ElasticsearchVersion:
         default: Elasticsearch Version
 
@@ -49,12 +52,6 @@ Parameters:
   VPCID:
     Description: ID for the VPC
     Type: AWS::EC2::VPC::Id
-  VPCCIDR:
-    AllowedPattern: "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$"
-    ConstraintDescription: "CIDR block parameter must be in the form x.x.x.x/16-28"
-    Default: "10.0.0.0/16"
-    Description: "CIDR block for the VPC"
-    Type: "String"
   ESVolumeSize:
     Default: 50
     Description: Data Node Volume Size in GB
@@ -88,6 +85,12 @@ Parameters:
     Default: "datahub"
     Description: Elasticsearch Domain Name
     Type: String
+  Environment:
+    Type: String
+    Description: The Environment
+  EksClusterName:
+    Type: String
+    Description: The EksClusterName
   ESMasterUser:
     Default: "admin"
     Type: String
@@ -107,18 +110,12 @@ Resources:
             GroupDescription: "Allow inbound traffic to ElasticSearch from VPC CIDR"
             GroupName: !Sub "${ESDomainName}-elasticsearch-sg"
             VpcId: !Ref VPCID
-            SecurityGroupIngress:
-              -
-                CidrIp: !Ref VPCCIDR
-                FromPort: 443
-                IpProtocol: "tcp"
-                ToPort: 443
 
     ESSecurityGroupIngress01:
         Type: "AWS::EC2::SecurityGroupIngress"
         Properties:
             GroupId: !Ref ESSecurityGroup
-            SourceSecurityGroupId: !Ref NodeSecurityGroup
+            SourceSecurityGroupId: !Sub "{{resolve:ssm:/${Environment}/${EksClusterName}/eks/clusterSecurityGroupId}}"
             SourceSecurityGroupOwnerId: !Ref AWS::AccountId
             FromPort: 443
             IpProtocol: "tcp"
@@ -151,7 +148,6 @@ Resources:
                   - !Ref PrivateSubnet3
             EncryptionAtRestOptions:
                 Enabled: true
-                #KmsKeyId:
             NodeToNodeEncryptionOptions:
                 Enabled: true
             AdvancedOptions:
@@ -181,7 +177,7 @@ Resources:
         Type: AWS::SSM::Parameter
         Properties:
           Description: ElasticSearch Domain Endpoint
-          Name: '/datahub/elasticsearch/endpoint'
+          Name: !Sub "/${Environment}/${ESDomainName}/elasticsearch/endpoint"
           Type: String
           Value: !GetAtt 'ElasticsearchDomain.DomainEndpoint'
 

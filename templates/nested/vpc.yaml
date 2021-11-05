@@ -499,7 +499,7 @@ Resources:
       AvailabilityZone: !Select ['0', !Ref 'AvailabilityZones']
       Tags:
         - Key: Name
-          Value: Private subnet 1A
+          Value: !Sub "${AWS::StackName} Private subnet 1A"
         - !If
           - PrivateSubnetATag1Condition
           - Key: !Select ['0', !Split ['=', !Ref 'PrivateSubnetATag1']]
@@ -524,7 +524,7 @@ Resources:
       AvailabilityZone: !Select ['0', !Ref 'AvailabilityZones']
       Tags:
         - Key: Name
-          Value: Private subnet 1B
+          Value: !Sub "${AWS::StackName} Private subnet 1B"
         - !If
           - PrivateSubnetBTag1Condition
           - Key: !Select ['0', !Split ['=', !Ref 'PrivateSubnetBTag1']]
@@ -549,7 +549,7 @@ Resources:
       AvailabilityZone: !Select ['1', !Ref 'AvailabilityZones']
       Tags:
         - Key: Name
-          Value: Private subnet 2A
+          Value: !Sub "${AWS::StackName} Private subnet 2A"
         - !If
           - PrivateSubnetATag1Condition
           - Key: !Select ['0', !Split ['=', !Ref 'PrivateSubnetATag1']]
@@ -574,7 +574,7 @@ Resources:
       AvailabilityZone: !Select ['1', !Ref 'AvailabilityZones']
       Tags:
         - Key: Name
-          Value: Private subnet 2B
+          Value: !Sub "${AWS::StackName} Private subnet 2B"
         - !If
           - PrivateSubnetBTag1Condition
           - Key: !Select ['0', !Split ['=', !Ref 'PrivateSubnetBTag1']]
@@ -599,7 +599,7 @@ Resources:
       AvailabilityZone: !Select ['2', !Ref 'AvailabilityZones']
       Tags:
         - Key: Name
-          Value: Private subnet 3A
+          Value: !Sub "${AWS::StackName} Private subnet 3A"
         - !If
           - PrivateSubnetATag1Condition
           - Key: !Select ['0', !Split ['=', !Ref 'PrivateSubnetATag1']]
@@ -624,7 +624,7 @@ Resources:
       AvailabilityZone: !Select ['2', !Ref 'AvailabilityZones']
       Tags:
         - Key: Name
-          Value: Private subnet 3B
+          Value: !Sub "${AWS::StackName} Private subnet 3B"
         - !If
           - PrivateSubnetBTag1Condition
           - Key: !Select ['0', !Split ['=', !Ref 'PrivateSubnetBTag1']]
@@ -649,7 +649,7 @@ Resources:
       AvailabilityZone: !Select ['3', !Ref 'AvailabilityZones']
       Tags:
         - Key: Name
-          Value: Private subnet 4A
+          Value: !Sub "${AWS::StackName} Private subnet 4A"
         - !If
           - PrivateSubnetATag1Condition
           - Key: !Select ['0', !Split ['=', !Ref 'PrivateSubnetATag1']]
@@ -674,7 +674,7 @@ Resources:
       AvailabilityZone: !Select ['3', !Ref 'AvailabilityZones']
       Tags:
         - Key: Name
-          Value: Private subnet 4B
+          Value: !Sub "${AWS::StackName} Private subnet 4B"
         - !If
           - PrivateSubnetBTag1Condition
           - Key: !Select ['0', !Split ['=', !Ref 'PrivateSubnetBTag1']]
@@ -704,7 +704,7 @@ Resources:
       AvailabilityZone: !Select ['0', !Ref 'AvailabilityZones']
       Tags:
         - Key: Name
-          Value: Public subnet 1
+          Value: !Sub "${AWS::StackName} Public subnet 1"
         - !If
           - PublicSubnetTag1Condition
           - Key: !Select ['0', !Split ['=', !Ref 'PublicSubnetTag1']]
@@ -735,7 +735,7 @@ Resources:
       AvailabilityZone: !Select ['1', !Ref 'AvailabilityZones']
       Tags:
         - Key: Name
-          Value: Public subnet 2
+          Value: !Sub "${AWS::StackName} Public subnet 2"
         - !If
           - PublicSubnetTag1Condition
           - Key: !Select ['0', !Split ['=', !Ref 'PublicSubnetTag1']]
@@ -766,7 +766,7 @@ Resources:
       AvailabilityZone: !Select ['2', !Ref 'AvailabilityZones']
       Tags:
         - Key: Name
-          Value: Public subnet 3
+          Value: !Sub "${AWS::StackName} Public subnet 3"
         - !If
           - PublicSubnetTag1Condition
           - Key: !Select ['0', !Split ['=', !Ref 'PublicSubnetTag1']]
@@ -797,7 +797,7 @@ Resources:
       AvailabilityZone: !Select ['3', !Ref 'AvailabilityZones']
       Tags:
         - Key: Name
-          Value: Public subnet 4
+          Value: !Sub "${AWS::StackName} Public subnet 4"
         - !If
           - PublicSubnetTag1Condition
           - Key: !Select ['0', !Split ['=', !Ref 'PublicSubnetTag1']]
@@ -821,7 +821,7 @@ Resources:
       VpcId: !Ref 'VPC'
       Tags:
         - Key: Name
-          Value: Private subnet 1A
+          Value: !Sub "${AWS::StackName} Private subnet 1A"
         - Key: Network
           Value: Private
   PrivateSubnet1ARoute:
@@ -844,7 +844,7 @@ Resources:
       VpcId: !Ref 'VPC'
       Tags:
         - Key: Name
-          Value: Private subnet 2A
+          Value: !Sub "${AWS::StackName} Private subnet 2A"
         - Key: Network
           Value: Private
   PrivateSubnet2ARoute:
@@ -867,7 +867,7 @@ Resources:
       VpcId: !Ref 'VPC'
       Tags:
         - Key: Name
-          Value: Private subnet 3A
+          Value: !Sub "${AWS::StackName} Private subnet 3A"
         - Key: Network
           Value: Private
   PrivateSubnet3ARoute:
@@ -890,7 +890,7 @@ Resources:
       VpcId: !Ref 'VPC'
       Tags:
         - Key: Name
-          Value: Private subnet 4A
+          Value: !Sub "${AWS::StackName} Private subnet 4A"
         - Key: Network
           Value: Private
   PrivateSubnet4ARoute:
@@ -913,7 +913,7 @@ Resources:
       VpcId: !Ref 'VPC'
       Tags:
         - Key: Name
-          Value: Private subnet 1B
+          Value: !Sub "${AWS::StackName} Private subnet 1B"
         - Key: Network
           Value: Private
   PrivateSubnet1BRoute:
@@ -982,7 +982,7 @@ Resources:
       VpcId: !Ref 'VPC'
       Tags:
         - Key: Name
-          Value: Private subnet 2B
+          Value: !Sub "${AWS::StackName} Private subnet 2B"
         - Key: Network
           Value: Private
   PrivateSubnet2BRoute:
@@ -1051,7 +1051,7 @@ Resources:
       VpcId: !Ref 'VPC'
       Tags:
         - Key: Name
-          Value: Private subnet 3B
+          Value: !Sub "${AWS::StackName} Private subnet 3B"
         - Key: Network
           Value: Private
   PrivateSubnet3BRoute:
@@ -1120,7 +1120,7 @@ Resources:
       VpcId: !Ref 'VPC'
       Tags:
         - Key: Name
-          Value: Private subnet 4B
+          Value: !Sub "${AWS::StackName} Private subnet 4B"
         - Key: Network
           Value: Private
   PrivateSubnet4BRoute:
@@ -1242,7 +1242,7 @@ Resources:
       SubnetId: !Ref 'PublicSubnet1'
       Tags:
         - Key: Name
-          Value: NATGateway1
+          Value: !Sub "${AWS::StackName}-NATGateway1"
   S3VPCEndpoint:
     Condition: PrivateSubnetsCondition
     Type: AWS::EC2::VPCEndpoint

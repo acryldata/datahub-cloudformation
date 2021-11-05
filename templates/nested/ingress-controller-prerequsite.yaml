@@ -4,10 +4,9 @@ Metadata:
   QSLint:
     Exclusions: [W9002, W9003, W9004, W9006]
 Parameters:
-  OIDCIssuerURLWithoutProtocol:
-    Type: String
-    Default: '{{resolve:ssm:/datahub/eks/oidc}}'
   EksClusterName:
+    Type: String
+  Environment:
     Type: String
   VpcId:
     Type: String
@@ -96,14 +95,13 @@ Resources:
             {
               "Effect": "Allow",
               "Principal": {
-                "Federated": "arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/${OIDCIssuerURLWithoutProtocol}"
+                "Federated": "arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/{{resolve:ssm:/${Environment}/${EksClusterName}/eks/oidc}}"
               },
               "Action": "sts:AssumeRoleWithWebIdentity",
               "Condition": {
                 "StringEquals": {
-                  "${OIDCIssuerURLWithoutProtocol}:aud": "sts.amazonaws.com",
-                  "${OIDCIssuerURLWithoutProtocol}:sub": "system:serviceaccount:kube-system:datahub-aws-load-balancer-controller"
-                }
+                  "{{resolve:ssm:/${Environment}/${EksClusterName}/eks/oidc}}:aud": "sts.amazonaws.com",
+                  "{{resolve:ssm:/${Environment}/${EksClusterName}/eks/oidc}}:sub": "system:serviceaccount:kube-system:${EksClusterName}-aws-load-balancer-controller" }
               }
             }
           ]

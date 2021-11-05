@@ -7,12 +7,14 @@ Metadata:
         - Label:
             default: Cluster Configuration
           Parameters:
+            - RemoveTempResources
             - EksMgmtIamRoleArn
             - NodeInstanceRoleArn
             - EKSServiceRoleArn
             - EKSClusterName
+            - KubernetesVersion
+            - Environment
             - TemplateBucketName
-            - TemplateBucketKeyPrefix
             - ControlPanelSecurityGroup
             - NodeSecurityGroup
             - ProvisionSecurityGroup
@@ -30,10 +32,10 @@ Metadata:
             - ProvisionInstanceType
 
       ParameterLabels:
+        RemoveTempResources:
+          default: Enable Deletion of Temp Resources
         TemplateBucketName:
           default: The name of the S3 bucket that holds the templates
-        TemplateBucketKeyPrefix:
-          default: The Key prefix for the templates in the S3 template bucket
         VPCID:
           default: The ID of the VPC to deploy the Provision and EKS Cluster into
         PrivateSubnet1ID:
@@ -66,16 +68,23 @@ Metadata:
           default: The AWS IAM Role name that will be allowed to manage EKS. Note format is arn:aws:iam::123456789:role/admin-role
         EKSClusterName:
           default: The EKS cluster name
+        KubernetesVersion:
+          default: The Kubernetes Version
+        Environment:
+          default: The Environment
 
 Parameters:
+    RemoveTempResources:
+      Description: "Set to true if you don't want to keep provision host"
+      Type: String
+      Default: "true"
+      AllowedValues:
+        - "true"
+        - "false"
     TemplateBucketName:
       AllowedPattern: "^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$"
       ConstraintDescription: "Bucket name can include numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen (-)."
       Description: "S3 bucket name that contains the CFN templates (VPC, Provision etc). This string can include numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen (-)."
-      Type: "String"
-    TemplateBucketKeyPrefix:
-      AllowedPattern: "^[0-9a-zA-Z-/]*$"
-      ConstraintDescription: "Template bucket key prefix can include numbers, lowercase letters, uppercase letters, hyphens (-), and forward slash (/)."
       Type: "String"
     VPCID:
       Description: "ID for the VPC"
@@ -131,6 +140,12 @@ Parameters:
     EKSClusterName:
       Type: String
       Description: The name of the eks cluster
+    KubernetesVersion:
+      Type: String
+      Description: The Kubernetes Version
+    Environment:
+      Type: String
+      Description: The Environment
 
 Mappings:
   # Use Amazon 2 Linux
@@ -153,13 +168,13 @@ Resources:
     Type: AWS::IAM::Role
     Properties:
       Policies:
-        - PolicyName: !Sub "${TemplateBucketName}-s3-policy"
+        - PolicyName: !Sub "${TemplateBucketName}-${Environment}-s3-policy"
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
               - Action:
                   - s3:GetObject
-                Resource: !Sub "arn:aws:s3:::${TemplateBucketName}/${TemplateBucketKeyPrefix}/scripts/*"
+                Resource: !Sub "arn:aws:s3:::${TemplateBucketName}/${Environment}/scripts/*"
                 Effect: Allow
         - PolicyName: cloudwatch-logs-policy
           PolicyDocument:
@@ -172,19 +187,8 @@ Resources:
                   - logs:DescribeLogGroups
                   - logs:DescribeLogStreams
                   - logs:PutRetentionPolicy
-                  - logs:PutMetricFilter
                   - logs:CreateLogGroup
                 Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:${EC2LogGroup}:*"
-                Effect: Allow
-        - PolicyName: provision-eip-policy
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Action:
-                  - ec2:AssociateAddress
-                  - ec2:DescribeAddresses
-                  - ec2:DescribeVolumes
-                Resource: "*"
                 Effect: Allow
         - PolicyName: provision-ssm-policy
           PolicyDocument:
@@ -194,7 +198,8 @@ Resources:
                   - ssm:PutParameter
                   - ssm:GetParameters
                   - ssm:GetParameter
-                  - ssm:DeleteParameter
+                  - ssm:AddTagsToResource
+                #Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${Environment}/${EKSClusterName}/*"
                 Resource: "*"
                 Effect: Allow
         - PolicyName: provision-kms-policy
@@ -213,23 +218,47 @@ Resources:
                   - iam:GetOpenIDConnectProvider
                   - iam:CreateOpenIDConnectProvider
                   - iam:TagOpenIDConnectProvider
-                  - cloudformation:ListStacks
-                  - cloudformation:CreateStack
+                Resource: "*"
+                Effect: Allow
+        - PolicyName: provision-secretsmanager-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - secretsmanager:CreateSecret
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:DescribeSecret
+                #Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${Environment}/${EKSClusterName}/*",
+                Resource: "*"
+                Effect: Allow
+        - PolicyName: provision-iam-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - iam:PassRole
                   - iam:GetRole
-                  - iam:TagRole
-                  - iam:CreateRole
-                  - iam:CreatePolicy
-                  - iam:DetachRolePolicy 
-                  - iam:AttachRolePolicy 
+                Resource: "*"
+                Effect: Allow
+        - PolicyName: provision-kafka-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
                   - kafka:Describe*
                   - kafka:Get*
                   - kafka:List*
-                  - elasticloadbalancing:DescribeLoadBalancers
+                #Resource: !Sub "arn:aws:kafka:${AWS::Region}:${AWS::AccountId}:cluster/${EKSClusterName}/*",
+                Resource: "*"
+                Effect: Allow
+        - PolicyName: provision-autoscaling-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
                   - autoscaling:DescribeAutoScalingInstances
                   - autoscaling:UpdateAutoScalingGroup
-                  - autoscaling:DeleteAutoScalingGroup
-                  - secretsmanager:CreateSecret
-                  - secretsmanager:GetSecretValue
+                #Resource: !Sub "arn:aws:autoscaling:${AWS::Region}:${AWS::AccountId}:autoScalingGroup/*",
                 Resource: "*"
                 Effect: Allow
         - PolicyName: eks-cluster-policy
@@ -237,11 +266,19 @@ Resources:
             Version: "2012-10-17"
             Statement:
               - Action:
-                  ### This a EKS limitation so far at deployment time
-                  ### Provision should only be able to delete or do anything to its own cluster
                   - eks:*
+                #Resource: !Sub "arn:aws:eks:${AWS::Region}:${AWS::AccountId}:cluster/${EKSClusterName}",
+                Resource: "*"
+                Effect: Allow
+        - PolicyName: provision-others-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - cloudformation:ListStacks
+                  - cloudformation:CreateStack
+                  - elasticloadbalancing:DescribeLoadBalancers
                   - sts:*
-                  - iam:PassRole
                   - ec2:DescribeTags 
                 Resource: "*"
                 Effect: Allow
@@ -270,9 +307,9 @@ Resources:
     Properties:
       LaunchConfigurationName: !Ref EKSProvisionLaunchConfiguration
       VPCZoneIdentifier:
-        - !Ref PublicSubnet1ID
-        - !Ref PublicSubnet2ID
-        - !Ref PublicSubnet3ID
+        - !Ref PrivateSubnet1ID
+        - !Ref PrivateSubnet2ID
+        - !Ref PrivateSubnet3ID
       MinSize: 1
       MaxSize: 1
       Cooldown: "300"
@@ -282,11 +319,11 @@ Resources:
           Value: !Sub "${EKSClusterName}-eks-provision-node"
           PropagateAtLaunch: true
         - Key: Component
-          Value: !Sub "${EKSClusterName}-Provision-AutoScaling-Group"
+          Value: !Sub "${EKSClusterName}-eks-provision-asg"
           PropagateAtLaunch: true
     CreationPolicy:
       ResourceSignal:
-        Timeout: PT20M
+        Timeout: PT25M
 
   EKSProvisionLaunchConfiguration:
     Type: AWS::AutoScaling::LaunchConfiguration
@@ -315,15 +352,6 @@ Resources:
               content: !Sub |
                 [general]
                 state_file = /var/lib/awslogs/agent-state
-                [/var/log/provision/provision.log]
-                file = /var/log/provision/provision.log
-                datetime_format = %b %d %H:%M:%S
-                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/provision/provision.log
-                log_group_name = ${EC2LogGroup}
-                [/var/log/dmesg]
-                file = /var/log/dmesg
-                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/dmesg
-                log_group_name = ${EC2LogGroup}
                 [/var/log/messages]
                 datetime_format = %b %d %H:%M:%S
                 file = /var/log/messages
@@ -334,25 +362,10 @@ Resources:
                 file = /var/log/secure
                 log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/secure
                 log_group_name = ${EC2LogGroup}
-                [/var/log/audit/audit.log]
-                datetime_format =
-                file = /var/log/audit/audit.log
-                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/audit/audit.log
-                log_group_name = ${EC2LogGroup}
-                [/var/log/cron]
-                datetime_format = %b %d %H:%M:%S
-                file = /var/log/cron
-                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/cron
-                log_group_name = ${EC2LogGroup}
                 [/var/log/cfn-init.log]
                 datetime_format = %Y-%m-%d %H:%M:%S
                 file = /var/log/cfn-init.log
                 log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/cfn-init.log
-                log_group_name = ${EC2LogGroup}
-                [/var/log/cfn-hup.log]
-                datetime_format = %Y-%m-%d %H:%M:%S
-                file = /var/log/cfn-hup.log
-                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/cfn-hup.log
                 log_group_name = ${EC2LogGroup}
                 [/var/log/cfn-init-cmd.log]
                 datetime_format = %Y-%m-%d %H:%M:%S
@@ -363,81 +376,98 @@ Resources:
                 file = /var/log/cloud-init-output.log
                 log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/cloud-init-output.log
                 log_group_name = ${EC2LogGroup}
-                [/var/log/amazon/ssm/amazon-ssm-agent.log]
-                datetime_format = %Y-%m-%d %H:%M:%S
-                file = /var/log/amazon/ssm/amazon-ssm-agent.log
-                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/amazon/ssm/amazon-ssm-agent.log
-                log_group_name = ${EC2LogGroup}
-                [/var/log/amazon/ssm/errors.log]
-                datetime_format = %Y-%m-%d %H:%M:%S
-                file = /var/log/amazon/ssm/errors.log
-                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/amazon/ssm/errors.log
-                log_group_name = ${EC2LogGroup}
-                [/var/log/maillog]
-                datetime_format = %b %d %H:%M:%S
-                file = /var/log/maillog
-                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/maillog
-                log_group_name = ${EC2LogGroup}
-                [/var/log/yum.log]
-                datetime_format = %b %d %H:%M:%S
-                file = /var/log/yum.log
-                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/yum.log
-                log_group_name = ${EC2LogGroup}
-                [/var/log/awslogs.log]
-                datetime_format = %Y-%m-%d %H:%M:%S
-                file = /var/log/awslogs.log
-                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/awslogs.log
-                log_group_name = ${EC2LogGroup}
-                [/var/log/boot.log]
-                file = /var/log/boot.log
-                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/boot.log
-                log_group_name = ${EC2LogGroup}
-                [/var/log/cfn-wire.log]
-                datetime_format = %Y-%m-%d %H:%M:%S
-                file = /var/log/cfn-wire.log
-                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/cfn-wire.log
+                [/tmp/eks_bootstrap.output]
+                file = /tmp/eks_bootstrap.output
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/tmp/eks_bootstrap.output
                 log_group_name = ${EC2LogGroup}
               mode: '000644'
+              owner: root
+              group: root
+            /tmp/check_extra_tags.sh:
+              source: !Sub "https://s3.${AWS::Region}.amazonaws.com/${TemplateBucketName}/${Environment}/scripts/check_extra_tags.sh"
+              mode: "000750"
+              owner: root
+              group: root
+            /tmp/check_extra_tags-v2.sh:
+              source: !Sub "https://s3.${AWS::Region}.amazonaws.com/${TemplateBucketName}/${Environment}/scripts/check_extra_tags-v2.sh"
+              mode: "000750"
               owner: root
               group: root
             /tmp/eks_bootstrap.sh:
               content: !Sub |
                 #!/bin/bash
+                set -x
+                echo "Checking extra tags..."
+                EXTRA_TAGS=$(/tmp/check_extra_tags.sh ${Environment} ${EKSClusterName})
+                len=`expr length "$EXTRA_TAGS"`
+                if [ $len -gt 3 ]; then
+                  EXTRA_TAGS_FLAG="true"
+                fi
+
                 echo "Checking whether cluster exists..."
                 aws eks describe-cluster --region ${AWS::Region} --name ${EKSClusterName} &> /dev/null
                 if [ $? -ne 0 ]; then
-                  echo Cluster does not exist, creating...
+                  if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
+                  echo "Cluster does not exist, creating with EXTRA_TAGS..."
                   aws eks create-cluster --region ${AWS::Region} \
                   --name ${EKSClusterName} \
-                  --kubernetes-version 1.18 \
+                  --tags "$EXTRA_TAGS" \
+                  --kubernetes-version ${KubernetesVersion} \
                   --role-arn ${EKSServiceRoleArn} \
                   --resources-vpc-config subnetIds=${PrivateSubnet1ID},${PrivateSubnet2ID},${PrivateSubnet3ID},${PublicSubnet1ID},${PublicSubnet2ID},${PublicSubnet3ID},securityGroupIds=${ControlPanelSecurityGroup},endpointPublicAccess=false,endpointPrivateAccess=true \
                   --logging '{"clusterLogging":[{"types":["api","audit","authenticator","controllerManager","scheduler"],"enabled":true}]}'
+                  else
+                  echo "Cluster does not exist, creating..."
+                  aws eks create-cluster --region ${AWS::Region} \
+                  --name ${EKSClusterName} \
+                  --kubernetes-version ${KubernetesVersion} \
+                  --role-arn ${EKSServiceRoleArn} \
+                  --resources-vpc-config subnetIds=${PrivateSubnet1ID},${PrivateSubnet2ID},${PrivateSubnet3ID},${PublicSubnet1ID},${PublicSubnet2ID},${PublicSubnet3ID},securityGroupIds=${ControlPanelSecurityGroup},endpointPublicAccess=false,endpointPrivateAccess=true \
+                  --logging '{"clusterLogging":[{"types":["api","audit","authenticator","controllerManager","scheduler"],"enabled":true}]}'
+                  fi 
                   if [ $? -ne 0 ]; then
                     exit 1
                   fi
                   sleep 5
                   STATUS=$(aws eks describe-cluster --region ${AWS::Region} --name ${EKSClusterName} --query cluster.status --output text)
                   while [ \"$STATUS\" = \"CREATING\" ]; do
-                    echo Cluster is still creating, sleeping for 30 seconds...
+                    echo "Cluster is still creating, sleeping for 30 seconds..."
                     sleep 30
                     STATUS=$(aws eks describe-cluster --region ${AWS::Region} --name ${EKSClusterName} --query cluster.status --output text)
                   done
                 fi
                 echo "Saving oidc info..."
                 OIDC=$(aws eks describe-cluster --region ${AWS::Region}  --name ${EKSClusterName} --query cluster.identity.oidc --output text --no-paginate |cut -c 9-)
-                parameter='/${EKSClusterName}/eks/oidc'
-                aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$OIDC" --overwrite --no-paginate
-                echo Updating kubeconfig file...
+                parameter="/${Environment}/${EKSClusterName}/eks/oidc"
+                if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
+                  EXTRA_TAGS=$(/tmp/check_extra_tags-v2.sh ${Environment} ${EKSClusterName})
+                  aws ssm put-parameter --tags $EXTRA_TAGS --region ${AWS::Region} --name "$parameter" --type "String" --value "$OIDC" --no-paginate
+                else
+                  aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$OIDC" --overwrite --no-paginate
+                fi
+                echo "Saving security group info..."
+                clusterSecurityGroupId=$(aws eks describe-cluster --region ${AWS::Region}  --name ${EKSClusterName} --query cluster.resourcesVpcConfig.clusterSecurityGroupId  --output text)
+                parameter="/${Environment}/${EKSClusterName}/eks/clusterSecurityGroupId"
+                if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
+                  EXTRA_TAGS=$(/tmp/check_extra_tags-v2.sh ${Environment} ${EKSClusterName})
+                  aws ssm put-parameter --tags $EXTRA_TAGS --region ${AWS::Region} --name "$parameter" --type "String" --value "$clusterSecurityGroupId" --no-paginate
+                else
+                  aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$clusterSecurityGroupId" --overwrite --no-paginate
+                fi
+                set +x
+                echo "Updating kubeconfig file..."
                 ENDPOINT=$(aws eks describe-cluster --region ${AWS::Region}  --name ${EKSClusterName} --query cluster.endpoint --output text)
                 CERT_DATA=$(aws eks describe-cluster --region ${AWS::Region}  --name ${EKSClusterName} --query cluster.certificateAuthority.data --output text)
                 sed -i s,ENDPOINT,$ENDPOINT,g /home/ec2-user/.kube/config
                 sed -i s,CERTIFICATE_DATA,$CERT_DATA,g /home/ec2-user/.kube/config
                 export KUBECONFIG=/home/ec2-user/.kube/config
-                echo Checking whether aws-auth configmap exists...
+                echo "Checking whether aws-auth configmap exists..."
                 kubectl get configmaps/aws-auth -n kube-system &> /dev/null
                 if [ $? -gt 0 ]; then
-                  echo Configmap does not exist, applying...
+                  echo "Configmap does not exist, applying..."
+                  curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+                  mv /tmp/eksctl /usr/local/bin
+                  eksctl create iamidentitymapping  --region ${AWS::Region} --cluster ${EKSClusterName} --arn ${EksMgmtIamRoleArn} --username admin --group system:masters
                   kubectl apply -f /tmp/aws-auth-cm.yaml
                 fi
               mode: "000750"
@@ -460,7 +490,7 @@ Resources:
                     - rolearn: ${EksMgmtIamRoleArn}
                       groups:
                         -system:masters
-                      username: federated-user
+                      username: admin
               mode: "000644"
               owner: root
               group: root
@@ -494,16 +524,18 @@ Resources:
               owner: ec2-user
               group: ec2-user
           commands:
-            00_eks-bootstrap:
-              command: "./tmp/eks_bootstrap.sh |tee -a /tmp/eks_bootstrap.out 2>&1"
             01_create_state_directory:
               command: mkdir -p /var/awslogs/state
             02_start_awslogsd:
               command: systemctl start awslogsd
             03_enable_awslogsd:
               command: systemctl enable awslogsd
+            04_extra_tags:
+              command: "./tmp/extra_tags.sh |tee -a /tmp/eks_bootstrap.output 2>&1"
+            05_eks-bootstrap:
+              command: "./tmp/eks_bootstrap.sh |tee -a /tmp/eks_bootstrap.output 2>&1"
     Properties:
-      AssociatePublicIpAddress: true
+      AssociatePublicIpAddress: false
       PlacementTenancy: default
       IamInstanceProfile: !Ref ProvisionInstanceProfile
       ImageId: !FindInMap [ProvisionLatestAmiRegionMap, !Ref "AWS::Region", AmiId]
@@ -516,7 +548,7 @@ Resources:
             set -x
             export PATH=$PATH:/usr/local/bin:/opt/aws/bin
             yum install -y https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm
-            yum install -y aws-cfn-bootstrap
+            yum install -y aws-cfn-bootstrap jq
             CLOUDWATCHGROUP=${EC2LogGroup}
             curl -LO https://dl.k8s.io/release/v1.20.2/bin/linux/amd64/kubectl
             chmod +x ./kubectl
@@ -528,10 +560,10 @@ Resources:
             aws-iam-authenticator version
             cfn-init -v --stack ${AWS::StackName} --resource EKSProvisionLaunchConfiguration --region ${AWS::Region}
             cfn-signal -e $? --stack ${AWS::StackName} --resource EKSProvisionAutoScalingGroup --region ${AWS::Region}
-            echo scale down eks provision ASG
+            echo "terminating eks provision node"
             INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
             ASG=$(aws autoscaling describe-auto-scaling-instances --region ${AWS::Region} --output text --query=AutoScalingInstances[].AutoScalingGroupName --instance-ids=$INSTANCE_ID)
-            echo $ASG
+            echo "$ASG"
             nohup aws autoscaling --region ${AWS::Region} update-auto-scaling-group --auto-scaling-group-name $ASG --desired-capacity 0 --min-size 0 --max-size 0 &>/dev/null &
 
 

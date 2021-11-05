@@ -2,9 +2,10 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: PrivateLink Stack that creates VPC Endpoint service
 
 Parameters:
-  EndpointServiceNetworkLoadBalancer:
+  Environment:
     Type: String
-    Default: '{{resolve:ssm:/datahub/admin/nlbarn}}'
+  EKSClusterName:
+    Type: String
 
 Resources:
   EndpointService:
@@ -12,7 +13,7 @@ Resources:
     Properties:
       AcceptanceRequired: True
       NetworkLoadBalancerArns:
-        - !Ref EndpointServiceNetworkLoadBalancer
+        - !Sub '{{resolve:ssm:/${Environment}/${EKSClusterName}/kotsadm/nlbarn}}'
 
   EndpointServicePermissions:
     Type: AWS::EC2::VPCEndpointServicePermissions
