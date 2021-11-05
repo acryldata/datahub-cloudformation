@@ -9,8 +9,6 @@ Metadata:
           Parameters:
             - RemoveTempResources
             - EksMgmtIamRoleArn
-            #- EksExternalUserArn
-            #- EksExternalUser
             - NodeInstanceRoleArn
             - EKSServiceRoleArn
             - EKSClusterName
@@ -68,10 +66,6 @@ Metadata:
           default: The Security Group of EKS Control Panel
         EksMgmtIamRoleArn:
           default: The AWS IAM Role name that will be allowed to manage EKS. Note format is arn:aws:iam::123456789:role/admin-role
-        #EksExternalUserArn:
-        #  default: The AWS IAM user arn who will be authorised to connect the cluster externally
-        #EksExternalUser:
-        #  default: The AWS IAM user who will be authorised to connect the cluster externally
         EKSClusterName:
           default: The EKS cluster name
         KubernetesVersion:
@@ -143,14 +137,6 @@ Parameters:
     EksMgmtIamRoleArn:
       Type: String
       Description: "The AWS IAM Role name that will be allowed to manage EKS. Note format is arn:aws:iam::123456789:role/admin-role"
-    #EksExternalUserArn:
-    #  Type: String
-    #  Description: The AWS IAM user arn who will be authorised to connect the cluster externally
-    #  Default: "arn:aws:iam::123456789:user/user01"
-    #EksExternalUser:
-    #  Type: String
-    #  Description: The AWS IAM user who will be authorised to connect the cluster externally
-    #  Default: "user01"
     EKSClusterName:
       Type: String
       Description: The name of the eks cluster
@@ -574,13 +560,11 @@ Resources:
             aws-iam-authenticator version
             cfn-init -v --stack ${AWS::StackName} --resource EKSProvisionLaunchConfiguration --region ${AWS::Region}
             cfn-signal -e $? --stack ${AWS::StackName} --resource EKSProvisionAutoScalingGroup --region ${AWS::Region}
-            #if [ "${RemoveTempResources}" == "true" ];then
             echo "terminating eks provision node"
             INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
             ASG=$(aws autoscaling describe-auto-scaling-instances --region ${AWS::Region} --output text --query=AutoScalingInstances[].AutoScalingGroupName --instance-ids=$INSTANCE_ID)
             echo "$ASG"
             nohup aws autoscaling --region ${AWS::Region} update-auto-scaling-group --auto-scaling-group-name $ASG --desired-capacity 0 --min-size 0 --max-size 0 &>/dev/null &
-            # fi
 
 
 Outputs:

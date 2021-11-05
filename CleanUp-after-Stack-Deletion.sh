@@ -1,7 +1,7 @@
 echo "====================================================================================="
 echo "0) delete PrivateLinkStack (Acryl needs to delete private vpc endpoint if they are connected to your privatelink)"
 echo "1) make sure run 'kubectl delete ns <StackName>' first"
-echo "2) trigger deletion of mastere Cloudformation Stack (i.e. dev-datahub),wait till EKSNodeGroup Stack is deleted, then  manually delete EKS cluster"
+echo "2) trigger deletion of mastere Cloudformation Stack (i.e. dev-datahub),wait till EKSNodeGroupStack is deleted, then  manually delete EKS cluster"
 echo "3) after Cloudformation Stack is deleted, run below CleanUp-after-Stack-Deletion.sh"
 echo "====================================================================================="
 if [ $# -ne 2 ]; then
@@ -12,6 +12,12 @@ else
   Environment=$1
   StackName=$2
 fi
+
+echo "Do you want to continue?"
+select yn in "Yes" "No"
+case $yn in
+    No ) exit;;
+esac
 
 #===Secrets===
 aws secretsmanager delete-secret --secret-id /${Environment}/${StackName}/admin/password --force-delete-without-recovery --region us-west-2 --no-cli-pager

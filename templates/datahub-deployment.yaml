@@ -41,20 +41,17 @@ Metadata:
             - ESVolumeSize
             - ESMasterNodeCount
             - ESMasterInstanceType
-            #- ESDomainName
             - ElasticsearchVersion
         - Label:
             default: MySQL Stack Configuration
           Parameters:
             - CreateMySQL
-            #- DBClusterIdentifier
             - DBInstanceClass
             - EngineVersion
         - Label:
             default: MSK Stack Configuration
           Parameters:
             - CreateMSK
-            #- MSKClusterName
             - KafkaVersion
             - MSKInstanceType
         - Label:
@@ -63,7 +60,6 @@ Metadata:
             - CreateEKS
             - ProvisionInstanceType
             - EksMgmtIamRoleArn
-            #- EksExternalUserArn
             #- EksExternalUser
             - KubernetesVersion
         - Label:
@@ -86,7 +82,6 @@ Metadata:
             - KotsDomainName
             - KotsAdmNLBScheme
             - ProvisionInstanceType
-            #- K8sNamespace
             - ElbCertArn 
             - ElbInboundCIDRs
             - Application
@@ -150,14 +145,8 @@ Metadata:
           default: The Environment Prefix
         EksMgmtIamRoleArn:
           default: The AWS IAM Role arn that will be allowed to manage EKS. Note do not include path just name of role like "my-role"
-        #EksExternalUserArn:
-        #  default: The AWS IAM user arn who will be authorised to connect the cluster externally
-        #EksExternalUser:
-        #  default: The AWS IAM user who will be authorised to connect the cluster externally
         KubernetesVersion:
           default: The Kubernetes Version
-        #K8sNamespace:
-        #  default: The namespace in EKS to deploy kots and datahub app 
         CreateElasticSearch:
           default: Enable Creation of ElasticSearch
         CreateVPC:
@@ -184,18 +173,12 @@ Metadata:
           default: The ElasticSearch Data Node Volume Size
         ESMasterInstanceType:
           default: The ElasticSearch Master Node Instance Type
-        #ESDomainName:
-        #  default: The ElasticSearch Domain Name
         ElasticsearchVersion:
           default: The ElasticSearch Version
-        #DBClusterIdentifier:
-        #  default: Aurora Cluster Identifier
         DBInstanceClass:
           default: Aurora Instance Type
         EngineVersion:
           default: Aurora Engine Version
-        #MSKClusterName:
-        #  default: MSK Cluster Name
         KafkaVersion:
           default: Kafka Version
         MSKInstanceType:
@@ -337,7 +320,6 @@ Parameters:
       ConstraintDescription: "Bucket name can include numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen (-)."
       Description: "S3 bucket name that contains the CFN templates (VPC, Provision etc). This string can include numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen (-)."
       Type: "String"
-      #Default: ""
     Environment:
       AllowedPattern: "^[0-9a-zA-Z]+([0-9a-zA-Z]*[0-9a-zA-Z])*$"
       Description: "The Environment Prefix"
@@ -347,26 +329,12 @@ Parameters:
       Type: String
       Description: The AWS IAM role arn that will have manage access to EKS
       Default: ""
-    #EksExternalUserArn:
-    #  Type: String
-    #  Description: The AWS IAM user arn who will be authorised to connect the cluster externally
-    #  Default: "arn:aws:iam::123456789:user/my-user"
-    #EksExternalUser:
-    #  Type: String
-    #  Description: The AWS IAM user who will be authorised to connect the cluster externally
-    #  Default: "my-user"
     KubernetesVersion:
       Description: "The Kubernetes Version"
       Type: String
       Default: "1.18"
       AllowedValues:
         - "1.18"
-    #K8sNamespace:
-    #  AllowedPattern: ".+"
-    #  ConstraintDescription: The K8s namespace can not be empty
-    #  Type: String
-    #  Description: The namespace in EKS to deploy kots and datahub app
-    #  Default: "datahub"
     CreateVPC:
       Description: "Set to true if you want to create VPC"
       Type: String
@@ -449,20 +417,12 @@ Parameters:
         - t3.small.elasticsearch
         - t3.large.elasticsearch
         - c5.large.elasticsearch
-    #ESDomainName:
-    #  Default: "datahub"
-    #  Description: Elasticsearch Domain Name
-    #  Type: String
     ElasticsearchVersion:
       Type: "String"
       Default: "7.9"
       Description: "The Elasticsearch Version"
       AllowedValues:
         - 7.9
-    #DBClusterIdentifier:
-    #  Description: "The Aurora Cluster Identifier"
-    #  Type: String
-    #  Default: datahub
     DBInstanceClass:
       AllowedValues:
         - db.t3.small
@@ -492,10 +452,6 @@ Parameters:
       Default: 2.4.1.1
       Description: Kafka version
       Type: String
-    #MSKClusterName:
-    #  Default: "datahub"
-    #  Description: MSK Cluster Name
-    #  Type: String
     ControllerHostNetwork:
       Description: Enables Ingress Controller IAM
       Type: String
@@ -623,7 +579,6 @@ Resources:
         TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/vpc.yaml"
         Parameters:
           AvailabilityZones: !Join [",", !Ref AvailabilityZones]
-          #AvailabilityZones: !Select ["", Fn::GetAZs: ${AWS::Region} ]
           PrivateSubnet1ACIDR: !Ref PrivateSubnet1CIDR
           PrivateSubnet2ACIDR: !Ref PrivateSubnet2CIDR
           PrivateSubnet3ACIDR: !Ref PrivateSubnet3CIDR
@@ -639,7 +594,6 @@ Resources:
       Type: AWS::Logs::LogGroup
       Properties: 
         LogGroupName: !Sub "/${Environment}/${AWS::StackName}/ProvisionHost"
-        #RetentionInDays: 14 
 
     ProvisionSecurityGroup:
       Condition: isCreateEKS
@@ -649,7 +603,6 @@ Resources:
           - Key: Name
             Value: !Sub "${AWS::StackName}-ProvisionHost-SG"
         GroupDescription: Enables SSH Access to Provision Hosts
-        #VpcId: !GetAtt VPCStack.Outputs.VPCID
         VpcId: !If [isCreateVPC, !GetAtt VPCStack.Outputs.VPCID, !Ref VPCID]
 
     NodeInstanceRole:
@@ -697,22 +650,6 @@ Resources:
           - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
           - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM
 
-    #NodeSecurityGroup:
-    #  Type: AWS::EC2::SecurityGroup
-    #  Properties:
-    #    GroupDescription: Security group for all nodes in the cluster
-    #    #VpcId: !GetAtt VPCStack.Outputs.VPCID
-    #    VpcId: !If [isCreateVPC, !GetAtt VPCStack.Outputs.VPCID, !Ref VPCID]
-    #    Tags:
-    #      - Key: Name
-    #        Value: !Sub "${AWS::StackName}-WorkerNodes-SG"
-    #      - Key: Component
-    #        Value: !Sub "${AWS::StackName}-NodeSG"
-    #      - Key: !Sub "kubernetes.io/cluster/${AWS::StackName}"
-    #        Value: 'owned'
-    #      - Key: KubernetesCluster
-    #        Value: !Sub "${AWS::StackName}"
-
     ElasticSearchStack:
       Condition: isCreateElasticSearch
       Type: AWS::CloudFormation::Stack
@@ -728,29 +665,21 @@ Resources:
         TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/elasticsearch.yaml"
         Parameters:
           # ES stack params
-          #VPCID: !GetAtt VPCStack.Outputs.VPCID
-          #VPCCIDR: !Ref VPCCIDR
-          #PrivateSubnet1: !GetAtt VPCStack.Outputs.PrivateSubnet1AID
-          #PrivateSubnet2: !GetAtt VPCStack.Outputs.PrivateSubnet2AID
-          #PrivateSubnet3: !GetAtt VPCStack.Outputs.PrivateSubnet3AID
           VPCID: !If [isCreateVPC, !GetAtt VPCStack.Outputs.VPCID, !Ref VPCID]
           PrivateSubnet1: !If [isCreateVPC, !GetAtt VPCStack.Outputs.PrivateSubnet1AID, !Ref PrivateSubnet1ID]
           PrivateSubnet2: !If [isCreateVPC, !GetAtt VPCStack.Outputs.PrivateSubnet2AID, !Ref PrivateSubnet2ID]
           PrivateSubnet3: !If [isCreateVPC, !GetAtt VPCStack.Outputs.PrivateSubnet3AID, !Ref PrivateSubnet3ID]
-          #NodeSecurityGroup: !Ref NodeSecurityGroup
           NodeSecurityGroup: !GetAtt EKSPreRequsiteStack.Outputs.ControlPanelSecurityGroup
           ESDataNodeCount: !Ref ESDataNodeCount
           ESInstanceType: !Ref ESInstanceType
           ESVolumeSize: !Ref ESVolumeSize
           ESMasterNodeCount: !Ref ESMasterNodeCount
           ESMasterInstanceType: !Ref ESMasterInstanceType
-          #ESDomainName: !Ref ESDomainName
           ESDomainName: !Sub "${AWS::StackName}"
           Environment: !Ref Environment
           ElasticsearchVersion: !Ref ElasticsearchVersion
           ESMasterUserPassword:
             Fn::Sub: "{{resolve:secretsmanager:${ESSecret}::password}}"
-          RemoveTempResources: !Ref RemoveTempResources
 
     MySQLStack:
       Condition: isCreateMySQL
@@ -767,22 +696,15 @@ Resources:
         Parameters:
           # MySQL stack params
           AvailabilityZones: !Join [",", !Ref AvailabilityZones]
-          #VPCID: !GetAtt VPCStack.Outputs.VPCID
-          #VPCCIDR: !Ref VPCCIDR
-          #DBSubnet1: !GetAtt VPCStack.Outputs.PrivateSubnet1AID
-          #DBSubnet2: !GetAtt VPCStack.Outputs.PrivateSubnet2AID
-          #DBSubnet3: !GetAtt VPCStack.Outputs.PrivateSubnet3AID
           VPCID: !If [isCreateVPC, !GetAtt VPCStack.Outputs.VPCID, !Ref VPCID]
           DBSubnet1: !If [isCreateVPC, !GetAtt VPCStack.Outputs.PrivateSubnet1AID, !Ref PrivateSubnet1ID]
           DBSubnet2: !If [isCreateVPC, !GetAtt VPCStack.Outputs.PrivateSubnet2AID, !Ref PrivateSubnet2ID]
           DBSubnet3: !If [isCreateVPC, !GetAtt VPCStack.Outputs.PrivateSubnet3AID, !Ref PrivateSubnet3ID]
-          #NodeSecurityGroup: !Ref NodeSecurityGroup
           NodeSecurityGroup: !GetAtt EKSPreRequsiteStack.Outputs.ControlPanelSecurityGroup
           MasterUser:
             Fn::Sub: "{{resolve:secretsmanager:${RDSSecret}::username}}"
           MasterUserPassword:
             Fn::Sub: "{{resolve:secretsmanager:${RDSSecret}::password}}"
-          #DBClusterIdentifier: !Ref DBClusterIdentifier
           Environment: !Ref Environment
           DBClusterIdentifier: !Sub "${AWS::StackName}"
           DBInstanceClass: !Ref DBInstanceClass
@@ -802,18 +724,11 @@ Resources:
         TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/msk.yaml"
         Parameters:
           # MSK stack params
-          #VPCID: !GetAtt VPCStack.Outputs.VPCID
-          #VPCCIDR: !Ref VPCCIDR
-          #DBSubnet1: !GetAtt VPCStack.Outputs.PrivateSubnet1AID
-          #DBSubnet2: !GetAtt VPCStack.Outputs.PrivateSubnet2AID
-          #DBSubnet3: !GetAtt VPCStack.Outputs.PrivateSubnet3AID
           VPCID: !If [isCreateVPC, !GetAtt VPCStack.Outputs.VPCID, !Ref VPCID]
           DBSubnet1: !If [isCreateVPC, !GetAtt VPCStack.Outputs.PrivateSubnet1AID, !Ref PrivateSubnet1ID]
           DBSubnet2: !If [isCreateVPC, !GetAtt VPCStack.Outputs.PrivateSubnet2AID, !Ref PrivateSubnet2ID]
           DBSubnet3: !If [isCreateVPC, !GetAtt VPCStack.Outputs.PrivateSubnet3AID, !Ref PrivateSubnet3ID]
-          #NodeSecurityGroup: !Ref NodeSecurityGroup
           NodeSecurityGroup: !GetAtt EKSPreRequsiteStack.Outputs.ControlPanelSecurityGroup
-          #MSKClusterName: !Ref MSKClusterName
           MSKClusterName: !Sub "${AWS::StackName}"
           Environment: !Ref Environment
           MSKInstanceType: !Ref MSKInstanceType
@@ -834,12 +749,9 @@ Resources:
             Value: !Sub "${AWS::StackName}"
         TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/eks-prerequsite.yaml"
         Parameters:
-          #VPCID: !GetAtt VPCStack.Outputs.VPCID
           VPCID: !If [isCreateVPC, !GetAtt VPCStack.Outputs.VPCID, !Ref VPCID]
           TemplateBucketName: !Ref TemplateBucketName
           Environment: !Ref Environment
-          #NodeSecurityGroup: !Ref NodeSecurityGroup
-          #NodeSecurityGroup: !GetAtt EKSPreRequsiteStack.Outputs.ControlPanelSecurityGroup
           ProvisionSecurityGroup: !Ref ProvisionSecurityGroup
 
     EKSClusterStack:
@@ -858,13 +770,6 @@ Resources:
         TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/eks-cluster.yaml"
         Parameters:
           # Provision stack params
-          #VPCID: !GetAtt VPCStack.Outputs.VPCID
-          #PublicSubnet1ID: !GetAtt VPCStack.Outputs.PublicSubnet1ID
-          #PublicSubnet2ID: !GetAtt VPCStack.Outputs.PublicSubnet2ID
-          #PublicSubnet3ID: !GetAtt VPCStack.Outputs.PublicSubnet3ID
-          #PrivateSubnet1ID: !GetAtt VPCStack.Outputs.PrivateSubnet1AID
-          #PrivateSubnet2ID: !GetAtt VPCStack.Outputs.PrivateSubnet2AID
-          #PrivateSubnet3ID: !GetAtt VPCStack.Outputs.PrivateSubnet3AID
           VPCID: !If [isCreateVPC, !GetAtt VPCStack.Outputs.VPCID, !Ref VPCID]
           PublicSubnet1ID: !If [isCreateVPC, !GetAtt VPCStack.Outputs.PublicSubnet1ID, !Ref PublicSubnet1ID]
           PublicSubnet2ID: !If [isCreateVPC, !GetAtt VPCStack.Outputs.PublicSubnet2ID, !Ref PublicSubnet2ID]
@@ -877,16 +782,15 @@ Resources:
           Environment: !Ref Environment
           EC2LogGroup: !Ref EC2LogGroup
           ProvisionSecurityGroup: !Ref ProvisionSecurityGroup
-          #NodeSecurityGroup: !Ref NodeSecurityGroup
           NodeSecurityGroup: !GetAtt EKSPreRequsiteStack.Outputs.ControlPanelSecurityGroup
           ControlPanelSecurityGroup: !GetAtt EKSPreRequsiteStack.Outputs.ControlPanelSecurityGroup
           EKSServiceRoleArn: !GetAtt EKSPreRequsiteStack.Outputs.EksServiceRoleArn
           NodeInstanceRoleArn: !GetAtt NodeInstanceRole.Arn
           EksMgmtIamRoleArn: !Ref EksMgmtIamRoleArn
-          #EksExternalUserArn: !Ref EksExternalUserArn
           Environment: !Ref Environment
           KubernetesVersion: !Ref KubernetesVersion
           EKSClusterName: !Sub "${AWS::StackName}"
+          RemoveTempResources: !Ref RemoveTempResources
 
     EKSNodeGroupStack:
       Condition: isCreateEKS
@@ -904,15 +808,11 @@ Resources:
         TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/eks-nodegroup.yaml"
         Parameters:
           # Provision stack params
-          #PrivateSubnet1ID: !GetAtt VPCStack.Outputs.PrivateSubnet1AID
-          #PrivateSubnet2ID: !GetAtt VPCStack.Outputs.PrivateSubnet2AID
-          #PrivateSubnet3ID: !GetAtt VPCStack.Outputs.PrivateSubnet3AID
           PrivateSubnet1ID: !If [isCreateVPC, !GetAtt VPCStack.Outputs.PrivateSubnet1AID, !Ref PrivateSubnet1ID]
           PrivateSubnet2ID: !If [isCreateVPC, !GetAtt VPCStack.Outputs.PrivateSubnet2AID, !Ref PrivateSubnet2ID]
           PrivateSubnet3ID: !If [isCreateVPC, !GetAtt VPCStack.Outputs.PrivateSubnet3AID, !Ref PrivateSubnet3ID]
           TemplateBucketName: !Ref TemplateBucketName
           Environment: !Ref Environment
-          #NodeSecurityGroup: !Ref NodeSecurityGroup
           NodeSecurityGroup: !GetAtt EKSPreRequsiteStack.Outputs.ControlPanelSecurityGroup
           ControlPanelSecurityGroup: !GetAtt EKSPreRequsiteStack.Outputs.ControlPanelSecurityGroup
           NodeInstanceRole: !Ref NodeInstanceRole
@@ -938,7 +838,6 @@ Resources:
             Value: !Sub "${AWS::StackName}-IngressControllerPreRequsite"
         TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/ingress-controller-prerequsite.yaml"
         Parameters:
-          #VpcId: !GetAtt VPCStack.Outputs.VPCID
           VpcId: !If [isCreateVPC, !GetAtt VPCStack.Outputs.VPCID, !Ref VPCID]
           EksClusterName: !Sub "${AWS::StackName}"
           Environment: !Sub "${Environment}"
@@ -963,11 +862,6 @@ Resources:
           # Provision stack params
           Application: !Ref Application
           ApplicationReleaseChannel: !Ref ApplicationReleaseChannel
-          #VPCID: !GetAtt VPCStack.Outputs.VPCID
-          #PublicSubnet1ID: !GetAtt VPCStack.Outputs.PublicSubnet1ID
-          #PublicSubnet2ID: !GetAtt VPCStack.Outputs.PublicSubnet2ID
-          #PrivateSubnet1ID: !GetAtt VPCStack.Outputs.PrivateSubnet1AID
-          #PrivateSubnet2ID: !GetAtt VPCStack.Outputs.PrivateSubnet2AID
           VPCID: !If [isCreateVPC, !GetAtt VPCStack.Outputs.VPCID, !Ref VPCID]
           PublicSubnet1ID: !If [isCreateVPC, !GetAtt VPCStack.Outputs.PublicSubnet1ID, !Ref PublicSubnet1ID]
           PublicSubnet2ID: !If [isCreateVPC, !GetAtt VPCStack.Outputs.PublicSubnet2ID, !Ref PublicSubnet2ID]
@@ -983,7 +877,6 @@ Resources:
           Environment: !Ref Environment
           EC2LogGroup: !Ref EC2LogGroup
           EKSClusterName: !Sub "${AWS::StackName}"
-          #K8sNamespace: !Ref K8sNamespace
           K8sNamespace: !Sub "${AWS::StackName}"
           # pass other stack info
           EKSProvisionAutoScalingGroup: !GetAtt EKSClusterStack.Outputs.EKSProvisionAutoScalingGroup
@@ -1071,9 +964,6 @@ Outputs:
   NodeInstanceRoleArn:
     Value: !GetAtt NodeInstanceRole.Arn
     Condition: isCreateEKS
-  #NodeSecurityGroupId:
-  #  Value: !Ref NodeSecurityGroup
-  #  Condition: isCreateEKS
   AvailabilityZones:
     Value: !Join [",", !Ref AvailabilityZones]
     Condition: isCreateVPC
