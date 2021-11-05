@@ -21,7 +21,34 @@ export AWS_PROFILE=***
 
      - choose Oregon region -> Cloudformation -> Create stack
 
-     - Template Amazon S3 URL: https://cf-templates-xxx-us-west-2.s3.us-west-2.amazonaws.com/dev/templates/datahub-deployment.yaml
+     - Template Amazon S3 URL: https://cf-templates-xxx-us-west-2.s3.us-west-2.amazonaws.com/dev/templates/datahub-deployment.yaml (will create new VPC/Subnets)
+
+
+     - Template Amazon S3 URL: https://cf-templates-xxx-us-west-2.s3.us-west-2.amazonaws.com/dev/templates/datahub-deployment-existing-vpc.yaml (use existing VPC/Subnets)
+         - to use existing VPC, fill in below parameters:
+             - StackName: dev-datahub
+             - TemplateBucketName: cf-templates-xxx-us-west-2
+             - Environment: dev
+             - VPCID: vpc-0xxxxxxxxxxxxxxxx
+             - choose 3 AZs
+             - The Existing Private Subnet 1 ID: subnet-1xxxxxxxxxxxxxxxx
+             - The Existing Private Subnet 2 ID: subnet-2xxxxxxxxxxxxxxxx
+             - The Existing Private Subnet 3 ID: subnet-3xxxxxxxxxxxxxxxx
+             - The Existing Public Subnet 1 ID: subnet-4xxxxxxxxxxxxxxxx
+             - The Existing Public Subnet 2 ID: subnet-5xxxxxxxxxxxxxxxx
+             - The Existing Public Subnet 2 ID: subnet-6xxxxxxxxxxxxxxxx
+
+             - Enable Creation of ElasticSearch Service Role: set to true if ServiceLinked Role for ES doesn't exists
+
+             - The AWS IAM Role arn that will be allowed to manage EKS: aws:iam::AccountID:role/admin-role
+             - DataHub Domain Name: datahub.a.b.c
+             - ELB cert arn: arn: arn:aws:acm:REGION:AccountID:certificate/xx-xx-xx-xx-xx (ssl cert for datahub.a.b.c)
+             - The Elastic Load Balancer Inbound CIDRs: comma seperated CIDR list that can access DataHub ALB
+
+             - Kots Admin Domain Name: kotsadm.e.f.g
+             - Kots ELB cert arn: arn:aws:acm:REGION:AccountID:certificate/xx-xx-xx-xx-xx (ssl cert for kotsadm.e.f.g)
+             
+             
 
      - Stack name: dev-datahub
  

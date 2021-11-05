@@ -18,8 +18,7 @@ Metadata:
             - VPCID
             - PrivateSubnet1ID
             - PrivateSubnet2ID
-            - PublicSubnet1ID
-            - PublicSubnet2ID
+            - PrivateSubnet3ID
             - EC2LogGroup
             - ProvisionInstanceType
 
@@ -34,10 +33,8 @@ Metadata:
           default: The ID of the first private subnet to deploy EKS Workers into
         PrivateSubnet2ID:
           default: The ID of the second private subnet to deploy EKS Workers into
-        PublicSubnet1ID:
-          default: The ID of the first public subet to deploy EKS into
-        PublicSubnet2ID:
-          default: The ID of the second public subnet to deploy EKS into
+        PrivateSubnet3ID:
+          default: The ID of the third private subnet to deploy EKS Workers into
         EC2LogGroup:
           default: The provision log group name
         ProvisionInstanceType:
@@ -65,17 +62,14 @@ Parameters:
     VPCID:
       Description: "ID for the VPC"
       Type: "AWS::EC2::VPC::Id"
-    PublicSubnet1ID:
-      Description: "ID of Public Subnet 1"
-      Type: "AWS::EC2::Subnet::Id"
-    PublicSubnet2ID:
-      Description: "ID of Public Subnet 2"
-      Type: "AWS::EC2::Subnet::Id"
     PrivateSubnet1ID:
       Description: "ID of Private Subnet 1"
       Type: "AWS::EC2::Subnet::Id"
     PrivateSubnet2ID:
       Description: "ID of Private Subnet 2"
+      Type: "AWS::EC2::Subnet::Id"
+    PrivateSubnet3ID:
+      Description: "ID of Private Subnet 3"
       Type: "AWS::EC2::Subnet::Id"
     EC2LogGroup:
       Description: The provision log group name
@@ -125,6 +119,8 @@ Parameters:
       Type: String
     ElbCertArn:
       Type: String
+    KotsElbCertArn:
+      Type: String
     ElbInboundCIDRs:
       Type: String
     Application:
@@ -164,6 +160,7 @@ Resources:
       VPCZoneIdentifier:
         - !Ref PrivateSubnet1ID
         - !Ref PrivateSubnet2ID
+        - !Ref PrivateSubnet3ID
       MinSize: 1
       MaxSize: 1
       Cooldown: "300"
@@ -348,41 +345,41 @@ Resources:
                 kubectl kots install ${Application}/${ApplicationReleaseChannel} -n ${K8sNamespace} --shared-password "${KOTSUserPassword}" --license-file /tmp/license.yaml --config-values /home/ec2-user/configvalues.yaml --wait-duration 120s --port-forward=false
                 echo "Install kotsadm svc..."
                 kubectl apply -f /home/ec2-user/kotsadm-svc.yaml
-                echo "Waiting datahub-kotsadm to be Active..."
-                aws elbv2 describe-load-balancers --region ${AWS::Region} --names datahub-kotsadm
+                echo "Waiting ${EKSClusterName}-kotsadm to be Active..."
+                aws elbv2 describe-load-balancers --region ${AWS::Region} --names ${EKSClusterName}-kotsadm
                 while [ $? -gt 0 ]; do
-                  echo "datahub-kotsadm is still creating, sleeping for 30 seconds..."
+                  echo "${EKSClusterName}-kotsadm is still creating, sleeping for 30 seconds..."
                   sleep 30
-                  aws elbv2 describe-load-balancers --region ${AWS::Region} --names datahub-kotsadm
+                  aws elbv2 describe-load-balancers --region ${AWS::Region} --names ${EKSClusterName}-kotsadm
                 done
-                STATUS=$(aws elbv2 describe-load-balancers --region ${AWS::Region} --names datahub-kotsadm --query LoadBalancers[0].State.Code --output text --no-paginate)
+                STATUS=$(aws elbv2 describe-load-balancers --region ${AWS::Region} --names ${EKSClusterName}-kotsadm --query LoadBalancers[0].State.Code --output text --no-paginate)
                 while [ $STATUS != 'active' ]; do
-                  echo "datahub-kotsadm is still provisioning, sleeping for 10 seconds..."
+                  echo "${EKSClusterName}-kotsadm is still provisioning, sleeping for 10 seconds..."
                   sleep 10
-                  STATUS=$(aws elbv2 describe-load-balancers --region ${AWS::Region} --names datahub-kotsadm --query LoadBalancers[0].State.Code --output text --no-paginate)
+                  STATUS=$(aws elbv2 describe-load-balancers --region ${AWS::Region} --names ${EKSClusterName}-kotsadm --query LoadBalancers[0].State.Code --output text --no-paginate)
                 done
-                NLBARN=$(aws elbv2 describe-load-balancers --region ${AWS::Region} --names datahub-kotsadm --query LoadBalancers[0].LoadBalancerArn --output text --no-paginate)
+                NLBARN=$(aws elbv2 describe-load-balancers --region ${AWS::Region} --names ${EKSClusterName}-kotsadm --query LoadBalancers[0].LoadBalancerArn --output text --no-paginate)
                 parameter='/${Environment}/${EKSClusterName}/kotsadm/nlbarn'
                 if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
                   aws ssm put-parameter --tags $EXTRA_TAGS --region ${AWS::Region} --name "$parameter" --type "String" --value "$NLBARN" --no-paginate
                 else
                   aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$NLBARN" --overwrite --no-paginate
                 fi
-                NLBDNS=$(aws elbv2 describe-load-balancers --region ${AWS::Region} --names datahub-kotsadm --query LoadBalancers[0].DNSName --output text --no-paginate)
+                NLBDNS=$(aws elbv2 describe-load-balancers --region ${AWS::Region} --names ${EKSClusterName}-kotsadm --query LoadBalancers[0].DNSName --output text --no-paginate)
                 parameter='/${Environment}/${EKSClusterName}/kotsadm/nlbdns'
                 if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
                   aws ssm put-parameter --tags $EXTRA_TAGS --region ${AWS::Region} --name "$parameter" --type "String" --value "$NLBDNS"  --no-paginate
                 else
                   aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$NLBARN" --overwrite --no-paginate
                 fi
-                ALBARN=$(aws elbv2 describe-load-balancers --region ${AWS::Region} --names datahub-frontend --query LoadBalancers[0].LoadBalancerArn --output text --no-paginate)
+                ALBARN=$(aws elbv2 describe-load-balancers --region ${AWS::Region} --names ${EKSClusterName}-datahub --query LoadBalancers[0].LoadBalancerArn --output text --no-paginate)
                 parameter='/${Environment}/${EKSClusterName}/admin/albarn'
                 if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
                   aws ssm put-parameter --tags $EXTRA_TAGS --region ${AWS::Region} --name "$parameter" --type "String" --value "$ALBARN" --no-paginate
                 else
                   aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$ALBARN" --overwrite --no-paginate
                 fi
-                ALBDNS=$(aws elbv2 describe-load-balancers --region ${AWS::Region} --names datahub-frontend --query LoadBalancers[0].DNSName --output text --no-paginate)
+                ALBDNS=$(aws elbv2 describe-load-balancers --region ${AWS::Region} --names ${EKSClusterName}-datahub --query LoadBalancers[0].DNSName --output text --no-paginate)
                 parameter='/${Environment}/${EKSClusterName}/admin/albdns'
                 if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
                   aws ssm put-parameter --tags $EXTRA_TAGS --region ${AWS::Region} --name "$parameter" --type "String" --value "$ALBDNS"  --no-paginate
@@ -428,10 +425,11 @@ Resources:
                 metadata:
                   annotations:
                     service.beta.kubernetes.io/aws-load-balancer-backend-protocol: tcp
-                    service.beta.kubernetes.io/aws-load-balancer-name: datahub-kotsadm
+                    service.beta.kubernetes.io/aws-load-balancer-name: ${EKSClusterName}-kotsadm
                     service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
                     service.beta.kubernetes.io/aws-load-balancer-scheme: "${KotsAdmNLBScheme}"
-                    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: "${ElbCertArn}"
+                    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: "${KotsElbCertArn}"
+                    service.beta.kubernetes.io/aws-load-balancer-subnets: ${PrivateSubnet1ID},${PrivateSubnet2ID},${PrivateSubnet3ID}
                     service.beta.kubernetes.io/aws-load-balancer-type: external
                   labels:
                     kots.io/kotsadm: "true"
@@ -481,6 +479,12 @@ Resources:
                     load_balancer_inbound_cidrs:
                       repeatableItem: service_port
                       value: "${ElbInboundCIDRs}"
+                    subnet_ids:
+                      repeatableItem: service_port
+                      value: ${PrivateSubnet1ID},${PrivateSubnet2ID},${PrivateSubnet3ID}
+                    load_balancer_name:
+                      repeatableItem: service_port
+                      value: "${EKSClusterName}-datahub"
                     oidc_enabled:
                       repeatableItem: service_port
                       value: "false"
