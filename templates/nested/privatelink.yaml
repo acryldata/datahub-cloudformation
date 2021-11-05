@@ -13,7 +13,7 @@ Resources:
     Properties:
       AcceptanceRequired: True
       NetworkLoadBalancerArns:
-        - !Sub '{{resolve:ssm:${Environment}/${EKSClusterName}/kotsadm/nlbarn}}'
+        - !Sub '{{resolve:ssm:/${Environment}/${EKSClusterName}/kotsadm/nlbarn}}'
 
   EndpointServicePermissions:
     Type: AWS::EC2::VPCEndpointServicePermissions
