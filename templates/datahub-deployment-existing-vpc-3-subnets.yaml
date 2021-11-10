@@ -691,6 +691,7 @@ Resources:
           Environment: !Ref Environment
           ProvisionSecurityGroup: !Ref ProvisionSecurityGroup
           EksCidrIp: !Ref EksCidrIp
+          EksClusterName: !Sub "${AWS::StackName}"
 
     EKSClusterStack:
       Condition: isCreateEKS

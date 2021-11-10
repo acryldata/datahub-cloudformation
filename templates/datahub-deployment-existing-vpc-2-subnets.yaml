@@ -1,0 +1,884 @@
+# Datahub Deployment AWS
+
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Master template that set up DataHub Platform in AWS
+Metadata:
+    AWS::CloudFormation::Interface:
+      ParameterGroups:
+        - Label:
+            default: Nested CFN Templates Location
+          Parameters:
+            - TemplateBucketName
+            - Environment
+        - Label:
+            default: Existing VPC Configuration (leave it alone when creating New VPC)
+          Parameters:
+            - VPCID
+            - AvailabilityZones
+            - PrivateSubnet1ID
+            - PrivateSubnet2ID
+            - PublicSubnet1ID
+            - PublicSubnet2ID
+        - Label:
+            default: ElasticSearch Stack Configuration
+          Parameters:
+            - CreateElasticSearchServiceRole
+            - CreateElasticSearch
+            - ESDataNodeCount
+            - ESInstanceType
+            - ESVolumeSize
+            - ESMasterNodeCount
+            - ESMasterInstanceType
+            - ElasticsearchVersion
+        - Label:
+            default: MySQL Stack Configuration
+          Parameters:
+            - CreateMySQL
+            - DBInstanceClass
+            - EngineVersion
+        - Label:
+            default: MSK Stack Configuration
+          Parameters:
+            - CreateMSK
+            - KafkaVersion
+            - MSKInstanceType
+        - Label:
+            default: EKS Control Panel Configuration
+          Parameters:
+            - CreateEKS
+            - EksCidrIp
+            - ProvisionInstanceType
+            - EksMgmtIamRoleArn
+            - EksMgmtIamUserArnList
+            - KubernetesVersion
+        - Label:
+            default: EKS Node Group Configuration
+          Parameters:
+            - NodeInstanceType
+            - MaxNumberOfNodes
+            - MinNumberOfNodes
+            - DesiredNumberOfNodes
+            - EKSNodeVolumeSize
+        - Label:
+            default: Ingress Controller Stack Configuration
+          Parameters:
+            - ControllerHostNetwork
+        - Label:
+            default: Admin Stack Configuration
+          Parameters:
+            - CreateAdmin
+            - DomainName
+            - ElbInboundCIDRs
+            - ElbCertArn 
+            - KotsDomainName
+            - KotsElbCertArn 
+            - KotsAdmNLBScheme
+            - ProvisionInstanceType
+            - Application
+            - ApplicationReleaseChannel
+        - Label:
+            default: PrivateLink Stack Configuration
+          Parameters:
+            - CreatePrivateLink
+        - Label:
+            default: Remove Admin Provision Host
+          Parameters:
+            - RemoveTempResources
+
+      ParameterLabels:
+        ### Existing VPC 
+        VPCID:
+          Default: The Existing VPC ID
+        PrivateSubnet1ID:
+          Default: The Existing Private Subnet 1 ID
+        PrivateSubnet2ID:
+          Default: The Existing Private Subnet 2 ID
+        PublicSubnet1ID:
+          Default: The Existing Public Subnet 1 ID
+        PublicSubnet2ID:
+          Default: The Existing Public Subnet 2 ID
+
+        ### New VPC 
+        AvailabilityZones:
+          default: The AZ's to deploy to.
+        ProvisionInstanceType:
+          default: The instance type to deploy Provision to
+        NodeInstanceType:
+          default: The instance type to deploy EKS Worker Node to
+        MaxNumberOfNodes:
+          default: The maximum number of nodes to scale up to for each EKS Worker Node Group
+        MinNumberOfNodes:
+          default: The minimum number of nodes to scale down to for each EKS Worker Node Group
+        DesiredNumberOfNodes:
+          default: The desired number of nodes to keep running for each EKS Worker Node Group
+        EKSNodeVolumeSize:
+          default: The Volume size of EKS Worker Node
+        TemplateBucketName:
+          default: The name of the S3 bucket that holds the templates
+        Environment:
+          default: The Environment Prefix
+        EksMgmtIamRoleArn:
+          default: The AWS IAM Role arn that will be allowed to manage EKS. Note do not include path just name of role like "my-role"
+        EksMgmtIamUserArnList:
+          default: The AWS IAM user arns list, who will be authorised to connect the cluster
+        KubernetesVersion:
+          default: The Kubernetes Version
+        CreateElasticSearch:
+          default: Enable Creation of ElasticSearch
+        CreateElasticSearchServiceRole:
+          default: Enable Creation of ElasticSearch Service Role
+        CreateMSK:
+          default: Enable Creation of MSK
+        CreateMySQL:
+          default: Enable Creation of Aurora RDS
+        CreateEKS:
+          default: Enable Creation of EKS
+        EksCidrIp:
+          default: Cidr to access EKS
+        CreateAdmin:
+          default: Enable Creation of Admin
+        CreatePrivateLink:
+          default: Enable Creation of PrivateLink
+        RemoveTempResources:
+          default: Enable Deletion of Temp Resources
+        ESDataNodeCount:
+          default: ES Data Node Instance Count 
+        ESMasterNodeCount:
+          default: ES Master Node Instance Count 
+        ESInstanceType:
+          default: The ElasticSearch Data Node Instance Type
+        ESVolumeSize:
+          default: The ElasticSearch Data Node Volume Size
+        ESMasterInstanceType:
+          default: The ElasticSearch Master Node Instance Type
+        ElasticsearchVersion:
+          default: The ElasticSearch Version
+        DBInstanceClass:
+          default: Aurora Instance Type
+        EngineVersion:
+          default: Aurora Engine Version
+        KafkaVersion:
+          default: Kafka Version
+        MSKInstanceType:
+          default: MSK Instance Type
+        ControllerHostNetwork:
+          default: Deploy EKS load balancer controller
+        ElbCertArn:
+          default: DataHub ALB cert arn
+        KotsElbCertArn:
+          default: KotsAdmin NLB cert arn
+        ElbInboundCIDRs:
+          default: DataHub ALB Inbound CIDRs
+        DomainName:
+          default: DataHub Domain Name
+        KotsDomainName:
+          default: Kots Admin Domain Name
+        KotsAdmNLBScheme:
+          default: Kots Admin Load Balancer Scheme
+        Application:
+          default: Application Name
+        ApplicationReleaseChannel:
+          default: Application Release Channel
+
+Parameters:
+    ### Existing VPC 
+    VPCID: 
+      Default: "vpc-1234" 
+      Type: String
+    AvailabilityZones:
+      Description: "List of Availability Zones to use for the subnets in the VPC. Please choose three zones."
+      Type: "List<AWS::EC2::AvailabilityZone::Name>"
+    PrivateSubnet1ID: 
+      Default: "subnet-01" 
+      Type: String
+    PrivateSubnet2ID: 
+      Default: "subnet-02" 
+      Type: String
+    PublicSubnet1ID: 
+      Default: "subnet-03" 
+      Type: String
+    PublicSubnet2ID: 
+      Default: "subnet-04" 
+      Type: String
+
+    ProvisionInstanceType:
+      Type: "String"
+      Default: "t2.micro"
+      Description: "The type of EC2 instance to be launched for Provision Host"
+      AllowedValues:
+        # Add more instance types if needed
+        - t2.micro
+        - t2.medium
+        - t2.large
+      ConstraintDescription: "Must contain a valid instance type"
+    NodeInstanceType:
+      Type: "String"
+      Default: "m5.large"
+      Description: "The type of EC2 instance to be launched for EKS Worker Node"
+      AllowedValues:
+        # Add more instance types if needed
+        - t2.xlarge
+        - t2.2xlarge
+        - m3.xlarge
+        - m3.2xlarge
+        - m4.xlarge
+        - m4.2xlarge
+        - m5.large
+        - m5.xlarge
+        - m5.2xlarge
+      ConstraintDescription: "Must contain a valid instance type"
+    DesiredNumberOfNodes:
+      Type: String
+      MinLength: 1
+      Description: "The desired number of EKS Worker Nodes to run for each group"
+      Default: "1"
+    EKSNodeVolumeSize:
+      Type: String
+      Description: "The EKS Worker Node Volume Size in GB"
+      Default: "50"
+    MaxNumberOfNodes:
+      Type: String
+      MinLength: 1
+      Description: "The maximum number of EKS Worker Nodes to run for each group"
+      Default: "1"
+    MinNumberOfNodes:
+      Type: String
+      MinLength: 1
+      Description: "The minimum number of EKS Worker Nodes to run for each group"
+      Default: "1"
+    TemplateBucketName:
+      AllowedPattern: "^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$"
+      ConstraintDescription: "Bucket name can include numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen (-)."
+      Description: "S3 bucket name that contains the CFN templates (VPC, Provision etc). This string can include numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen (-)."
+      Type: "String"
+    Environment:
+      AllowedPattern: "^[0-9a-zA-Z]+([0-9a-zA-Z]*[0-9a-zA-Z])*$"
+      Description: "The Environment Prefix"
+      Type: "String"
+      Default: "dev"
+    EksMgmtIamRoleArn:
+      Type: String
+      Description: The AWS IAM role arn that will have manage access to EKS
+      Default: ""
+    EksMgmtIamUserArnList:
+      Type: String
+      Description: "The AWS IAM user arns list who will be authorised to connect the cluster. Note format is arn:aws:iam::123456789:user/user1,arn:aws:iam::123456789:user/user2"
+      Default: ""
+    KubernetesVersion:
+      Description: "The Kubernetes Version"
+      Type: String
+      Default: "1.18"
+      AllowedValues:
+        - "1.18"
+    CreateElasticSearch:
+      Description: "Set to true if you want to create ElasticSearch"
+      Type: String
+      Default: "true"
+      AllowedValues:
+        - "true"
+        - "false"
+    CreateElasticSearchServiceRole:
+      Description: "Set to true if IAM Role AWSServiceRoleForAmazonElasticsearchService doesn't exist"
+      Type: String
+      Default: "false"
+      AllowedValues:
+        - "true"
+        - "false"
+    CreateMySQL:
+      Description: "Set to true if you want to create MySQL"
+      Type: String
+      Default: "true"
+      AllowedValues:
+        - "true"
+        - "false"
+    CreateMSK:
+      Description: "Set to true if you want to create MSK"
+      Type: String
+      Default: "true"
+      AllowedValues:
+        - "true"
+        - "false"
+    CreateEKS:
+      Description: "Set to true if you want to create EKS"
+      Type: String
+      Default: "true"
+      AllowedValues:
+        - "true"
+        - "false"
+    CreateAdmin:
+      Description: "Set to true if you want to create Admin"
+      Type: String
+      Default: "true"
+      AllowedValues:
+        - "true"
+        - "false"
+    CreatePrivateLink:
+      Description: "Set to true if you want to create PrivateLink"
+      Type: String
+      Default: "false"
+      AllowedValues:
+        - "true"
+        - "false"
+    RemoveTempResources:
+      Description: "Set to true if you don't want to keep admin provision host"
+      Type: String
+      Default: "true"
+      AllowedValues:
+        - "true"
+        - "false"
+    ESVolumeSize:
+      Default: 50
+      Description: Data Node Volume Size in GB
+      Type: String
+    ESDataNodeCount:
+      Default: 4
+      Type: String
+    ESMasterNodeCount:
+      Default: 3
+      Type: String
+    ESInstanceType:
+      Type: "String"
+      Default: "m5.large.elasticsearch"
+      Description: "The type of EC2 instance to be launched for ElasticSearch Data Node"
+      AllowedValues:
+        - t3.small.elasticsearch
+        - t3.large.elasticsearch
+        - m5.large.elasticsearch
+    ESMasterInstanceType:
+      Type: "String"
+      Default: "c5.large.elasticsearch"
+      Description: "The type of EC2 instance to be launched for ElasticSearch Master Node"
+      AllowedValues:
+        - t3.small.elasticsearch
+        - t3.large.elasticsearch
+        - c5.large.elasticsearch
+    ElasticsearchVersion:
+      Type: "String"
+      Default: "7.9"
+      Description: "The Elasticsearch Version"
+      AllowedValues:
+        - 7.9
+    DBInstanceClass:
+      AllowedValues:
+        - db.t3.small
+        - db.t3.large
+      ConstraintDescription: Must contain valid RDS instance type
+      Default: db.t3.large
+      Description: instance type for the Amazon Aurora
+      Type: String
+    EngineVersion:
+      AllowedValues:
+        - 5.7.mysql_aurora.2.09.1
+      Default: 5.7.mysql_aurora.2.09.1
+      Description: Aurora Engine Version
+      Type: String
+    MSKInstanceType:
+      AllowedValues:
+        - kafka.t3.small
+        - kafka.t3.large
+        - kafka.m5.large
+      ConstraintDescription: Must contain valid MSK instance type
+      Default: kafka.m5.large
+      Description: EC2 instance type for the Amazon MSK instances
+      Type: String
+    KafkaVersion:
+      AllowedValues:
+        - 2.4.1.1
+      Default: 2.4.1.1
+      Description: Kafka version
+      Type: String
+    ControllerHostNetwork:
+      Description: Enables Ingress Controller IAM
+      Type: String
+      Default: "Enabled"
+      AllowedValues:
+      - "Disabled"
+      - "Enabled"
+    ElbCertArn:
+      ConstraintDescription: The Elastic Load Balancer Cert Arn can not be empty
+      Type: String
+      Default: ""
+    KotsElbCertArn:
+      ConstraintDescription: The Elastic Load Balancer Cert Arn can not be empty
+      Type: String
+      Default: ""
+    ElbInboundCIDRs:
+      ConstraintDescription: The Elastic Load Balancer Inbound CIDRs
+      Type: String
+      Default: "192.168.1.0/24,192.168.2.0/24"
+    EksCidrIp:
+      ConstraintDescription: Cidr to access EKS, single range only
+      Type: String
+      Default: "192.168.1.0/24"
+    DomainName:
+      Default: "datahub.a.b.c"
+      Description: DataHub Domain Name
+      Type: String
+    KotsDomainName:
+      Default: "kotsadm.e.f.g"
+      Description: Kots Admin Domain Name
+      Type: String
+    KotsAdmNLBScheme:
+      Description: Kots Admin Load Balancer Scheme
+      Type: String
+      Default: "internal"
+      AllowedValues:
+      - "internal"
+      - "internet-facing"
+    Application:
+      Description: Application Name
+      Type: String
+      Default: "datahub-poc"
+      AllowedValues:
+      - "datahub-poc"
+      - "datahub"
+    ApplicationReleaseChannel:
+      Description: Application Release Channel
+      Type: String
+      Default: "unstable"
+      AllowedValues:
+      - "unstable"
+      - "beta"
+      - "stable"
+
+
+
+Conditions:
+  isCreateElasticSearchServiceRole: !Equals [!Ref CreateElasticSearchServiceRole, "true"]
+  isCreateElasticSearch:            !Equals [!Ref CreateElasticSearch, "true"]
+  isCreateESServiceRole:            !And
+    - !Condition isCreateElasticSearchServiceRole
+    - !Condition isCreateElasticSearch
+  isCreateMySQL:                    !Equals [!Ref CreateMySQL, "true"]
+  isCreateMSK:                      !Equals [!Ref CreateMSK, "true"]
+  isCreateEKS:                      !Equals [!Ref CreateEKS, "true"]
+  isCreateAdmin:                    !Equals [!Ref CreateAdmin, "true"]
+  isCreatePrivateLink:              !Equals [!Ref CreatePrivateLink, "true"]
+
+
+Resources:
+
+    ESServiceRole:
+        Condition: isCreateESServiceRole
+        Type: 'AWS::IAM::ServiceLinkedRole'
+        Properties:
+            AWSServiceName: es.amazonaws.com
+            Description: 'Service-linked role to give Amazon ES permissions to access your VPC'
+
+    RDSSecret:
+      Condition: isCreateMySQL
+      Type: AWS::SecretsManager::Secret
+      Properties:
+        Name: !Sub "/${Environment}/${AWS::StackName}/mysql/password"
+        Description: !Sub "${Environment}/${AWS::StackName}: Secrets for Aurora MySQL"
+        GenerateSecretString:
+          SecretStringTemplate: '{"username": "admin"}'
+          GenerateStringKey: password
+          PasswordLength: 16
+          ExcludeCharacters: '"@/\<>()$?+-`'
+          ExcludePunctuation: true
+        Tags:
+          -
+            Key: CloudFormation
+            Value: "true"
+
+    ESSecret:
+      Condition: isCreateElasticSearch
+      Type: AWS::SecretsManager::Secret
+      Properties:
+        Name: !Sub "/${Environment}/${AWS::StackName}/elasticsearch/password"
+        Description: !Sub "${Environment}/${AWS::StackName}: Secrets for ElasticSearch"
+        GenerateSecretString:
+          SecretStringTemplate: '{"username": "admin"}'
+          GenerateStringKey: password
+          PasswordLength: 16
+          ExcludeCharacters: '"@/\<>()$?+-`'
+        Tags:
+          -
+            Key: CloudFormation
+            Value: "true"
+
+    KOTSSecret:
+      Type: AWS::SecretsManager::Secret
+      Properties:
+        Name: !Sub "/${Environment}/${AWS::StackName}/kotsadm/password"
+        Description: !Sub "${Environment}/${AWS::StackName}: Secrets for KOTS Admin"
+        GenerateSecretString:
+          SecretStringTemplate: '{"username": "admin"}'
+          GenerateStringKey: password
+          PasswordLength: 16
+          ExcludeCharacters: '"@/\<>()$?+-`'
+          ExcludePunctuation: true
+        Tags:
+          -
+            Key: CloudFormation
+            Value: "true"
+
+    EC2LogGroup:
+      Type: AWS::Logs::LogGroup
+      #DeletionPolicy: Retain
+      Properties: 
+        LogGroupName: !Sub "/${Environment}/${AWS::StackName}/ProvisionHost"
+
+    ProvisionSecurityGroup:
+      Condition: isCreateEKS
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        Tags:
+          - Key: Name
+            Value: !Sub "${AWS::StackName}-ProvisionHost-SG"
+        GroupDescription: Enables SSH Access to Provision Hosts
+        VpcId: !Ref VPCID
+
+    NodeInstanceRole:
+      Condition: isCreateEKS
+      Type: AWS::IAM::Role
+      Properties:
+        Policies:
+          - PolicyName: cloudwatch-logs-policy
+            PolicyDocument:
+              Version: 2012-10-17
+              Statement:
+                - Action:
+                    - logs:CreateLogStream
+                    - logs:GetLogEvents
+                    - logs:PutLogEvents
+                    - logs:DescribeLogGroups
+                    - logs:DescribeLogStreams
+                    - logs:PutRetentionPolicy
+                    - logs:PutMetricFilter
+                    #- logs:CreateLogGroup
+                  Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:${EC2LogGroup}:*"
+                  Effect: Allow
+          - PolicyName: ebs-volume-policy
+            PolicyDocument:
+              Version: 2012-10-17
+              Statement:
+                - Action:
+                    - ec2:AttachVolume
+                    - ec2:DetachVolume
+                  Resource: "arn:aws:ec2:*:*:volume/*"
+                  Effect: Allow
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - ec2.amazonaws.com
+            Action:
+            - sts:AssumeRole
+        Path: /
+        ManagedPolicyArns:
+          - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+          - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+          - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+          - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM
+
+    ElasticSearchStack:
+      Condition: isCreateElasticSearch
+      Type: AWS::CloudFormation::Stack
+      DependsOn:
+        - EKSClusterStack
+      Properties:
+        Tags:
+          - Key: Name
+            Value: !Sub "${AWS::StackName}"
+          - Key: Component
+            Value: Datahub-ElasticSearch
+        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/2-subnets/elasticsearch.yaml"
+        Parameters:
+          # ES stack params
+          VPCID: !Ref VPCID
+          PrivateSubnet1: !Ref PrivateSubnet1ID
+          PrivateSubnet2: !Ref PrivateSubnet2ID
+          NodeSecurityGroup: !GetAtt EKSPreRequsiteStack.Outputs.ControlPanelSecurityGroup
+          ESDataNodeCount: !Ref ESDataNodeCount
+          ESInstanceType: !Ref ESInstanceType
+          ESVolumeSize: !Ref ESVolumeSize
+          ESMasterNodeCount: !Ref ESMasterNodeCount
+          ESMasterInstanceType: !Ref ESMasterInstanceType
+          ESDomainName: !Sub "${AWS::StackName}"
+          Environment: !Ref Environment
+          EksClusterName: !Sub "${AWS::StackName}"
+          ElasticsearchVersion: !Ref ElasticsearchVersion
+          ESMasterUserPassword:
+            Fn::Sub: "{{resolve:secretsmanager:${ESSecret}::password}}"
+
+    MySQLStack:
+      Condition: isCreateMySQL
+      Type: AWS::CloudFormation::Stack
+      DependsOn:
+        - EKSClusterStack
+      Properties:
+        Tags:
+          - Key: Name
+            Value: !Sub "${AWS::StackName}"
+          - Key: Component
+            Value: Datahub-MySQL
+        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/2-subnets/mysql.yaml"
+        Parameters:
+          # MySQL stack params
+          AvailabilityZones: !Join [",", !Ref AvailabilityZones]
+          VPCID: !Ref VPCID
+          DBSubnet1: !Ref PrivateSubnet1ID
+          DBSubnet2: !Ref PrivateSubnet2ID
+          NodeSecurityGroup: !GetAtt EKSPreRequsiteStack.Outputs.ControlPanelSecurityGroup
+          MasterUser:
+            Fn::Sub: "{{resolve:secretsmanager:${RDSSecret}::username}}"
+          MasterUserPassword:
+            Fn::Sub: "{{resolve:secretsmanager:${RDSSecret}::password}}"
+          Environment: !Ref Environment
+          EksClusterName: !Sub "${AWS::StackName}"
+          DBClusterIdentifier: !Sub "${AWS::StackName}"
+          DBInstanceClass: !Ref DBInstanceClass
+          EngineVersion: !Ref EngineVersion
+
+    MSKStack:
+      Condition: isCreateMSK
+      Type: AWS::CloudFormation::Stack
+      DependsOn:
+        - EKSClusterStack
+      Properties:
+        Tags:
+          - Key: Name
+            Value: !Sub "${AWS::StackName}"
+          - Key: Component
+            Value: Datahub-MSK
+        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/2-subnets/msk.yaml"
+        Parameters:
+          # MSK stack params
+          VPCID: !Ref VPCID
+          DBSubnet1: !Ref PrivateSubnet1ID
+          DBSubnet2: !Ref PrivateSubnet2ID
+          NodeSecurityGroup: !GetAtt EKSPreRequsiteStack.Outputs.ControlPanelSecurityGroup
+          MSKClusterName: !Sub "${AWS::StackName}"
+          Environment: !Ref Environment
+          EksClusterName: !Sub "${AWS::StackName}"
+          MSKInstanceType: !Ref MSKInstanceType
+          KafkaVersion: !Ref KafkaVersion
+
+    EKSPreRequsiteStack:
+      Condition: isCreateEKS
+      Type: AWS::CloudFormation::Stack
+      Properties:
+        Tags:
+          - Key: Name
+            Value: !Sub "${AWS::StackName}"
+          - Key: Component
+            Value: !Sub "${AWS::StackName}-EKSPreRequsite"
+          - Key: KubernetesCluster
+            Value: !Sub "${AWS::StackName}"
+        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/eks-prerequsite.yaml"
+        Parameters:
+          VPCID: !Ref VPCID
+          TemplateBucketName: !Ref TemplateBucketName
+          Environment: !Ref Environment
+          ProvisionSecurityGroup: !Ref ProvisionSecurityGroup
+          EksCidrIp: !Ref EksCidrIp
+          EksClusterName: !Sub "${AWS::StackName}"
+
+    EKSClusterStack:
+      Condition: isCreateEKS
+      Type: AWS::CloudFormation::Stack
+      DependsOn:
+        - EKSPreRequsiteStack
+      Properties:
+        Tags:
+          - Key: Name
+            Value: !Sub "${AWS::StackName}"
+          - Key: Component
+            Value: !Sub "${AWS::StackName}-Provision"
+          - Key: KubernetesCluster
+            Value: !Sub "${AWS::StackName}"
+        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/2-subnets/eks-cluster.yaml"
+        Parameters:
+          # Provision stack params
+          VPCID: !Ref VPCID
+          PublicSubnet1ID: !Ref PublicSubnet1ID
+          PublicSubnet2ID: !Ref PublicSubnet2ID
+          PrivateSubnet1ID: !Ref PrivateSubnet1ID
+          PrivateSubnet2ID: !Ref PrivateSubnet2ID
+          ProvisionInstanceType: !Ref ProvisionInstanceType
+          TemplateBucketName: !Ref TemplateBucketName
+          Environment: !Ref Environment
+          EC2LogGroup: !Ref EC2LogGroup
+          ProvisionSecurityGroup: !Ref ProvisionSecurityGroup
+          NodeSecurityGroup: !GetAtt EKSPreRequsiteStack.Outputs.ControlPanelSecurityGroup
+          ControlPanelSecurityGroup: !GetAtt EKSPreRequsiteStack.Outputs.ControlPanelSecurityGroup
+          EKSServiceRoleArn: !GetAtt EKSPreRequsiteStack.Outputs.EksServiceRoleArn
+          NodeInstanceRoleArn: !GetAtt NodeInstanceRole.Arn
+          EksMgmtIamRoleArn: !Ref EksMgmtIamRoleArn
+          EksMgmtIamUserArnList: !Ref EksMgmtIamUserArnList
+          Environment: !Ref Environment
+          KubernetesVersion: !Ref KubernetesVersion
+          EKSClusterName: !Sub "${AWS::StackName}"
+          RemoveTempResources: !Ref RemoveTempResources
+
+    EKSNodeGroupStack:
+      Condition: isCreateEKS
+      Type: AWS::CloudFormation::Stack
+      DependsOn:
+        - EKSClusterStack
+      Properties:
+        Tags:
+          - Key: Name
+            Value: !Sub "${AWS::StackName}"
+          - Key: Component
+            Value: !Sub "${AWS::StackName}-Provision"
+          - Key: KubernetesCluster
+            Value: !Sub "${AWS::StackName}"
+        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/2-subnets/eks-nodegroup.yaml"
+        Parameters:
+          # Provision stack params
+          PrivateSubnet1ID: !Ref PrivateSubnet1ID
+          PrivateSubnet2ID: !Ref PrivateSubnet2ID
+          TemplateBucketName: !Ref TemplateBucketName
+          Environment: !Ref Environment
+          NodeSecurityGroup: !GetAtt EKSPreRequsiteStack.Outputs.ControlPanelSecurityGroup
+          ControlPanelSecurityGroup: !GetAtt EKSPreRequsiteStack.Outputs.ControlPanelSecurityGroup
+          NodeInstanceRole: !Ref NodeInstanceRole
+          NodeInstanceRoleArn: !GetAtt NodeInstanceRole.Arn
+          NodeInstanceType: !Ref NodeInstanceType
+          MaxNumberOfNodes: !Ref MaxNumberOfNodes
+          MinNumberOfNodes: !Ref MinNumberOfNodes
+          DesiredNumberOfNodes: !Ref DesiredNumberOfNodes
+          EKSNodeVolumeSize: !Ref EKSNodeVolumeSize
+          EKSClusterName: !Sub "${AWS::StackName}"
+          KubernetesVersion: !Ref KubernetesVersion
+          Environment: !Sub "${Environment}"
+
+    IngressControllerPreRequsiteStack:
+      Type: AWS::CloudFormation::Stack
+      DependsOn:
+        - EKSNodeGroupStack
+      Properties:
+        Tags:
+          - Key: Name
+            Value: !Sub "${AWS::StackName}"
+          - Key: Component
+            Value: !Sub "${AWS::StackName}-IngressControllerPreRequsite"
+        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/ingress-controller-prerequsite.yaml"
+        Parameters:
+          VpcId: !Ref VPCID
+          EksClusterName: !Sub "${AWS::StackName}"
+          Environment: !Sub "${Environment}"
+          ControllerHostNetwork: !Ref ControllerHostNetwork
+
+    AdminStack:
+      Condition: isCreateAdmin
+      Type: AWS::CloudFormation::Stack
+      DependsOn: 
+          - MSKStack
+          - ElasticSearchStack
+          - MySQLStack
+          - EKSNodeGroupStack
+      Properties:
+        Tags:
+          - Key: Name
+            Value: !Sub "${AWS::StackName}"
+          - Key: Component
+            Value: !Sub "${AWS::StackName}-Admin"
+        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/2-subnets/admin.yaml"
+        Parameters:
+          # Provision stack params
+          Application: !Ref Application
+          ApplicationReleaseChannel: !Ref ApplicationReleaseChannel
+          VPCID: !Ref VPCID
+          PrivateSubnet1ID: !Ref PrivateSubnet1ID
+          PrivateSubnet2ID: !Ref PrivateSubnet2ID
+          ProvisionInstanceRole: !GetAtt EKSClusterStack.Outputs.ProvisionInstanceRole
+          ProvisionInstanceProfile: !GetAtt EKSClusterStack.Outputs.ProvisionInstanceProfile
+          ProvisionInstanceType: !Ref ProvisionInstanceType
+          ProvisionSecurityGroup: !Ref ProvisionSecurityGroup
+          NodeInstanceRoleArn: !GetAtt EKSClusterStack.Outputs.NodeInstanceRoleArn
+          # EKS Worker Node stack params
+          TemplateBucketName: !Ref TemplateBucketName
+          Environment: !Ref Environment
+          EC2LogGroup: !Ref EC2LogGroup
+          EKSClusterName: !Sub "${AWS::StackName}"
+          K8sNamespace: !Sub "${AWS::StackName}"
+          # pass other stack info
+          EKSProvisionAutoScalingGroup: !GetAtt EKSClusterStack.Outputs.EKSProvisionAutoScalingGroup
+          DomainName: !Ref DomainName
+          KotsDomainName: !Ref KotsDomainName
+          KotsAdmNLBScheme: !Ref KotsAdmNLBScheme
+          MySQLEndpoint: !GetAtt MySQLStack.Outputs.ClusterEndpoint
+          ElasticSearchEndpoint: !GetAtt ElasticSearchStack.Outputs.DomainEndpoint
+          MSKClusterName: !Sub "${AWS::StackName}"
+          ElbCertArn: !Ref ElbCertArn
+          KotsElbCertArn: !Ref KotsElbCertArn
+          ElbInboundCIDRs: !Ref ElbInboundCIDRs
+          MasterUserPassword:
+            Fn::Sub: "{{resolve:secretsmanager:${RDSSecret}::password}}"
+          ESMasterUserPassword:
+            Fn::Sub: "{{resolve:secretsmanager:${ESSecret}::password}}"
+          KOTSUserPassword:
+            Fn::Sub: "{{resolve:secretsmanager:${KOTSSecret}::password}}"
+          Environment: !Sub "${Environment}"
+          RemoveTempResources: !Ref RemoveTempResources
+
+    PrivateLinkStack:
+      Condition: isCreatePrivateLink
+      Type: AWS::CloudFormation::Stack
+      DependsOn:
+        - AdminStack
+      Properties:
+        Tags:
+          - Key: Name
+            Value: !Sub "${AWS::StackName}"
+          - Key: Component
+            Value: !Sub "${AWS::StackName}-PrivateLink"
+        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/privatelink.yaml"
+        Parameters:
+          Environment: !Sub "${Environment}"
+          EKSClusterName: !Sub "${AWS::StackName}"
+
+Outputs:
+  # Provision stack
+  ProvisionSubstackName:
+    Value: !GetAtt EKSClusterStack.Outputs.SubstackName
+    Condition: isCreateEKS
+  ProvisionSecurityGroup:
+    Value: !Ref ProvisionSecurityGroup
+    Condition: isCreateEKS
+  EKSProvisionLaunchConfiguration:
+    Value: !GetAtt EKSClusterStack.Outputs.EKSProvisionLaunchConfiguration
+    Condition: isCreateEKS
+  EKSProvisionAutoScalingGroup:
+    Value: !GetAtt EKSClusterStack.Outputs.EKSProvisionAutoScalingGroup
+    Condition: isCreateEKS
+  ProvisionInstanceRole:
+    Value: !GetAtt EKSClusterStack.Outputs.ProvisionInstanceRole
+    Condition: isCreateEKS
+  ProvisionInstanceProfile:
+    Value: !GetAtt EKSClusterStack.Outputs.ProvisionInstanceProfile
+    Condition: isCreateEKS
+  ProvisionInstanceRole:
+    Value: !GetAtt EKSClusterStack.Outputs.ProvisionInstanceRole
+    Condition: isCreateEKS
+  EC2LogGroup:
+    Value: !Ref EC2LogGroup
+    Condition: isCreateEKS
+
+  # ElasticSearch
+  DomainEndpoint:
+   Value: !GetAtt ElasticSearchStack.Outputs.DomainEndpoint
+   Condition: isCreateElasticSearch
+  
+
+  # EKS Cluster
+  ControlPanelSecurityGroup:
+    Value: !GetAtt EKSPreRequsiteStack.Outputs.ControlPanelSecurityGroup
+    Condition: isCreateEKS
+  EksClusterName:
+    Value: !GetAtt EKSClusterStack.Outputs.EksClusterName
+    Condition: isCreateEKS
+  EksServiceRoleArn:
+    Value: !GetAtt EKSPreRequsiteStack.Outputs.EksServiceRoleArn
+    Condition: isCreateEKS
+  NodeInstanceRoleArn:
+    Value: !GetAtt NodeInstanceRole.Arn
+    Condition: isCreateEKS
+  AvailabilityZones:
+    Value: !Join [",", !Ref AvailabilityZones]

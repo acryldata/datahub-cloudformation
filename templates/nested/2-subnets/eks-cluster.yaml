@@ -25,10 +25,8 @@ Metadata:
             - VPCID
             - PrivateSubnet1ID
             - PrivateSubnet2ID
-            - PrivateSubnet3ID
             - PublicSubnet1ID
             - PublicSubnet2ID
-            - PublicSubnet3ID
             - EC2LogGroup
             - ProvisionInstanceType
 
@@ -43,14 +41,10 @@ Metadata:
           default: The ID of the first private subnet to deploy EKS Workers into
         PrivateSubnet2ID:
           default: The ID of the second private subnet to deploy EKS Workers into
-        PrivateSubnet3ID:
-          default: The ID of the third private subnet to deploy EKS Workers into
         PublicSubnet1ID:
           default: The ID of the first public subet to deploy EKS into
         PublicSubnet2ID:
           default: The ID of the second public subnet to deploy EKS into
-        PublicSubnet3ID:
-          default: The ID of the third public subnet to deploy EKS into
         EC2LogGroup:
           default: The provision log group name
         ProvisionInstanceType:
@@ -98,17 +92,11 @@ Parameters:
     PublicSubnet2ID:
       Description: "ID of Public Subnet 2"
       Type: "AWS::EC2::Subnet::Id"
-    PublicSubnet3ID:
-      Description: "ID of Public Subnet 3"
-      Type: "AWS::EC2::Subnet::Id"
     PrivateSubnet1ID:
       Description: "ID of Private Subnet 1"
       Type: "AWS::EC2::Subnet::Id"
     PrivateSubnet2ID:
       Description: "ID of Private Subnet 2"
-      Type: "AWS::EC2::Subnet::Id"
-    PrivateSubnet3ID:
-      Description: "ID of Private Subnet 3"
       Type: "AWS::EC2::Subnet::Id"
     EC2LogGroup:
       Description: The provision log group name
@@ -331,7 +319,6 @@ Resources:
       VPCZoneIdentifier:
         - !Ref PrivateSubnet1ID
         - !Ref PrivateSubnet2ID
-        - !Ref PrivateSubnet3ID
       MinSize: 1
       MaxSize: 1
       Cooldown: "300"
@@ -436,7 +423,7 @@ Resources:
                   --tags "$EXTRA_TAGS" \
                   --kubernetes-version ${KubernetesVersion} \
                   --role-arn ${EKSServiceRoleArn} \
-                  --resources-vpc-config subnetIds=${PrivateSubnet1ID},${PrivateSubnet2ID},${PrivateSubnet3ID},${PublicSubnet1ID},${PublicSubnet2ID},${PublicSubnet3ID},securityGroupIds=${ControlPanelSecurityGroup},endpointPublicAccess=false,endpointPrivateAccess=true \
+                  --resources-vpc-config subnetIds=${PrivateSubnet1ID},${PrivateSubnet2ID},${PublicSubnet1ID},${PublicSubnet2ID},securityGroupIds=${ControlPanelSecurityGroup},endpointPublicAccess=false,endpointPrivateAccess=true \
                   --logging '{"clusterLogging":[{"types":["api","audit","authenticator","controllerManager","scheduler"],"enabled":true}]}'
                   else
                   echo "Cluster does not exist, creating..."
@@ -444,7 +431,7 @@ Resources:
                   --name ${EKSClusterName} \
                   --kubernetes-version ${KubernetesVersion} \
                   --role-arn ${EKSServiceRoleArn} \
-                  --resources-vpc-config subnetIds=${PrivateSubnet1ID},${PrivateSubnet2ID},${PrivateSubnet3ID},${PublicSubnet1ID},${PublicSubnet2ID},${PublicSubnet3ID},securityGroupIds=${ControlPanelSecurityGroup},endpointPublicAccess=false,endpointPrivateAccess=true \
+                  --resources-vpc-config subnetIds=${PrivateSubnet1ID},${PrivateSubnet2ID},${PublicSubnet1ID},${PublicSubnet2ID},securityGroupIds=${ControlPanelSecurityGroup},endpointPublicAccess=false,endpointPrivateAccess=true \
                   --logging '{"clusterLogging":[{"types":["api","audit","authenticator","controllerManager","scheduler"],"enabled":true}]}'
                   fi 
                   if [ $? -ne 0 ]; then

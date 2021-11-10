@@ -12,6 +12,7 @@ Metadata:
             - VPCID
             - ProvisionSecurityGroup
             - EksCidrIp
+            - EksClusterName
 
       ParameterLabels:
         TemplateBucketName:
@@ -24,6 +25,8 @@ Metadata:
           default: The Security Group of Provision Host
         EksCidrIp:
           default: Cidr to access EKS
+        EksClusterName:
+          default: The EKS cluster name
 
 Parameters:
     TemplateBucketName:
@@ -44,11 +47,15 @@ Parameters:
     EksCidrIp:
       Description: "Cidr to access EKS"
       Type: "String"
+    EksClusterName:
+      Type: String
+      Description: The name of the eks cluster
 
 Resources:
   EKSServiceRole:
     Type: AWS::IAM::Role
     Properties:
+      RoleName: !Sub "${EksClusterName}-service-role"
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
