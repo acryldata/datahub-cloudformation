@@ -31,7 +31,7 @@ Metadata:
         VPCID:
           Default: The Existing VPC ID
         CreateRoleAndSg:
-          default: Enable Creation of Security Group
+          default: Enable Creation of IAM Role and Security Group
         ProvisionInstanceRoleName:
           default: The instance role name
         #ProvisionInstanceProfileName:
@@ -39,7 +39,7 @@ Metadata:
         ProvisionInstanceType:
           default: The instance type to deploy Provision to
         OldProvisionInstanceProfileArn:
-          default: The AWS IAM Role Arn that was used to create EKS in Old Stack
+          default: The AWS IAM Instance Profile ARNs that was used to create EKS in Old Stack
         PrivateSubnet1ID:
           Default: The Existing Private Subnet 1 ID
         OldProvisionSecurityGroupID:
@@ -121,6 +121,12 @@ Mappings:
       AmiId: ami-07d9160fa81ccffb5
 
 Resources:
+  EC2LogGroup:
+    Type: AWS::Logs::LogGroup
+    #DeletionPolicy: Retain
+    Properties:
+      LogGroupName: !Sub "/${Environment}/${AWS::StackName}/ProvisionHost"
+
   ProvisionInstanceRole:
     Condition: isCreateRoleAndSg
     Type: AWS::IAM::Role
@@ -238,12 +244,14 @@ Resources:
                   - elasticloadbalancing:DescribeTags
                   - elasticloadbalancing:DeleteLoadBalancers
                   - elasticloadbalancing:DeleteLoadBalancer 
+                  - elasticloadbalancing:DescribeTargetGroups
                   - sts:*
                   - ec2:DescribeTags
                   - ec2:RevokeSecurityGroupIngress
                   - ec2:DescribeSecurityGroups
                   - ec2:DeleteSecurityGroups
                   - ec2:DeleteSecurityGroup
+                  - ec2:AuthorizeSecurityGroupIngress
                   - autoscaling:DeleteLaunchConfiguration
                   - autoscaling:DescribeAutoScalingGroups
                   - autoscaling:DescribeScalingActivities
@@ -311,7 +319,54 @@ Resources:
     Metadata:
       AWS::CloudFormation::Init:
         config:
+          packages:
+            yum:
+              awslogs: []
           files:
+            '/etc/awslogs/awscli.conf':
+              content: !Sub |
+                [default]
+                region = ${AWS::Region}
+                [plugins]
+                cwlogs = cwlogs
+              mode: '000644'
+              owner: root
+              group: root
+            '/etc/awslogs/awslogs.conf':
+              content: !Sub |
+                [general]
+                state_file = /var/lib/awslogs/agent-state
+                [/var/log/messages]
+                datetime_format = %b %d %H:%M:%S
+                file = /var/log/messages
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/messages
+                log_group_name = ${EC2LogGroup}
+                [/var/log/secure]
+                datetime_format = %b %d %H:%M:%S
+                file = /var/log/secure
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/secure
+                log_group_name = ${EC2LogGroup}
+                [/var/log/cfn-init.log]
+                datetime_format = %Y-%m-%d %H:%M:%S
+                file = /var/log/cfn-init.log
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/cfn-init.log
+                log_group_name = ${EC2LogGroup}
+                [/var/log/cfn-init-cmd.log]
+                datetime_format = %Y-%m-%d %H:%M:%S
+                file = /var/log/cfn-init-cmd.log
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/cfn-init-cmd.log
+                log_group_name = ${EC2LogGroup}
+                [/var/log/cloud-init-output.log]
+                file = /var/log/cloud-init-output.log
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/cloud-init-output.log
+                log_group_name = ${EC2LogGroup}
+                [/tmp/cleanup_bootstrap.output]
+                file = /tmp/cleanup_bootstrap.output
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/tmp/cleanup_bootstrap.output
+                log_group_name = ${EC2LogGroup}
+              mode: '000644'
+              owner: root
+              group: root
             /home/ec2-user/.kube/config:
               content: !Sub |
                 apiVersion: v1
@@ -344,7 +399,7 @@ Resources:
             /tmp/cleanup_bootstrap.sh:
               content: !Sub |
                 #!/bin/bash -x
-                exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
+                #exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
                 echo "Deleting leftover secrets/parameter stores used by Environment: ${Environment}, Stack: ${OldCFNStackName}..."
                 aws secretsmanager delete-secret --secret-id /${Environment}/${OldCFNStackName}/admin/password --force-delete-without-recovery --region ${AWS::Region} --no-paginate;
                 aws secretsmanager delete-secret --secret-id /${Environment}/${OldCFNStackName}/admin/apikey --force-delete-without-recovery --region ${AWS::Region} --no-paginate;
@@ -362,27 +417,17 @@ Resources:
                   export KUBECONFIG=/home/ec2-user/.kube/config
                   chmod 600 /home/ec2-user/.kube/config
 
+                  OldEKSSecurityGroupId=$(aws eks describe-cluster --region ${AWS::Region} --name ${OldCFNStackName} --query cluster.resourcesVpcConfig.securityGroupIds --output text)
+                  echo "add ingress rule to EKS control panel security group..."
+                  LOCAL_IP=$(curl http://169.254.169.254/latest/meta-data/local-ipv4)
+                  aws ec2 authorize-security-group-ingress --region ${AWS::Region} --group-id $OldEKSSecurityGroupId --ip-permissions IpProtocol=tcp,FromPort=443,ToPort=443,IpRanges="[{CidrIp=$LOCAL_IP/32,Description='grant access to EKS'}]"
+                  sleep 5
+
                   echo "deleting namespace ${OldCFNStackName}..."
                   kubectl get ns ${OldCFNStackName} -o json | jq '.spec.finalizers = []' | kubectl replace --raw "/api/v1/namespaces/${OldCFNStackName}/finalize" -f -
                   kubectl delete ns ${OldCFNStackName} --grace-period=0 --force
                   if [ $? -eq 0 ]; then
                     echo "namespace ${OldCFNStackName} deleted..."
-                    #echo "deleting Stack: ${OldCFNStackName}..."
-                    #aws cloudformation --region ${AWS::Region} delete-stack --stack-name ${OldCFNStackName}
-                    #STACK_ARN=$(aws cloudformation --region ${AWS::Region} describe-stacks --stack-name ${OldCFNStackName} --query Stacks[].StackId --output text)
-                    #STACK_STATUS=$(aws cloudformation --region ${AWS::Region} describe-stacks --stack-name ${OldCFNStackName} --query Stacks[].StackStatus --output text)
-                    #while [ \"$STACK_STATUS\" != \"DELETE_FAILED\" ]; do
-                    #  echo "Stack deletion still in process, sleeping for 30 seconds..."
-                    #  sleep 30
-                    #  STACK_STATUS=$(aws cloudformation --region ${AWS::Region} describe-stacks --stack-name ${OldCFNStackName} --query Stacks[].StackStatus --output text)
-                    #done
-                    #echo "deleting EKS cluster: ${OldCFNStackName}..."
-                    #aws eks delete-cluster --region ${AWS::Region} --name ${OldCFNStackName}
-                    #while [ $? -ne 0 ]; do
-                    #  echo "Cluster is still deleting, sleeping for 10 seconds..."
-                    #  sleep 10
-                    #  aws eks describe-cluster --region ${AWS::Region} --name ${OldCFNStackName} --query cluster.status --output text
-                    #done
                   fi
                   echo "deleting EKS cluster: ${OldCFNStackName}..."
                   aws eks delete-cluster --region ${AWS::Region} --name ${OldCFNStackName}
@@ -410,7 +455,7 @@ Resources:
                 if [ "$NLB_TAG" == "${OldCFNStackName}" ]; then
                   NLB_TG=$(aws elbv2 describe-target-groups --load-balancer-arn $NLB_RESOURCE_ARN --region ${AWS::Region} --no-paginate --query 'TargetGroups[*].TargetGroupArn' --output text)
                   aws elbv2 delete-load-balancer --load-balancer-arn {NLB_RESOURCE_ARN --region ${AWS::Region}
-                  echo "deleting ingress ALB target group from ${OldCFNStackName}..."
+                  echo "deleting ingress NLB target group from ${OldCFNStackName}..."
                   aws elbv2 delete-target-group --target-group-arn $NLB_TG  --region ${AWS::Region} --no-paginate
                 fi
                 echo "deleting ingress security group from ${OldCFNStackName}..."
@@ -420,7 +465,13 @@ Resources:
               owner: root
               group: root
           commands:
-            cleanup-bootstrap:
+            01_create_state_directory:
+              command: mkdir -p /var/awslogs/state
+            02_start_awslogsd:
+              command: systemctl start awslogsd
+            03_enable_awslogsd:
+              command: systemctl enable awslogsd
+            04_cleanup-bootstrap:
               command: "./tmp/cleanup_bootstrap.sh |tee -a /tmp/cleanup_bootstrap.output 2>&1"
     Properties:
       AssociatePublicIpAddress: false
