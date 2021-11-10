@@ -431,7 +431,8 @@ Resources:
                   fi
                   echo "deleting EKS cluster: ${OldCFNStackName}..."
                   aws eks delete-cluster --region ${AWS::Region} --name ${OldCFNStackName}
-                  while [ $? -ne 0 ]; do
+                  aws eks describe-cluster --region ${AWS::Region} --name ${OldCFNStackName} --query cluster.status --output text
+                  while [ $? -eq 0 ]; do
                     echo "Cluster is still deleting, sleeping for 10 seconds..."
                     sleep 10
                     aws eks describe-cluster --region ${AWS::Region} --name ${OldCFNStackName} --query cluster.status --output text
