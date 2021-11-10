@@ -467,6 +467,12 @@ Resources:
                 else
                   aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$OIDC" --overwrite --no-paginate
                 fi
+                EKSSecurityGroupId=$(aws eks describe-cluster --region ${AWS::Region} --name ${EKSClusterName} --query cluster.resourcesVpcConfig.securityGroupIds --output text)
+                echo "add ingress rule to EKS control panel security group..."
+                for cidr in $(echo ${ElbInboundCIDRs} | sed "s/,/ /g")
+                do
+                  aws ec2 authorize-security-group-ingress --region ${AWS::Region} --group-id $EKSSecurityGroupId --ip-permissions IpProtocol=tcp,FromPort=443,ToPort=443,IpRanges="[{CidrIp=$cidr,Description='grant access to EKS'}]"
+                done
                 echo "Saving security group info..."
                 clusterSecurityGroupId=$(aws eks describe-cluster --region ${AWS::Region}  --name ${EKSClusterName} --query cluster.resourcesVpcConfig.clusterSecurityGroupId  --output text)
                 parameter="/${Environment}/${EKSClusterName}/eks/clusterSecurityGroupId"

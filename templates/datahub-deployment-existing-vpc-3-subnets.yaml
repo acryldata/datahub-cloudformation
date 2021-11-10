@@ -48,7 +48,6 @@ Metadata:
             default: EKS Control Panel Configuration
           Parameters:
             - CreateEKS
-            - EksCidrIp
             - ProvisionInstanceType
             - EksMgmtIamRoleArn
             - EksMgmtIamUserArnList
@@ -139,8 +138,6 @@ Metadata:
           default: Enable Creation of Aurora RDS
         CreateEKS:
           default: Enable Creation of EKS
-        EksCidrIp:
-          default: Cidr to access EKS
         CreateAdmin:
           default: Enable Creation of Admin
         CreatePrivateLink:
@@ -418,10 +415,6 @@ Parameters:
       ConstraintDescription: The Elastic Load Balancer Inbound CIDRs
       Type: String
       Default: "192.168.1.0/24,192.168.2.0/24"
-    EksCidrIp:
-      ConstraintDescription: Cidr to access EKS, single range only
-      Type: String
-      Default: "192.168.1.0/24"
     DomainName:
       Default: "datahub.a.b.c"
       Description: DataHub Domain Name
@@ -690,7 +683,6 @@ Resources:
           TemplateBucketName: !Ref TemplateBucketName
           Environment: !Ref Environment
           ProvisionSecurityGroup: !Ref ProvisionSecurityGroup
-          EksCidrIp: !Ref EksCidrIp
           EksClusterName: !Sub "${AWS::StackName}"
 
     EKSClusterStack:
