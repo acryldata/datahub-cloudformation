@@ -559,7 +559,7 @@ Resources:
                     - logs:DescribeLogStreams
                     - logs:PutRetentionPolicy
                     - logs:PutMetricFilter
-                    - logs:CreateLogGroup
+                    #- logs:CreateLogGroup
                   Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:${EC2LogGroup}:*"
                   Effect: Allow
           - PolicyName: ebs-volume-policy

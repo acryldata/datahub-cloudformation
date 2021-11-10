@@ -193,7 +193,7 @@ Resources:
                   - logs:DescribeLogGroups
                   - logs:DescribeLogStreams
                   - logs:PutRetentionPolicy
-                  - logs:CreateLogGroup
+                  #- logs:CreateLogGroup
                 Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:${EC2LogGroup}:*"
                 Effect: Allow
         - PolicyName: provision-ssm-policy
