@@ -1,0 +1,502 @@
+# Datahub Deployment AWS
+
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Template that cleanup DataHub Platform in AWS
+Metadata:
+    AWS::CloudFormation::Interface:
+      ParameterGroups:
+        - Label:
+            default: Nested CFN Templates Location
+          Parameters:
+            - TemplateBucketName
+            - Environment
+        - Label:
+            default: Old Stack Cleanup Configuration
+          Parameters:
+            - VPCID
+            - CreateRoleAndSg
+            - ProvisionInstanceRoleName
+            #- ProvisionInstanceProfileName
+            - ProvisionInstanceType
+            - OldProvisionInstanceProfileArn
+            - PrivateSubnet1ID
+            - OldProvisionSecurityGroupID
+            - OldCFNStackName
+
+      ParameterLabels:
+        TemplateBucketName:
+          default: The name of the S3 bucket that holds the templates
+        Environment:
+          default: The Environment Prefix
+        VPCID:
+          Default: The Existing VPC ID
+        CreateRoleAndSg:
+          default: Enable Creation of IAM Role and Security Group
+        ProvisionInstanceRoleName:
+          default: The instance role name
+        #ProvisionInstanceProfileName:
+        #  default: The instance profile name
+        ProvisionInstanceType:
+          default: The instance type to deploy Provision to
+        OldProvisionInstanceProfileArn:
+          default: The AWS IAM Instance Profile ARNs that was used to create EKS in Old Stack
+        PrivateSubnet1ID:
+          Default: The Existing Private Subnet 1 ID
+        OldProvisionSecurityGroupID:
+          default: The Old Provision Instance Security Group Id
+        OldCFNStackName:
+          default: The Name of The Old Cloudformation Stack
+
+Parameters:
+    TemplateBucketName:
+      AllowedPattern: "^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$"
+      ConstraintDescription: "Bucket name can include numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen (-)."
+      Description: "S3 bucket name that contains the CFN templates (VPC, Provision etc). This string can include numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen (-)."
+      Type: "String"
+    Environment:
+      AllowedPattern: "^[0-9a-zA-Z]+([0-9a-zA-Z]*[0-9a-zA-Z])*$"
+      Description: "The Environment Prefix"
+      Type: "String"
+      Default: "dev"
+    VPCID:
+      Default: "vpc-1234"
+      Type: String
+    CreateRoleAndSg:
+      Description: "Set to true if you want to create Security Group"
+      Type: String
+      Default: "true"
+      AllowedValues:
+        - "true"
+        - "false"
+    ProvisionInstanceRoleName:
+      Type: String
+      Default: ""
+    #ProvisionInstanceProfileName:
+    #  Type: String
+    #  Default: ""
+    ProvisionInstanceType:
+      Type: "String"
+      Default: "t2.micro"
+      Description: "The type of EC2 instance to be launched for Provision Host"
+      AllowedValues:
+        # Add more instance types if needed
+        - t2.micro
+        - t2.medium
+        - t2.large
+      ConstraintDescription: "Must contain a valid instance type"
+    OldProvisionInstanceProfileArn:
+      Type: String
+      Description: The AWS IAM Role arn that was used to create EKS in Old Stack
+      Default: ""
+    PrivateSubnet1ID:
+      Default: "subnet-01"
+      Type: String
+    OldProvisionSecurityGroupID:
+      Type: String
+      Description: The Old Provision Instance Security Group Id
+      Default: ""
+    OldCFNStackName:
+      Type: String
+      Description: The Name of The Old Cloudformation Stack
+      Default: ""
+
+
+Conditions:
+  isCreateRoleAndSg: !Equals [!Ref CreateRoleAndSg, "true"]
+
+Mappings:
+  # Use Amazon 2 Linux
+  ProvisionLatestAmiRegionMap:
+    us-west-2:
+      AmiId: ami-0873b46c45c11058d
+    us-west-1:
+      AmiId: ami-05655c267c89566dd
+    us-east-1:
+      AmiId: ami-02354e95b39ca8dec
+    us-east-2:
+      AmiId: ami-07c8bc5c1ce9598c3
+    eu-central-1:
+      AmiId: ami-0c115dbd34c69a004
+    eu-west-1:
+      AmiId: ami-07d9160fa81ccffb5
+
+Resources:
+  EC2LogGroup:
+    Type: AWS::Logs::LogGroup
+    #DeletionPolicy: Retain
+    Properties:
+      LogGroupName: !Sub "/${Environment}/${AWS::StackName}/ProvisionHost"
+
+  ProvisionInstanceRole:
+    Condition: isCreateRoleAndSg
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Ref ProvisionInstanceRoleName
+      Policies:
+        - PolicyName: !Sub "${TemplateBucketName}-${Environment}-s3-policy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - s3:GetObject
+                Resource: !Sub "arn:aws:s3:::${TemplateBucketName}/${Environment}/scripts/*"
+                Effect: Allow
+        - PolicyName: cloudwatch-logs-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - logs:CreateLogStream
+                  - logs:GetLogEvents
+                  - logs:PutLogEvents
+                  - logs:DescribeLogGroups
+                  - logs:DescribeLogStreams
+                  - logs:PutRetentionPolicy
+                  #- logs:CreateLogGroup
+                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:*:*"
+                Effect: Allow
+        - PolicyName: provision-ssm-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - ssm:PutParameter
+                  - ssm:GetParameters
+                  - ssm:GetParameter
+                  - ssm:AddTagsToResource
+                #Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${Environment}/${OldCFNStackName}/*"
+                Resource: "*"
+                Effect: Allow
+        - PolicyName: provision-kms-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - kms:GenerateRandom
+                Resource: "*"
+                Effect: Allow
+        - PolicyName: provision-OpenID-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - iam:GetOpenIDConnectProvider
+                  - iam:CreateOpenIDConnectProvider
+                  - iam:TagOpenIDConnectProvider
+                Resource: "*"
+                Effect: Allow
+        - PolicyName: provision-secretsmanager-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - secretsmanager:CreateSecret
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:DescribeSecret
+                #Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${Environment}/${OldCFNStackName}/*",
+                Resource: "*"
+                Effect: Allow
+        - PolicyName: provision-iam-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - iam:PassRole
+                  - iam:GetRole
+                Resource: "*"
+                Effect: Allow
+        - PolicyName: provision-kafka-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - kafka:Describe*
+                  - kafka:Get*
+                  - kafka:List*
+                #Resource: !Sub "arn:aws:kafka:${AWS::Region}:${AWS::AccountId}:cluster/${OldCFNStackName}/*",
+                Resource: "*"
+                Effect: Allow
+        - PolicyName: provision-autoscaling-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - autoscaling:DescribeAutoScalingInstances
+                  - autoscaling:UpdateAutoScalingGroup
+                #Resource: !Sub "arn:aws:autoscaling:${AWS::Region}:${AWS::AccountId}:autoScalingGroup/*",
+                Resource: "*"
+                Effect: Allow
+        - PolicyName: eks-cluster-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - eks:*
+                #Resource: !Sub "arn:aws:eks:${AWS::Region}:${AWS::AccountId}:cluster/${OldCFNStackName}",
+                Resource: "*"
+                Effect: Allow
+        - PolicyName: provision-others-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - elasticloadbalancing:DescribeLoadBalancers
+                  - elasticloadbalancing:DescribeTags
+                  - elasticloadbalancing:DeleteLoadBalancers
+                  - elasticloadbalancing:DeleteLoadBalancer 
+                  - elasticloadbalancing:DescribeTargetGroups
+                  - sts:*
+                  - ec2:DescribeTags
+                  - ec2:RevokeSecurityGroupIngress
+                  - ec2:DescribeSecurityGroups
+                  - ec2:DeleteSecurityGroups
+                  - ec2:DeleteSecurityGroup
+                  - ec2:AuthorizeSecurityGroupIngress
+                  - autoscaling:DeleteLaunchConfiguration
+                  - autoscaling:DescribeAutoScalingGroups
+                  - autoscaling:DescribeScalingActivities
+                  - autoscaling:DeleteAutoScalingGroup
+                  - secretsmanager:DeleteSecret
+                  - ssm:DeleteParameters
+                  - ssm:DeleteParameter
+                Resource: "*"
+                Effect: Allow
+      Path: /
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Effect: Allow
+        Version: "2012-10-17"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM
+
+  ProvisionInstanceProfile:
+    Condition: isCreateRoleAndSg
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      #InstanceProfileName: !Ref ProvisionInstanceProfileName
+      Roles:
+        - !Ref ProvisionInstanceRole
+      Path: /
+
+  ProvisionSecurityGroup:
+    Condition: isCreateRoleAndSg
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ProvisionHost-SG"
+      GroupDescription: !Sub "${AWS::StackName}-ProvisionHost-SG"
+      VpcId: !Ref VPCID
+
+  CleanupAutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      LaunchConfigurationName: !Ref CleanupLaunchConfiguration
+      VPCZoneIdentifier:
+        - !Ref PrivateSubnet1ID
+      MinSize: 1
+      MaxSize: 1
+      Cooldown: "300"
+      DesiredCapacity: 1
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-provision-node"
+          PropagateAtLaunch: true
+        - Key: Component
+          Value: !Sub "${AWS::StackName}-provision-asg"
+          PropagateAtLaunch: true
+    #CreationPolicy:
+    #  ResourceSignal:
+    #    Timeout: PT50M
+
+  CleanupLaunchConfiguration:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Metadata:
+      AWS::CloudFormation::Init:
+        config:
+          packages:
+            yum:
+              awslogs: []
+          files:
+            '/etc/awslogs/awscli.conf':
+              content: !Sub |
+                [default]
+                region = ${AWS::Region}
+                [plugins]
+                cwlogs = cwlogs
+              mode: '000644'
+              owner: root
+              group: root
+            '/etc/awslogs/awslogs.conf':
+              content: !Sub |
+                [general]
+                state_file = /var/lib/awslogs/agent-state
+                [/var/log/messages]
+                datetime_format = %b %d %H:%M:%S
+                file = /var/log/messages
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/messages
+                log_group_name = ${EC2LogGroup}
+                [/var/log/secure]
+                datetime_format = %b %d %H:%M:%S
+                file = /var/log/secure
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/secure
+                log_group_name = ${EC2LogGroup}
+                [/var/log/cfn-init.log]
+                datetime_format = %Y-%m-%d %H:%M:%S
+                file = /var/log/cfn-init.log
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/cfn-init.log
+                log_group_name = ${EC2LogGroup}
+                [/var/log/cfn-init-cmd.log]
+                datetime_format = %Y-%m-%d %H:%M:%S
+                file = /var/log/cfn-init-cmd.log
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/cfn-init-cmd.log
+                log_group_name = ${EC2LogGroup}
+                [/var/log/cloud-init-output.log]
+                file = /var/log/cloud-init-output.log
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/var/log/cloud-init-output.log
+                log_group_name = ${EC2LogGroup}
+                [/tmp/cleanup_bootstrap.output]
+                file = /tmp/cleanup_bootstrap.output
+                log_stream_name = ${AWS::StackName}/provision-{instance_id}/tmp/cleanup_bootstrap.output
+                log_group_name = ${EC2LogGroup}
+              mode: '000644'
+              owner: root
+              group: root
+            /home/ec2-user/.kube/config:
+              content: !Sub |
+                apiVersion: v1
+                clusters:
+                - cluster:
+                    server: ENDPOINT
+                    certificate-authority-data: CERTIFICATE_DATA
+                  name: kubernetes
+                contexts:
+                - context:
+                    cluster: kubernetes
+                    user: aws
+                  name: aws
+                current-context: aws
+                kind: Config
+                preferences: {}
+                users:
+                - name: aws
+                  user:
+                    exec:
+                      apiVersion: client.authentication.k8s.io/v1alpha1
+                      command: aws-iam-authenticator
+                      args:
+                        - token
+                        - -i
+                        - ${OldCFNStackName}
+              mode: "000666"
+              owner: ec2-user
+              group: ec2-user
+            /tmp/cleanup_bootstrap.sh:
+              content: !Sub |
+                #!/bin/bash -x
+                #exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
+                echo "Deleting leftover secrets/parameter stores used by Environment: ${Environment}, Stack: ${OldCFNStackName}..."
+                aws secretsmanager delete-secret --secret-id /${Environment}/${OldCFNStackName}/admin/password --force-delete-without-recovery --region ${AWS::Region} --no-paginate;
+                aws secretsmanager delete-secret --secret-id /${Environment}/${OldCFNStackName}/admin/apikey --force-delete-without-recovery --region ${AWS::Region} --no-paginate;
+                aws ssm delete-parameters --names "/${Environment}/${OldCFNStackName}/eks/oidc" "/${Environment}/${OldCFNStackName}/eks/clusterSecurityGroupId" "/${Environment}/${OldCFNStackName}/msk/bootstrap_brokers" "/${Environment}/${OldCFNStackName}/msk/zookeeper_connect" "/${Environment}/${OldCFNStackName}/kotsadm/nlbarn" "/${Environment}/${OldCFNStackName}/kotsadm/nlbdns" "/${Environment}/${OldCFNStackName}/admin/albarn" "/${Environment}/${OldCFNStackName}/admin/albdns" --region ${AWS::Region} --no-paginate;
+
+                echo "Checking whether cluster exists..."
+                aws eks describe-cluster --region ${AWS::Region} --name ${OldCFNStackName} &> /dev/null
+                if [ $? -eq 0 ]; then
+                  echo "Find cluster ${OldCFNStackName}, deleting..."
+                  echo "Updating kubeconfig file..."
+                  ENDPOINT=$(aws eks describe-cluster --region ${AWS::Region}  --name ${OldCFNStackName} --query cluster.endpoint --output text)
+                  CERT_DATA=$(aws eks describe-cluster --region ${AWS::Region}  --name ${OldCFNStackName} --query cluster.certificateAuthority.data --output text)
+                  sed -i s,ENDPOINT,$ENDPOINT,g /home/ec2-user/.kube/config
+                  sed -i s,CERTIFICATE_DATA,$CERT_DATA,g /home/ec2-user/.kube/config
+                  export KUBECONFIG=/home/ec2-user/.kube/config
+                  chmod 600 /home/ec2-user/.kube/config
+
+                  OldEKSSecurityGroupId=$(aws eks describe-cluster --region ${AWS::Region} --name ${OldCFNStackName} --query cluster.resourcesVpcConfig.securityGroupIds --output text)
+                  echo "add ingress rule to EKS control panel security group..."
+                  LOCAL_IP=$(curl http://169.254.169.254/latest/meta-data/local-ipv4)
+                  aws ec2 authorize-security-group-ingress --region ${AWS::Region} --group-id $OldEKSSecurityGroupId --ip-permissions IpProtocol=tcp,FromPort=443,ToPort=443,IpRanges="[{CidrIp=$LOCAL_IP/32,Description='grant access to EKS'}]"
+                  sleep 5
+
+                  echo "deleting namespace ${OldCFNStackName}..."
+                  kubectl get ns ${OldCFNStackName} -o json | jq '.spec.finalizers = []' | kubectl replace --raw "/api/v1/namespaces/${OldCFNStackName}/finalize" -f -
+                  kubectl delete ns ${OldCFNStackName} --grace-period=0 --force
+                  if [ $? -eq 0 ]; then
+                    echo "namespace ${OldCFNStackName} deleted..."
+                  fi
+                  echo "deleting EKS cluster: ${OldCFNStackName}..."
+                  aws eks delete-cluster --region ${AWS::Region} --name ${OldCFNStackName}
+                  aws eks describe-cluster --region ${AWS::Region} --name ${OldCFNStackName} --query cluster.status --output text
+                  while [ $? -eq 0 ]; do
+                    echo "Cluster is still deleting, sleeping for 10 seconds..."
+                    sleep 10
+                    aws eks describe-cluster --region ${AWS::Region} --name ${OldCFNStackName} --query cluster.status --output text
+                  done
+                  echo "EKS cluster: ${OldCFNStackName} deleted..."
+                fi
+                echo "deleting ingress ALB from: ${OldCFNStackName}......"
+                ALB_RESOURCE_ARN=$(aws elbv2 describe-load-balancers --names ${OldCFNStackName}-datahub --query 'LoadBalancers[*].LoadBalancerArn' --region ${AWS::Region} --no-paginate --output text)
+                aws elbv2 delete-load-balancer --load-balancer-arn $ALB_RESOURCE_ARN --region ${AWS::Region}
+                ALB_RESOURCE_ARN=$(aws elbv2 describe-load-balancers --names ${OldCFNStackName}-kotsadm --query 'LoadBalancers[*].LoadBalancerArn' --region ${AWS::Region} --no-paginate --output text)
+                ALB_TAG=$(aws elbv2 describe-tags --resource-arns $ALB_RESOURCE_ARN --region ${AWS::Region} --no-paginate --output text|grep "elbv2.k8s.aws/cluster"|awk '{print $3}')
+                if [ "$ALB_TAG" == "${OldCFNStackName}" ]; then
+                  ALB_TG=$(aws elbv2 describe-target-groups --load-balancer-arn $ALB_RESOURCE_ARN --region ${AWS::Region} --no-paginate --query 'TargetGroups[*].TargetGroupArn' --output text)
+                  aws elbv2 delete-load-balancer --load-balancer-arn $ALB_RESOURCE_ARN --region ${AWS::Region}
+                  echo "deleting ingress ALB target group from ${OldCFNStackName}..."
+                  aws elbv2 delete-target-group --target-group-arn $ALB_TG  --region ${AWS::Region} --no-paginate
+                fi
+                echo "deleting ingress NLB from: ${OldCFNStackName}......"
+                NLB_RESOURCE_ARN=$(aws elbv2 describe-load-balancers --names ${OldCFNStackName}-kotsadm --query 'LoadBalancers[*].LoadBalancerArn' --region ${AWS::Region} --no-paginate --output text)
+                NLB_TAG=$(aws elbv2 describe-tags --resource-arns $NLB_RESOURCE_ARN --region ${AWS::Region} --no-paginate --output text|grep "elbv2.k8s.aws/cluster"|awk '{print $3}')
+                if [ "$NLB_TAG" == "${OldCFNStackName}" ]; then
+                  NLB_TG=$(aws elbv2 describe-target-groups --load-balancer-arn $NLB_RESOURCE_ARN --region ${AWS::Region} --no-paginate --query 'TargetGroups[*].TargetGroupArn' --output text)
+                  aws elbv2 delete-load-balancer --load-balancer-arn {NLB_RESOURCE_ARN --region ${AWS::Region}
+                  echo "deleting ingress NLB target group from ${OldCFNStackName}..."
+                  aws elbv2 delete-target-group --target-group-arn $NLB_TG  --region ${AWS::Region} --no-paginate
+                fi
+                echo "deleting ingress security group from ${OldCFNStackName}..."
+                LB_SG=$(aws ec2 describe-security-groups --filters Name=tag:elbv2.k8s.aws/cluster,Values=${OldCFNStackName} --region ${AWS::Region} --query 'SecurityGroups[*].GroupId' --output text --no-paginate)
+                aws ec2 delete-security-group --group-id $LB_SG --region ${AWS::Region} --no-paginate
+              mode: "000750"
+              owner: root
+              group: root
+          commands:
+            01_create_state_directory:
+              command: mkdir -p /var/awslogs/state
+            02_start_awslogsd:
+              command: systemctl start awslogsd
+            03_enable_awslogsd:
+              command: systemctl enable awslogsd
+            04_cleanup-bootstrap:
+              command: "./tmp/cleanup_bootstrap.sh |tee -a /tmp/cleanup_bootstrap.output 2>&1"
+    Properties:
+      AssociatePublicIpAddress: false
+      PlacementTenancy: default
+      IamInstanceProfile: !If [isCreateRoleAndSg, !Ref ProvisionInstanceProfile, !Ref OldProvisionInstanceProfileArn]
+      ImageId: !FindInMap [ProvisionLatestAmiRegionMap, !Ref "AWS::Region", AmiId]
+      SecurityGroups:
+        - !If [isCreateRoleAndSg, !Ref ProvisionSecurityGroup, !Ref OldProvisionSecurityGroupID]
+        
+      InstanceType: !Ref ProvisionInstanceType
+      UserData:
+        Fn::Base64: !Sub |
+            #!/bin/bash -xe
+            exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
+            export PATH=$PATH:/usr/local/bin:/opt/aws/bin
+            yum install -y https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm
+            yum install -y aws-cfn-bootstrap jq
+            curl -LO https://dl.k8s.io/release/v1.20.2/bin/linux/amd64/kubectl
+            chmod +x ./kubectl
+            mv kubectl /usr/local/bin
+            kubectl version --short --client
+            curl -o aws-iam-authenticator https://amazon-eks.s3.${AWS::Region}.amazonaws.com/1.21.2/2021-07-05/bin/linux/amd64/aws-iam-authenticator
+            chmod +x ./aws-iam-authenticator
+            mv aws-iam-authenticator /usr/local/bin
+            aws-iam-authenticator version
+            cfn-init -v --stack ${AWS::StackName} --resource CleanupLaunchConfiguration --region ${AWS::Region}
+            cfn-signal -e $? --stack ${AWS::StackName} --resource CleanupAutoScalingGroup --region ${AWS::Region}

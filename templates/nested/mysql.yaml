@@ -124,6 +124,7 @@ Resources:
 
     RDSDBCluster:
         Type: "AWS::RDS::DBCluster"
+        DeletionPolicy: Delete
         DependsOn: RDSSecurityGroup
         Properties:
             AvailabilityZones:
@@ -163,6 +164,7 @@ Resources:
     RDSDBInstance:
         Type: "AWS::RDS::DBInstance"
         DependsOn: RDSDBCluster
+        DeletionPolicy: Delete
         Properties:
             DBInstanceIdentifier: !Sub "${DBClusterIdentifier}-1"
             DBInstanceClass: "db.t3.small"

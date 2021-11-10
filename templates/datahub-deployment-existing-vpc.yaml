@@ -48,8 +48,10 @@ Metadata:
             default: EKS Control Panel Configuration
           Parameters:
             - CreateEKS
+            - EksCidrIp
             - ProvisionInstanceType
             - EksMgmtIamRoleArn
+            - EksMgmtIamUserArnList
             - KubernetesVersion
         - Label:
             default: EKS Node Group Configuration
@@ -81,7 +83,7 @@ Metadata:
           Parameters:
             - CreatePrivateLink
         - Label:
-            default: Remove Temp Resources
+            default: Remove Admin Provision Host
           Parameters:
             - RemoveTempResources
 
@@ -123,6 +125,8 @@ Metadata:
           default: The Environment Prefix
         EksMgmtIamRoleArn:
           default: The AWS IAM Role arn that will be allowed to manage EKS. Note do not include path just name of role like "my-role"
+        EksMgmtIamUserArnList:
+          default: The AWS IAM user arns list, who will be authorised to connect the cluster
         KubernetesVersion:
           default: The Kubernetes Version
         CreateElasticSearch:
@@ -135,6 +139,8 @@ Metadata:
           default: Enable Creation of Aurora RDS
         CreateEKS:
           default: Enable Creation of EKS
+        EksCidrIp:
+          default: Cidr to access EKS
         CreateAdmin:
           default: Enable Creation of Admin
         CreatePrivateLink:
@@ -265,6 +271,10 @@ Parameters:
     EksMgmtIamRoleArn:
       Type: String
       Description: The AWS IAM role arn that will have manage access to EKS
+      Default: ""
+    EksMgmtIamUserArnList:
+      Type: String
+      Description: "The AWS IAM user arns list who will be authorised to connect the cluster. Note format is arn:aws:iam::123456789:user/user1,arn:aws:iam::123456789:user/user2"
       Default: ""
     KubernetesVersion:
       Description: "The Kubernetes Version"
@@ -408,6 +418,10 @@ Parameters:
       ConstraintDescription: The Elastic Load Balancer Inbound CIDRs
       Type: String
       Default: "192.168.1.0/24,192.168.2.0/24"
+    EksCidrIp:
+      ConstraintDescription: Cidr to access EKS, single range only
+      Type: String
+      Default: "192.168.1.0/24"
     DomainName:
       Default: "datahub.a.b.c"
       Description: DataHub Domain Name
@@ -514,7 +528,7 @@ Resources:
 
     EC2LogGroup:
       Type: AWS::Logs::LogGroup
-      DeletionPolicy: Retain
+      #DeletionPolicy: Retain
       Properties: 
         LogGroupName: !Sub "/${Environment}/${AWS::StackName}/ProvisionHost"
 
@@ -545,7 +559,7 @@ Resources:
                     - logs:DescribeLogStreams
                     - logs:PutRetentionPolicy
                     - logs:PutMetricFilter
-                    - logs:CreateLogGroup
+                    #- logs:CreateLogGroup
                   Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:${EC2LogGroup}:*"
                   Effect: Allow
           - PolicyName: ebs-volume-policy
@@ -676,6 +690,7 @@ Resources:
           TemplateBucketName: !Ref TemplateBucketName
           Environment: !Ref Environment
           ProvisionSecurityGroup: !Ref ProvisionSecurityGroup
+          EksCidrIp: !Ref EksCidrIp
 
     EKSClusterStack:
       Condition: isCreateEKS
@@ -710,6 +725,7 @@ Resources:
           EKSServiceRoleArn: !GetAtt EKSPreRequsiteStack.Outputs.EksServiceRoleArn
           NodeInstanceRoleArn: !GetAtt NodeInstanceRole.Arn
           EksMgmtIamRoleArn: !Ref EksMgmtIamRoleArn
+          EksMgmtIamUserArnList: !Ref EksMgmtIamUserArnList
           Environment: !Ref Environment
           KubernetesVersion: !Ref KubernetesVersion
           EKSClusterName: !Sub "${AWS::StackName}"

@@ -9,6 +9,7 @@ Metadata:
           Parameters:
             - RemoveTempResources
             - EksMgmtIamRoleArn
+            - EksMgmtIamUserArnList
             - NodeInstanceRoleArn
             - EKSServiceRoleArn
             - EKSClusterName
@@ -66,6 +67,8 @@ Metadata:
           default: The Security Group of EKS Control Panel
         EksMgmtIamRoleArn:
           default: The AWS IAM Role name that will be allowed to manage EKS. Note format is arn:aws:iam::123456789:role/admin-role
+        EksMgmtIamUserArnList:
+          default: The AWS IAM user arns list, who will be authorised to connect the cluster
         EKSClusterName:
           default: The EKS cluster name
         KubernetesVersion:
@@ -137,6 +140,9 @@ Parameters:
     EksMgmtIamRoleArn:
       Type: String
       Description: "The AWS IAM Role name that will be allowed to manage EKS. Note format is arn:aws:iam::123456789:role/admin-role"
+    EksMgmtIamUserArnList:
+      Type: String
+      Description: "The AWS IAM user arns list who will be authorised to connect the cluster. Note format is arn:aws:iam::123456789:user/user1,arn:aws:iam::123456789:user/user2"
     EKSClusterName:
       Type: String
       Description: The name of the eks cluster
@@ -167,6 +173,7 @@ Resources:
   ProvisionInstanceRole:
     Type: AWS::IAM::Role
     Properties:
+      #RoleName:!Sub "${EKSClusterName}-provision"
       Policies:
         - PolicyName: !Sub "${TemplateBucketName}-${Environment}-s3-policy"
           PolicyDocument:
@@ -187,7 +194,7 @@ Resources:
                   - logs:DescribeLogGroups
                   - logs:DescribeLogStreams
                   - logs:PutRetentionPolicy
-                  - logs:CreateLogGroup
+                  #- logs:CreateLogGroup
                 Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:${EC2LogGroup}:*"
                 Effect: Allow
         - PolicyName: provision-ssm-policy
@@ -275,11 +282,26 @@ Resources:
             Version: "2012-10-17"
             Statement:
               - Action:
-                  - cloudformation:ListStacks
-                  - cloudformation:CreateStack
                   - elasticloadbalancing:DescribeLoadBalancers
+                  - elasticloadbalancing:DescribeTags
+                  - elasticloadbalancing:DeleteLoadBalancers
+                  - elasticloadbalancing:DeleteLoadBalancer
+                  - elasticloadbalancing:DescribeTargetGroups
                   - sts:*
                   - ec2:DescribeTags 
+                  - ec2:RevokeSecurityGroupIngress
+                  - ec2:DescribeSecurityGroups
+                  - ec2:DeleteSecurityGroups
+                  - ec2:DeleteSecurityGroup
+                  - ec2:RevokeSecurityGroupIngress
+                  - ec2:AuthorizeSecurityGroupIngress
+                  - autoscaling:DeleteLaunchConfiguration
+                  - autoscaling:DescribeAutoScalingGroups
+                  - autoscaling:DescribeScalingActivities
+                  - autoscaling:DeleteAutoScalingGroup
+                  - secretsmanager:DeleteSecret
+                  - ssm:DeleteParameters
+                  - ssm:DeleteParameter
                 Resource: "*"
                 Effect: Allow
       Path: /
@@ -323,7 +345,7 @@ Resources:
           PropagateAtLaunch: true
     CreationPolicy:
       ResourceSignal:
-        Timeout: PT25M
+        Timeout: PT50M
 
   EKSProvisionLaunchConfiguration:
     Type: AWS::AutoScaling::LaunchConfiguration
@@ -466,6 +488,14 @@ Resources:
                 if [ $? -gt 0 ]; then
                   echo "Configmap does not exist, applying..."
                   curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+                  for u in $(echo ${EksMgmtIamUserArnList} | sed "s/,/ /g")
+                  do
+                    echo "    - userarn: $u" >> /tmp/aws-auth-cm.yaml
+                    echo "      username: admin" >> /tmp/aws-auth-cm.yaml
+                    echo "      groups:" >> /tmp/aws-auth-cm.yaml
+                    echo "        - system:masters" >> /tmp/aws-auth-cm.yaml
+                  done
+                  kubectl apply -f /tmp/aws-auth-cm.yaml
                   mv /tmp/eksctl /usr/local/bin
                   eksctl create iamidentitymapping  --region ${AWS::Region} --cluster ${EKSClusterName} --arn ${EksMgmtIamRoleArn} --username admin --group system:masters
                   kubectl get cm -n kube-system aws-auth -o yaml
@@ -487,10 +517,7 @@ Resources:
                       groups:
                         - system:bootstrappers
                         - system:nodes
-                    - rolearn: ${EksMgmtIamRoleArn}
-                      groups:
-                        -system:masters
-                      username: admin
+                  mapUsers: |
               mode: "000644"
               owner: root
               group: root
