@@ -441,8 +441,6 @@ Resources:
                 fi
                 echo "deleting ingress ALB from: ${OldCFNStackName}......"
                 ALB_RESOURCE_ARN=$(aws elbv2 describe-load-balancers --names ${OldCFNStackName}-datahub --query 'LoadBalancers[*].LoadBalancerArn' --region ${AWS::Region} --no-paginate --output text)
-                aws elbv2 delete-load-balancer --load-balancer-arn $ALB_RESOURCE_ARN --region ${AWS::Region}
-                ALB_RESOURCE_ARN=$(aws elbv2 describe-load-balancers --names ${OldCFNStackName}-kotsadm --query 'LoadBalancers[*].LoadBalancerArn' --region ${AWS::Region} --no-paginate --output text)
                 ALB_TAG=$(aws elbv2 describe-tags --resource-arns $ALB_RESOURCE_ARN --region ${AWS::Region} --no-paginate --output text|grep "elbv2.k8s.aws/cluster"|awk '{print $3}')
                 if [ "$ALB_TAG" == "${OldCFNStackName}" ]; then
                   ALB_TG=$(aws elbv2 describe-target-groups --load-balancer-arn $ALB_RESOURCE_ARN --region ${AWS::Region} --no-paginate --query 'TargetGroups[*].TargetGroupArn' --output text)
