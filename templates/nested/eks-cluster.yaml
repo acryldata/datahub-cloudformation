@@ -173,7 +173,7 @@ Resources:
   ProvisionInstanceRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName:!Sub "${EKSClusterName}-provision"
+      #RoleName:!Sub "${EKSClusterName}-provision"
       Policies:
         - PolicyName: !Sub "${TemplateBucketName}-${Environment}-s3-policy"
           PolicyDocument:
