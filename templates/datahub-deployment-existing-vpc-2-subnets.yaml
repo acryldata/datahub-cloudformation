@@ -416,7 +416,7 @@ Parameters:
     ElbInboundCIDRs:
       ConstraintDescription: The Elastic Load Balancer Inbound CIDRs
       Type: String
-      Default: "10.0.0.0/8,192.168.0.0/8,172.16.0.0/8"
+      Default: "10.0.0.0/8,192.0.0.0/8,172.0.0.0/8"
     DomainName:
       Default: "datahub.a.b.c"
       Description: DataHub Domain Name
@@ -536,12 +536,6 @@ Resources:
             Value: !Sub "${AWS::StackName}-ProvisionHost-SG"
         GroupDescription: Enables SSH Access to Provision Hosts
         VpcId: !Ref VPCID
-        ### temp workaround, for troubleshooting
-        #SecurityGroupIngress:
-        #  - IpProtocol: tcp
-        #    FromPort: 22
-        #    ToPort: 22
-        #    CidrIp: 0.0.0.0/0
 
     NodeInstanceRole:
       Condition: isCreateEKS

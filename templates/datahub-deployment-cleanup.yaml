@@ -105,7 +105,7 @@ Parameters:
     InboundCIDRs:
       ConstraintDescription: The Elastic Load Balancer Inbound CIDRs
       Type: String
-      Default: "10.0.0.0/8,192.168.0.0/8,172.16.0.0/8"
+      Default: "10.0.0.0/8,192.0.0.0/8,172.0.0.0/8"
 
 
 Conditions:
@@ -428,6 +428,8 @@ Resources:
                 chown ec2-user /home/ec2-user/.ssh/*
                 chmod 400 "$KEY_FILE_NAME"
                 cat "$KEY_FILE_NAME" >> /home/ec2-user/.ssh/authorized_keys
+                exit 0
+                aws eks --region ${AWS::Region} update-kubeconfig --name ${OldCFNStackName}
                 echo "Deleting leftover secrets/parameter stores used by Environment: ${Environment}, Stack: ${OldCFNStackName}..."
                 aws secretsmanager delete-secret --secret-id /${Environment}/${OldCFNStackName}/admin/password --force-delete-without-recovery --region ${AWS::Region} --no-paginate;
                 aws secretsmanager delete-secret --secret-id /${Environment}/${OldCFNStackName}/admin/apikey --force-delete-without-recovery --region ${AWS::Region} --no-paginate;
@@ -436,6 +438,7 @@ Resources:
                 echo "Checking whether cluster exists..."
                 aws eks describe-cluster --region ${AWS::Region} --name ${OldCFNStackName} &> /dev/null
                 if [ $? -eq 0 ]; then
+                  aws eks --region ${AWS::Region} update-kubeconfig --name ${OldCFNStackName}
                   echo "Find cluster ${OldCFNStackName}, deleting..."
                   echo "Updating kubeconfig file..."
                   ENDPOINT=$(aws eks describe-cluster --region ${AWS::Region}  --name ${OldCFNStackName} --query cluster.endpoint --output text)
@@ -459,7 +462,6 @@ Resources:
                   done
                   sleep 5
 
-                  exit 0
 
                   echo "deleting namespace ${OldCFNStackName}..."
                   #kubectl get ns ${OldCFNStackName} -o json | jq '.spec.finalizers = []' | kubectl replace --raw "/api/v1/namespaces/${OldCFNStackName}/finalize" -f -

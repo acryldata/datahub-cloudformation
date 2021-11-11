@@ -17,6 +17,7 @@ Metadata:
           - KafkaVersion
           - MSKInstanceType
           - MSKVolumeSize
+          - NumberOfBrokerNodes
 
     ParameterLabels:
       NodeSecurityGroup:
@@ -41,6 +42,8 @@ Metadata:
         default: MSK Instance Type
       MSKVolumeSize:
         default: The MSK Volume Size
+      NumberOfBrokerNodes:
+        default: The Number of MSK Brokers
 
 Parameters:
   NodeSecurityGroup:
@@ -87,6 +90,10 @@ Parameters:
     Default: 10
     Description: MSK Volume Size in GB
     Type: String
+  NumberOfBrokerNodes:
+    Default: 3
+    Description: The number of MSK Brokers
+    Type: String
 
 
 Resources:
@@ -132,7 +139,7 @@ Resources:
         DependsOn: MSKLogGroup
         Properties:
             ClusterName: !Sub "${MSKClusterName}"
-            NumberOfBrokerNodes: 3
+            NumberOfBrokerNodes: !Ref NumberOfBrokerNodes
             Tags:
                 CloudFormation: "true"
                 Environment: !Sub "${MSKClusterName}"

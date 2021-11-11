@@ -19,6 +19,7 @@ Metadata:
             - ControlPanelSecurityGroup
             - NodeSecurityGroup
             - ProvisionSecurityGroup
+            - ElbInboundCIDRs
         - Label:
             default: Provision Stack Configuration
           Parameters:
@@ -75,6 +76,8 @@ Metadata:
           default: The Kubernetes Version
         Environment:
           default: The Environment
+        ElbInboundCIDRs:
+          default: DataHub ALB Inbound CIDRs
 
 Parameters:
     RemoveTempResources:
@@ -152,6 +155,10 @@ Parameters:
     Environment:
       Type: String
       Description: The Environment
+    ElbInboundCIDRs:
+      ConstraintDescription: The Elastic Load Balancer Inbound CIDRs
+      Type: String
+      Default: "10.0.0.0/8,192.0.0.0/8,172.0.0.0/8"
 
 Mappings:
   # Use Amazon 2 Linux
