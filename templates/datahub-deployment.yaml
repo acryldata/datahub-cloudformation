@@ -467,7 +467,7 @@ Parameters:
     ElbInboundCIDRs:
       ConstraintDescription: The Elastic Load Balancer Inbound CIDRs
       Type: String
-      Default: "10.0.0.0/8,192.168.0.0/8,172.16.0.0/8"
+      Default: "192.168.1.0/24,192.168.2.0/24"
     DomainName:
       Default: "datahub.a.b.c"
       Description: DataHub Domain Name
