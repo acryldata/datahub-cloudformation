@@ -1,0 +1,228 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: EKSNodeGroup stack that creates EKS worker nodes group
+
+Metadata:
+    AWS::CloudFormation::Interface:
+      ParameterGroups:
+        - Label:
+            default: EKS Worker Nodes Stack Configuration
+          Parameters:
+            - EKSClusterName
+            - KubernetesVersion
+            - Environment
+            - TemplateBucketName
+            - NodeInstanceRole
+            - NodeInstanceRoleArn
+            - NodeInstanceType
+            - NodeSecurityGroup
+            - ControlPanelSecurityGroup
+
+      ParameterLabels:
+        TemplateBucketName:
+          default: The name of the S3 bucket that holds the templates
+        NodeInstanceRole:
+          default: The AWS IAM Role to be applied to the EKS Worker Nodes
+        NodeInstanceRoleArn:
+          default: The AWS IAM Role ARN to be applied to the EKS Worker Nodes
+        NodeInstanceType:
+          default: The instance type to deploy EKS Worker Node to
+        NodeSecurityGroup:
+          default: The Security Group of EKS Worker nodes
+        MaxNumberOfNodes:
+          default: The maximum number of nodes to scale up to for EKS Worker Node
+        MinNumberOfNodes:
+          default: The minimum number of nodes to scale down to for EKS Worker Node
+        DesiredNumberOfNodes:
+          default: The desired number of nodes to keep running for EKS Worker Node
+        EKSNodeVolumeSize:
+          default: The Volume Size of EKS Worker node
+        EKSClusterName:
+          default: The EKS cluster name
+        KubernetesVersion:
+          default: The Kubernetes Version
+        Environment:
+          default: The Environment
+        NodeSecurityGroup:
+          default: The Security Group of EKS Worker nodes
+        ControlPanelSecurityGroup:
+          default: The Security Group of EKS Control Panel
+
+Parameters:
+    TemplateBucketName:
+      AllowedPattern: "^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$"
+      ConstraintDescription: "Bucket name can include numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen (-)."
+      Description: "S3 bucket name that contains the CFN templates (VPC, Provision etc). This string can include numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen (-)."
+      Type: "String"
+    NodeSecurityGroup:
+      Description: "ID for the VPC, This will be used to get the node security group"
+      Type: "AWS::EC2::SecurityGroup::Id"
+    ControlPanelSecurityGroup:
+      Description: "ID for the VPC, This will be used to get the eks control panel security group"
+      Type: "AWS::EC2::SecurityGroup::Id"
+    PrivateSubnet1ID:
+      Description: "ID of Private Subnet 1"
+      Type: "AWS::EC2::Subnet::Id"
+    PrivateSubnet2ID:
+      Description: "ID of Private Subnet 2"
+      Type: "AWS::EC2::Subnet::Id"
+    NodeInstanceRole:
+      Type: "String"
+      Description: "The AWS IAM Role to be applied to the EKS Worker Nodes"
+    NodeInstanceRoleArn:
+      Type: "String"
+      Description: "The AWS IAM Role ARN to be applied to the EKS Worker Nodes"
+    NodeInstanceType:
+      Type: "String"
+      Description: "The type of EC2 instance to be launched for EKS Worker Node"
+      AllowedValues:
+        # Add more instance types if needed
+        - t2.xlarge
+        - t2.2xlarge
+        - m3.xlarge
+        - m3.2xlarge
+        - m4.xlarge
+        - m4.2xlarge
+        - m5.large
+        - m5.xlarge
+        - m5.2xlarge
+      ConstraintDescription: "Must contain a valid instance type"
+    DesiredNumberOfNodes:
+      Type: "String"
+      MinLength: 1
+      Description: "The desired number of EKS Worker Nodes to run"
+    EKSNodeVolumeSize:
+      Type: "String"
+      Description: "The volume size of EKS Worker Node"
+    MaxNumberOfNodes:
+      Type: "String"
+      MinLength: 1
+      Description: "The maximum number of EKS Worker Nodes to run"
+    MinNumberOfNodes:
+      Type: "String"
+      MinLength: 1
+      Description: "The minimum number of EKS Worker Nodes to run"
+    EKSClusterName:
+      Type: String
+      Description: The name of the eks cluster
+    KubernetesVersion:
+      Type: String
+      Description: The Kubernetes Version
+    Environment:
+      Type: String
+      Description: The Kubernetes Version
+
+Mappings:
+  NodeAmiRegionMap:
+    us-west-2:
+      AmiId: ami-0fd02f0f218f458ce
+    us-west-1:
+      AmiId: ami-071bd7a109135a490
+    us-east-1:
+      AmiId: ami-0b8a17014e9e7f9b9
+    us-east-2:
+      AmiId: ami-0bb8793bb0e4bdb1f
+    eu-central-1:
+      AmiId: ami-0c0083f53400a6a1b
+    eu-west-1:
+      AmiId: ami-0c085e378560aff3f
+
+
+Resources:
+  NodeInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles:
+      - !Ref NodeInstanceRole
+
+  NodeSecurityGroupIngress01:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Allow TCP 443 traffic
+      GroupId: !Ref NodeSecurityGroup
+      SourceSecurityGroupId: !Ref NodeSecurityGroup
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+
+  NodeSecurityIngress02:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Allow TCP 1025-65535 traffic
+      GroupId: !Ref NodeSecurityGroup
+      SourceSecurityGroupId: !Ref NodeSecurityGroup
+      IpProtocol: tcp
+      FromPort: 1025
+      ToPort: 65535
+
+  NodeSecurityGroupFromControlPanelIngress01:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Allow worker Kubelets and pods to receive communication from the cluster control panel
+      GroupId: !Ref NodeSecurityGroup
+      SourceSecurityGroupId: !Ref ControlPanelSecurityGroup
+      IpProtocol: tcp
+      FromPort: 10250
+      ToPort: 10250
+
+
+  NodeSecurityGroupFromControlPanelIngress02:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Allow pods running extension API servers on port 443 to receive communication from cluster control panel
+      GroupId: !Ref NodeSecurityGroup
+      SourceSecurityGroupId: !Ref ControlPanelSecurityGroup
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+
+  EKSNodegroup1:
+      Type: "AWS::EKS::Nodegroup"
+      Properties:
+          NodegroupName: !Sub "${EKSClusterName}-nodegroup1"
+          ClusterName: !Ref EKSClusterName
+          Version: !Ref KubernetesVersion
+          ScalingConfig:
+              MinSize: !Ref MinNumberOfNodes
+              MaxSize: !Ref MaxNumberOfNodes
+              DesiredSize: !Ref DesiredNumberOfNodes
+          InstanceTypes:
+            - !Ref NodeInstanceType
+          Subnets:
+            - !Ref PrivateSubnet1ID
+          AmiType: "AL2_x86_64"
+          NodeRole: !Ref NodeInstanceRoleArn
+          Labels: {}
+          DiskSize: !Ref EKSNodeVolumeSize
+          Tags:
+              Name: !Sub "${EKSClusterName}-nodegroup1"
+              CloudFormation: "true"
+          CapacityType: "ON_DEMAND"
+
+  EKSNodegroup2:
+      Type: "AWS::EKS::Nodegroup"
+      Properties:
+          NodegroupName: !Sub "${EKSClusterName}-nodegroup2"
+          ClusterName: !Ref EKSClusterName
+          Version: !Ref KubernetesVersion
+          ScalingConfig:
+              MinSize: !Ref MinNumberOfNodes
+              MaxSize: !Ref MaxNumberOfNodes
+              DesiredSize: !Ref DesiredNumberOfNodes
+          InstanceTypes:
+            - !Ref NodeInstanceType
+          Subnets:
+            - !Ref PrivateSubnet2ID
+          AmiType: "AL2_x86_64"
+          NodeRole: !Ref NodeInstanceRoleArn
+          Labels: {}
+          DiskSize: !Ref EKSNodeVolumeSize
+          Tags:
+              Name: !Sub "${EKSClusterName}-nodegroup2"
+              CloudFormation: "true"
+          CapacityType: "ON_DEMAND"
+
+Outputs:
+  SubstackName:
+    Description: The eks nodegroup stack name
+    Value: !Sub "${AWS::StackName}"

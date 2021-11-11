@@ -11,7 +11,7 @@ Metadata:
             - Environment
             - VPCID
             - ProvisionSecurityGroup
-            - EksCidrIp
+            - EksClusterName
 
       ParameterLabels:
         TemplateBucketName:
@@ -22,8 +22,8 @@ Metadata:
           default: The ID of the VPC to deploy the EKS Cluster into
         ProvisionSecurityGroup:
           default: The Security Group of Provision Host
-        EksCidrIp:
-          default: Cidr to access EKS
+        EksClusterName:
+          default: The EKS cluster name
 
 Parameters:
     TemplateBucketName:
@@ -41,14 +41,15 @@ Parameters:
     ProvisionSecurityGroup:
       Description: "ID for the VPC, This will be used to get the provision security group"
       Type: "AWS::EC2::SecurityGroup::Id"
-    EksCidrIp:
-      Description: "Cidr to access EKS"
-      Type: "String"
+    EksClusterName:
+      Type: String
+      Description: The name of the eks cluster
 
 Resources:
   EKSServiceRole:
     Type: AWS::IAM::Role
     Properties:
+      RoleName: !Sub "${EksClusterName}-service-role"
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -98,16 +99,6 @@ Resources:
       Description: Allow provision to communicate with the cluster API Server
       GroupId: !Ref ControlPanelSecurityGroup
       SourceSecurityGroupId: !Ref ProvisionSecurityGroup
-      IpProtocol: tcp
-      ToPort: 443
-      FromPort: 443
-
-  ClusterControlPanelSecurityGroupIngress03:
-    Type: AWS::EC2::SecurityGroupIngress
-    Properties:
-      Description: Allow other subnets to communicate with the cluster API Server
-      GroupId: !Ref ControlPanelSecurityGroup
-      CidrIp: !Ref EksCidrIp
       IpProtocol: tcp
       ToPort: 443
       FromPort: 443

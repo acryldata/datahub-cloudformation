@@ -10,13 +10,13 @@ Metadata:
           - VPCID
           - DBSubnet1
           - DBSubnet2
-          - DBSubnet3
           - MSKClusterName
           - Environment
           - EksClusterName
           - KafkaVersion
           - MSKInstanceType
           - MSKVolumeSize
+          - NumberOfBrokerNodes
 
     ParameterLabels:
       NodeSecurityGroup:
@@ -25,8 +25,6 @@ Metadata:
         default: The ID of Private Subnet 1
       DBSubnet2:
         default: The ID of Private Subnet 2
-      DBSubnet3:
-        default: The ID of Private Subnet 3
       VPCID:
         default: VPC ID
       MSKClusterName:
@@ -41,6 +39,8 @@ Metadata:
         default: MSK Instance Type
       MSKVolumeSize:
         default: The MSK Volume Size
+      NumberOfBrokerNodes:
+        default: The Number of MSK Brokers
 
 Parameters:
   NodeSecurityGroup:
@@ -51,9 +51,6 @@ Parameters:
     Type: AWS::EC2::Subnet::Id
   DBSubnet2:
     Description: ID of Private Subnet 2
-    Type: AWS::EC2::Subnet::Id
-  DBSubnet3:
-    Description: ID of Private Subnet 3
     Type: AWS::EC2::Subnet::Id
   VPCID:
     Description: ID for the VPC
@@ -86,6 +83,10 @@ Parameters:
   MSKVolumeSize:
     Default: 10
     Description: MSK Volume Size in GB
+    Type: String
+  NumberOfBrokerNodes:
+    Default: 4
+    Description: The number of MSK Brokers
     Type: String
 
 
@@ -132,7 +133,7 @@ Resources:
         DependsOn: MSKLogGroup
         Properties:
             ClusterName: !Sub "${MSKClusterName}"
-            NumberOfBrokerNodes: 3
+            NumberOfBrokerNodes: !Ref NumberOfBrokerNodes
             Tags:
                 CloudFormation: "true"
                 Environment: !Sub "${MSKClusterName}"
@@ -147,7 +148,6 @@ Resources:
                 ClientSubnets:
                   - !Ref DBSubnet1
                   - !Ref DBSubnet2
-                  - !Ref DBSubnet3
                 InstanceType: !Ref MSKInstanceType
                 SecurityGroups:
                   - !Ref MSKSecurityGroup

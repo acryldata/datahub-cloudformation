@@ -1,0 +1,183 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: ElasticSearch stack that creates Amazon ElasticSearch
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: ES Stack Configuration
+        Parameters:
+          - VPCID
+          - PrivateSubnet1
+          - PrivateSubnet2
+          - ESDomainName
+          - Environment
+          - EksClusterName
+          - ElasticsearchVersion
+
+    ParameterLabels:
+      NodeSecurityGroup:
+        default: The Node Security Group ID to use for ElasticSearch
+      PrivateSubnet1:
+        default: The ID of Private Subnet 1
+      PrivateSubnet2:
+        default: The ID of Private Subnet 2
+      VPCID:
+        default: VPC ID
+      ESDomainName:
+        default: Elasticsearch Domain
+      Environment:
+        default: The Environment
+      EksClusterName:
+        default: The EksClusterName
+      ElasticsearchVersion:
+        default: Elasticsearch Version
+
+Parameters:
+  NodeSecurityGroup:
+    Description: ID for the VPC, This will be used to get the node security group
+    Type: AWS::EC2::SecurityGroup::Id
+  PrivateSubnet1:
+    Description: ID of Private Subnet 1
+    Type: AWS::EC2::Subnet::Id
+  PrivateSubnet2:
+    Description: ID of Private Subnet 2
+    Type: AWS::EC2::Subnet::Id
+  VPCID:
+    Description: ID for the VPC
+    Type: AWS::EC2::VPC::Id
+  ESVolumeSize:
+    Default: 50
+    Description: Data Node Volume Size in GB
+    Type: String
+  ESInstanceType:
+    AllowedValues:
+      - t3.small.elasticsearch
+      - t3.large.elasticsearch
+      - m5.large.elasticsearch
+    ConstraintDescription: Must contain valid ES instance type
+    Default: t3.small.elasticsearch
+    Description: EC2 instance type for the Amazon ES instances
+    Type: String
+  ESMasterInstanceType:
+    AllowedValues:
+      - t3.small.elasticsearch
+      - t3.large.elasticsearch
+      - c5.large.elasticsearch
+    ConstraintDescription: Must contain valid ES instance type
+    Default: t3.small.elasticsearch
+    Description: EC2 instance type for the Amazon ES instances
+    Type: String
+
+  ElasticsearchVersion:
+    AllowedValues:
+      - 7.9
+    Default: 7.9
+    Description: Elasticsearch versions
+    Type: String
+  ESDomainName:
+    Default: "datahub"
+    Description: Elasticsearch Domain Name
+    Type: String
+  Environment:
+    Type: String
+    Description: The Environment
+  EksClusterName:
+    Type: String
+    Description: The EksClusterName
+  ESMasterUser:
+    Default: "admin"
+    Type: String
+  ESMasterUserPassword:
+    NoEcho: true
+    Type: String
+  ESDataNodeCount:
+    Type: String
+  ESMasterNodeCount:
+    Type: String
+
+
+Resources:
+    ESSecurityGroup:
+        Type: "AWS::EC2::SecurityGroup"
+        Properties:
+            GroupDescription: "Allow inbound traffic to ElasticSearch from VPC CIDR"
+            GroupName: !Sub "${ESDomainName}-elasticsearch-sg"
+            VpcId: !Ref VPCID
+
+    ESSecurityGroupIngress01:
+        Type: "AWS::EC2::SecurityGroupIngress"
+        Properties:
+            GroupId: !Ref ESSecurityGroup
+            SourceSecurityGroupId: !Sub "{{resolve:ssm:/${Environment}/${EksClusterName}/eks/clusterSecurityGroupId}}"
+            SourceSecurityGroupOwnerId: !Ref AWS::AccountId
+            FromPort: 443
+            IpProtocol: "tcp"
+            ToPort: 443
+
+    ElasticsearchDomain:
+        Type: "AWS::Elasticsearch::Domain"
+        Properties:
+            DomainName: !Ref ESDomainName
+            ElasticsearchVersion: !Ref ElasticsearchVersion
+            ElasticsearchClusterConfig:
+                DedicatedMasterEnabled: true
+                InstanceCount: !Ref ESDataNodeCount
+                InstanceType: !Ref ESInstanceType
+                ZoneAwarenessConfig: 
+                    AvailabilityZoneCount: 2
+                ZoneAwarenessEnabled: true
+                DedicatedMasterType: !Ref ESMasterInstanceType
+                DedicatedMasterCount: !Ref ESMasterNodeCount
+                WarmEnabled: false
+            AccessPolicies: !Sub "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"AWS\":\"*\"},\"Action\":\"es:*\",\"Resource\":\"arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/${ESDomainName}/*\"}]}"
+            SnapshotOptions:
+                AutomatedSnapshotStartHour: 0
+            VPCOptions:
+                SecurityGroupIds:
+                  - !Ref ESSecurityGroup
+                SubnetIds:
+                  - !Ref PrivateSubnet1
+                  - !Ref PrivateSubnet2
+            EncryptionAtRestOptions:
+                Enabled: true
+            NodeToNodeEncryptionOptions:
+                Enabled: true
+            AdvancedOptions:
+                "rest.action.multi.allow_explicit_index": "true"
+            EBSOptions:
+                EBSEnabled: true
+                VolumeType: "gp2"
+                VolumeSize: !Ref ESVolumeSize
+            CognitoOptions:
+                Enabled: false
+            DomainEndpointOptions:
+                EnforceHTTPS: true
+                TLSSecurityPolicy: "Policy-Min-TLS-1-0-2019-07"
+                CustomEndpointEnabled: false
+            AdvancedSecurityOptions:
+                Enabled: true
+                InternalUserDatabaseEnabled: true
+                MasterUserOptions: 
+                    MasterUserName: !Ref ESMasterUser
+                    MasterUserPassword: !Ref ESMasterUserPassword
+            Tags:
+              -
+                Key: "Environment"
+                Value: !Sub "${AWS::StackName}"
+
+    ESEndpointSSM:
+        Type: AWS::SSM::Parameter
+        Properties:
+          Description: ElasticSearch Domain Endpoint
+          Name: !Sub "/${Environment}/${ESDomainName}/elasticsearch/endpoint"
+          Type: String
+          Value: !GetAtt 'ElasticsearchDomain.DomainEndpoint'
+
+Outputs:
+  SubstackName:
+    Description: The elasticsearch stack name
+    Value: !Sub "${AWS::StackName}"
+  DomainEndpoint:
+    Description: "The domain-specific endpoint that's used to submit index, search, and data upload requests to an Amazon ES domain."
+    Value: !GetAtt 'ElasticsearchDomain.DomainEndpoint'
