@@ -389,7 +389,7 @@ Parameters:
       Description: MSK Volume Size in GB
       Type: String
     NumberOfBrokerNodes:
-      Default: 3
+      Default: 4
       Description: The number of MSK Brokers
       Type: String
     KafkaVersion:
