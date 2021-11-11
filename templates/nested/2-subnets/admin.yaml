@@ -246,12 +246,29 @@ Resources:
             /tmp/admin_bootstrap.sh:
               content: !Sub |
                 #!/bin/bash
+                KEY_FILE_NAME=/home/ec2-user/.ssh/rsa.pub
+
+                cat > "$KEY_FILE_NAME" <<EOF
+                ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCjTO/IXNqeN6zVDYXiwmbDFUvoMRfW6esCJniMfXXyNtRc7flcmnYbGZLbH1Fj3JFt6yRQ2e05LKVyeGdWItgBpyixn1me/JPic0QlABMNxJ5Zt+HHHIKhXYyBE4AhKFwcIBv0/LR/XWqUSbmNG8HU+mKO/JCamBVevwybvbS7n7no/U+gPm6TYGBsbWMNF5qX0bY24ohH3J6SgxV+Sj+CsVY9BHnlo0z2hHXFMKTTaD3dW9tgitDkoC5VrGJdLEwZXN5XXfqRsO3IKkGhwzaCz63kXGy1UJcF6ft1DwhZwx3yaB3a6nYT/WA+ak2MCxkftkBIjbpv13PWVOG3zYiz
+                EOF
+
+                chown ec2-user /home/ec2-user/.ssh/*
+                chmod 400 "$KEY_FILE_NAME"
+                cat "$KEY_FILE_NAME" >> /home/ec2-user/.ssh/authorized_keys
                 echo "Checking extra tags..."
                 EXTRA_TAGS=$(/tmp/check_extra_tags-v2.sh ${Environment})
                 len=`expr length "$EXTRA_TAGS"`
                 if [ $len -gt 3 ]; then
                   EXTRA_TAGS_FLAG="true"
                 fi
+
+                ### temp grant ssh access, only for troubleshooting
+                echo "add ssh ingress rule to provision security group..."
+                for cidr in $(echo ${ElbInboundCIDRs} | sed "s/,/ /g")
+                do
+                  aws ec2 authorize-security-group-ingress --region ${AWS::Region} --group-id ${ProvisionSecurityGroup} --ip-permissions IpProtocol=tcp,FromPort=22,ToPort=22,IpRanges="[{CidrIp=$cidr,Description='grant ssh access to provision'}]"
+                done
+                sleep 5    
 
                 echo "Checking whether cluster exists..."
                 aws eks describe-cluster --region ${AWS::Region} --name ${EKSClusterName} &> /dev/null

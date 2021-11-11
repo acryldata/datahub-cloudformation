@@ -536,6 +536,12 @@ Resources:
             Value: !Sub "${AWS::StackName}-ProvisionHost-SG"
         GroupDescription: Enables SSH Access to Provision Hosts
         VpcId: !Ref VPCID
+        ### temp workaround, for troubleshooting
+        #SecurityGroupIngress:
+        #  - IpProtocol: tcp
+        #    FromPort: 22
+        #    ToPort: 22
+        #    CidrIp: 0.0.0.0/0
 
     NodeInstanceRole:
       Condition: isCreateEKS

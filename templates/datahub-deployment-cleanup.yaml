@@ -459,6 +459,8 @@ Resources:
                   done
                   sleep 5
 
+                  exit 0
+
                   echo "deleting namespace ${OldCFNStackName}..."
                   #kubectl get ns ${OldCFNStackName} -o json | jq '.spec.finalizers = []' | kubectl replace --raw "/api/v1/namespaces/${OldCFNStackName}/finalize" -f -
                   #kubectl delete ns ${OldCFNStackName} --grace-period=0 --force
