@@ -43,6 +43,7 @@ Metadata:
             - KafkaVersion
             - MSKInstanceType
             - MSKVolumeSize
+            - NumberOfBrokerNodes
         - Label:
             default: EKS Control Panel Configuration
           Parameters:
@@ -161,6 +162,8 @@ Metadata:
           default: MSK Instance Type
         MSKVolumeSize:
           default: The MSK Volume Size
+        NumberOfBrokerNodes:
+          default: The Number of MSK Brokers
         ControllerHostNetwork:
           default: Deploy EKS load balancer controller
         ElbCertArn:
@@ -384,6 +387,10 @@ Parameters:
     MSKVolumeSize:
       Default: 10
       Description: MSK Volume Size in GB
+      Type: String
+    NumberOfBrokerNodes:
+      Default: 3
+      Description: The number of MSK Brokers
       Type: String
     KafkaVersion:
       AllowedValues:
@@ -658,6 +665,7 @@ Resources:
           MSKInstanceType: !Ref MSKInstanceType
           KafkaVersion: !Ref KafkaVersion
           MSKVolumeSize: !Ref MSKVolumeSize
+          NumberOfBrokerNodes: !Ref NumberOfBrokerNodes
 
     EKSPreRequsiteStack:
       Condition: isCreateEKS
