@@ -1,5 +1,3 @@
-# Datahub Deployment AWS
-
 AWSTemplateFormatVersion: "2010-09-09"
 Description: Master template that set up DataHub Platform in AWS
 Metadata:
@@ -49,9 +47,24 @@ Metadata:
           Parameters:
             - CreateEKS
             - ProvisionInstanceType
-            - EksMgmtIamRoleArn
-            - EksMgmtIamUserArnList
+            - AdditionalEKSAdminRoleArn
+            - AdditionalEKSAdminUserArn
             - KubernetesVersion
+        - Label:
+            default: AWSQSEKS Control Panel Configuration
+          Parameters:
+            - CreateAWSQSEKS
+            - AWSQSEKSSubnetIds
+            - AdditionalEKSAdminRoleArn
+            - AdditionalEKSAdminUserArn
+            - KubernetesVersion
+            - EKSPublicAccessCIDRs
+            - EKSPublicAccessEndpoint
+            - EKSPrivateAccessEndpoint
+            - EKSClusterLoggingTypes
+            - EKSEncryptSecrets
+            - EKSEncryptSecretsKmsKeyArn
+            - IamOidcProvider
         - Label:
             default: EKS Node Group Configuration
           Parameters:
@@ -87,7 +100,6 @@ Metadata:
             - RemoveTempResources
 
       ParameterLabels:
-        ### Existing VPC 
         VPCID:
           Default: The Existing VPC ID
         PrivateSubnet1ID:
@@ -99,7 +111,6 @@ Metadata:
         PublicSubnet2ID:
           Default: The Existing Public Subnet 2 ID
 
-        ### New VPC 
         AvailabilityZones:
           default: The AZ's to deploy to.
         ProvisionInstanceType:
@@ -118,12 +129,28 @@ Metadata:
           default: The name of the S3 bucket that holds the templates
         Environment:
           default: The Environment Prefix
-        EksMgmtIamRoleArn:
-          default: The AWS IAM Role arn that will be allowed to manage EKS. Note do not include path just name of role like "my-role"
-        EksMgmtIamUserArnList:
-          default: The AWS IAM user arns list, who will be authorised to connect the cluster
+        AdditionalEKSAdminRoleArn:
+          default: The AWS IAM Role arn that will be allowed to manage EKS. Note do not include path just name of role like my-role
+        AdditionalEKSAdminUserArn:
+          default: The AWS IAM user arn who will be authorised to connect the cluster
         KubernetesVersion:
           default: The Kubernetes Version
+        EKSClusterLoggingTypes:
+          default: EKS Cluster Logging Types List
+        EKSEncryptSecrets:
+          default: Enable Secrets Encryption
+        EKSEncryptSecretsKmsKeyArn:
+          default: KMS key arn for Secrets Encryption
+        EKSPublicAccessEndpoint:
+          default: Enable EKSPublicAccessEndpoint
+        EKSPrivateAccessEndpoint:
+          default: Enable EKSPrivateAccessEndpoint
+        EKSPublicAccessCIDRs:
+          default: The EKSPublicAccessCIDRs
+        IamOidcProvider:
+          default: Enable IAM OIDC Provider
+        AWSQSEKSSubnetIds:
+          default: EKS Subnet Ids
         CreateElasticSearch:
           default: Enable Creation of ElasticSearch
         CreateElasticSearchServiceRole:
@@ -134,6 +161,8 @@ Metadata:
           default: Enable Creation of Aurora RDS
         CreateEKS:
           default: Enable Creation of EKS
+        CreateAWSQSEKS:
+          default: Enable Creation of AWSQSEKS
         CreateAdmin:
           default: Enable Creation of Admin
         CreatePrivateLink:
@@ -184,7 +213,6 @@ Metadata:
           default: Application Release Channel
 
 Parameters:
-    ### Existing VPC 
     VPCID: 
       Default: "vpc-1234" 
       Type: String
@@ -209,7 +237,6 @@ Parameters:
       Default: "t2.micro"
       Description: "The type of EC2 instance to be launched for Provision Host"
       AllowedValues:
-        # Add more instance types if needed
         - t2.micro
         - t2.medium
         - t2.large
@@ -219,7 +246,6 @@ Parameters:
       Default: "m5.large"
       Description: "The type of EC2 instance to be launched for EKS Worker Node"
       AllowedValues:
-        # Add more instance types if needed
         - t2.xlarge
         - t2.2xlarge
         - m3.xlarge
@@ -259,13 +285,13 @@ Parameters:
       Description: "The Environment Prefix"
       Type: "String"
       Default: "dev"
-    EksMgmtIamRoleArn:
+    AdditionalEKSAdminRoleArn:
       Type: String
       Description: The AWS IAM role arn that will have manage access to EKS
       Default: ""
-    EksMgmtIamUserArnList:
+    AdditionalEKSAdminUserArn:
       Type: String
-      Description: "The AWS IAM user arns list who will be authorised to connect the cluster. Note format is arn:aws:iam::123456789:user/user1,arn:aws:iam::123456789:user/user2"
+      Description: "The AWS IAM user arn who will be authorised to connect the cluster. Note format is arn:aws:iam::123456789:user/user1"
       Default: ""
     KubernetesVersion:
       Description: "The Kubernetes Version"
@@ -273,6 +299,36 @@ Parameters:
       Default: "1.18"
       AllowedValues:
         - "1.18"
+    EKSPublicAccessEndpoint:
+      Description: "Set to Enabled if you want to enable EKSPublicAccessEndpoint"
+      Type: String
+      AllowedValues: [Enabled, Disabled]
+      Default: Disabled
+    EKSPrivateAccessEndpoint:
+      Description: "Set to Enabled if you want to enable EKSPrivateAccessEndpoint"
+      Type: String
+      AllowedValues: [Enabled, Disabled]
+      Default: Enabled
+    EKSPublicAccessCIDRs:
+      Type: List<String>
+      Default: 0.0.0.0/0
+    EKSClusterLoggingTypes:
+      Type: List<String>
+      Default: "api,audit,authenticator,controllerManager,scheduler"
+    EKSEncryptSecrets:
+      Type: String
+      AllowedValues: [Enabled, Disabled]
+      Default: Disabled
+    EKSEncryptSecretsKmsKeyArn:
+      Type: String
+      Default: ""
+    IamOidcProvider:
+      Type: String
+      AllowedValues: [ "Enabled", "Disabled" ]
+      Default: "Disabled"
+    AWSQSEKSSubnetIds:
+      Type: List<AWS::EC2::Subnet::Id>
+      Default: "subnet-0127a3f6a25ae5b7e,subnet-096f4342d04e00657"
     CreateElasticSearch:
       Description: "Set to true if you want to create ElasticSearch"
       Type: String
@@ -305,6 +361,13 @@ Parameters:
       Description: "Set to true if you want to create EKS"
       Type: String
       Default: "true"
+      AllowedValues:
+        - "true"
+        - "false"
+    CreateAWSQSEKS:
+      Description: "Set to true if you want to create AWSQSEKS"
+      Type: String
+      Default: "false"
       AllowedValues:
         - "true"
         - "false"
@@ -459,8 +522,13 @@ Conditions:
   isCreateMySQL:                    !Equals [!Ref CreateMySQL, "true"]
   isCreateMSK:                      !Equals [!Ref CreateMSK, "true"]
   isCreateEKS:                      !Equals [!Ref CreateEKS, "true"]
+  isCreateAWSQSEKS:                 !Equals [!Ref CreateAWSQSEKS, "true"]
+  isCreateEKSPreRequsite:           !Or
+    - !Condition isCreateEKS
+    - !Condition isCreateAWSQSEKS
   isCreateAdmin:                    !Equals [!Ref CreateAdmin, "true"]
   isCreatePrivateLink:              !Equals [!Ref CreatePrivateLink, "true"]
+   
 
 
 Resources:
@@ -522,13 +590,13 @@ Resources:
             Value: "true"
 
     EC2LogGroup:
+      Condition: isCreateEKSPreRequsite
       Type: AWS::Logs::LogGroup
-      #DeletionPolicy: Retain
       Properties: 
         LogGroupName: !Sub "/${Environment}/${AWS::StackName}/ProvisionHost"
 
     ProvisionSecurityGroup:
-      Condition: isCreateEKS
+      Condition: isCreateEKSPreRequsite
       Type: AWS::EC2::SecurityGroup
       Properties:
         Tags:
@@ -538,7 +606,7 @@ Resources:
         VpcId: !Ref VPCID
 
     NodeInstanceRole:
-      Condition: isCreateEKS
+      Condition: isCreateEKSPreRequsite
       Type: AWS::IAM::Role
       Properties:
         Policies:
@@ -554,7 +622,6 @@ Resources:
                     - logs:DescribeLogStreams
                     - logs:PutRetentionPolicy
                     - logs:PutMetricFilter
-                    #- logs:CreateLogGroup
                   Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:${EC2LogGroup}:*"
                   Effect: Allow
           - PolicyName: ebs-volume-policy
@@ -595,7 +662,6 @@ Resources:
             Value: Datahub-ElasticSearch
         TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/2-subnets/elasticsearch.yaml"
         Parameters:
-          # ES stack params
           VPCID: !Ref VPCID
           PrivateSubnet1: !Ref PrivateSubnet1ID
           PrivateSubnet2: !Ref PrivateSubnet2ID
@@ -625,7 +691,6 @@ Resources:
             Value: Datahub-MySQL
         TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/2-subnets/mysql.yaml"
         Parameters:
-          # MySQL stack params
           AvailabilityZones: !Join [",", !Ref AvailabilityZones]
           VPCID: !Ref VPCID
           DBSubnet1: !Ref PrivateSubnet1ID
@@ -654,7 +719,6 @@ Resources:
             Value: Datahub-MSK
         TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/2-subnets/msk.yaml"
         Parameters:
-          # MSK stack params
           VPCID: !Ref VPCID
           DBSubnet1: !Ref PrivateSubnet1ID
           DBSubnet2: !Ref PrivateSubnet2ID
@@ -668,7 +732,7 @@ Resources:
           NumberOfBrokerNodes: !Ref NumberOfBrokerNodes
 
     EKSPreRequsiteStack:
-      Condition: isCreateEKS
+      Condition: isCreateEKSPreRequsite
       Type: AWS::CloudFormation::Stack
       Properties:
         Tags:
@@ -701,7 +765,6 @@ Resources:
             Value: !Sub "${AWS::StackName}"
         TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/2-subnets/eks-cluster.yaml"
         Parameters:
-          # Provision stack params
           VPCID: !Ref VPCID
           PublicSubnet1ID: !Ref PublicSubnet1ID
           PublicSubnet2ID: !Ref PublicSubnet2ID
@@ -709,25 +772,72 @@ Resources:
           PrivateSubnet2ID: !Ref PrivateSubnet2ID
           ProvisionInstanceType: !Ref ProvisionInstanceType
           TemplateBucketName: !Ref TemplateBucketName
-          Environment: !Ref Environment
           EC2LogGroup: !Ref EC2LogGroup
           ProvisionSecurityGroup: !Ref ProvisionSecurityGroup
           NodeSecurityGroup: !GetAtt EKSPreRequsiteStack.Outputs.ControlPanelSecurityGroup
           ControlPanelSecurityGroup: !GetAtt EKSPreRequsiteStack.Outputs.ControlPanelSecurityGroup
           EKSServiceRoleArn: !GetAtt EKSPreRequsiteStack.Outputs.EksServiceRoleArn
           NodeInstanceRoleArn: !GetAtt NodeInstanceRole.Arn
-          EksMgmtIamRoleArn: !Ref EksMgmtIamRoleArn
-          EksMgmtIamUserArnList: !Ref EksMgmtIamUserArnList
+          AdditionalEKSAdminRoleArn: !Ref AdditionalEKSAdminRoleArn
+          AdditionalEKSAdminUserArn: !Ref AdditionalEKSAdminUserArn
           Environment: !Ref Environment
           KubernetesVersion: !Ref KubernetesVersion
-          EKSClusterName: !Sub "${AWS::StackName}"
+          EksClusterName: !Sub "${AWS::StackName}"
           RemoveTempResources: !Ref RemoveTempResources
 
-    EKSNodeGroupStack:
-      Condition: isCreateEKS
+
+    AWSQSEKSPreRequsiteStack:
+      Condition: isCreateAWSQSEKS
+      Type: AWS::CloudFormation::Stack
+      Properties:
+        Tags:
+          - Key: Name
+            Value: !Sub "${AWS::StackName}"
+          - Key: Component
+            Value: !Sub "${AWS::StackName}-AWSQSEKSPreRequsite"
+          - Key: KubernetesCluster
+            Value: !Sub "${AWS::StackName}"
+        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/cfn-extensions.yaml"
+        Parameters:
+          EksClusterName: !Sub "${AWS::StackName}"
+          Environment: !Ref Environment
+
+    AWSQSEKSClusterStack:
+      Condition: isCreateAWSQSEKS
       Type: AWS::CloudFormation::Stack
       DependsOn:
-        - EKSClusterStack
+        - AWSQSEKSPreRequsiteStack
+      Properties:
+        Tags:
+          - Key: Name
+            Value: !Sub "${AWS::StackName}"
+          - Key: Component
+            Value: !Sub "${AWS::StackName}-AWSQSEKSCluster"
+          - Key: KubernetesCluster
+            Value: !Sub "${AWS::StackName}"
+        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/2-subnets/awsqseks-cluster.yaml"
+        Parameters:
+          EksClusterName: !Sub "${AWS::StackName}"
+          Environment: !Ref Environment
+          SubnetIds: !Ref AWSQSEKSSubnetIds
+          SecurityGroupIds: !GetAtt EKSPreRequsiteStack.Outputs.ControlPanelSecurityGroup
+          RoleArn: !GetAtt EKSPreRequsiteStack.Outputs.EksServiceRoleArn
+          AdditionalEKSAdminRoleArn: !Ref AdditionalEKSAdminRoleArn
+          AdditionalEKSAdminUserArn: !Ref AdditionalEKSAdminUserArn
+          KubernetesVersion: !Ref KubernetesVersion
+          EKSPublicAccessEndpoint: !Ref EKSPublicAccessEndpoint
+          EKSPublicAccessCIDRs: !Ref EKSPublicAccessCIDRs
+          EKSPrivateAccessEndpoint: !Ref EKSPrivateAccessEndpoint
+          EKSClusterLoggingTypes: !Ref EKSClusterLoggingTypes
+          EKSEncryptSecrets: !Ref EKSEncryptSecrets
+          EKSEncryptSecretsKmsKeyArn: !Ref EKSEncryptSecretsKmsKeyArn
+          IamOidcProvider: !Ref IamOidcProvider
+
+    EKSNodeGroupStack:
+      Condition: isCreateEKSPreRequsite
+      Type: AWS::CloudFormation::Stack
+      DependsOn:
+        - AWSQSEKSClusterStack
       Properties:
         Tags:
           - Key: Name
@@ -738,11 +848,9 @@ Resources:
             Value: !Sub "${AWS::StackName}"
         TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/2-subnets/eks-nodegroup.yaml"
         Parameters:
-          # Provision stack params
           PrivateSubnet1ID: !Ref PrivateSubnet1ID
           PrivateSubnet2ID: !Ref PrivateSubnet2ID
           TemplateBucketName: !Ref TemplateBucketName
-          Environment: !Ref Environment
           NodeSecurityGroup: !GetAtt EKSPreRequsiteStack.Outputs.ControlPanelSecurityGroup
           ControlPanelSecurityGroup: !GetAtt EKSPreRequsiteStack.Outputs.ControlPanelSecurityGroup
           NodeInstanceRole: !Ref NodeInstanceRole
@@ -752,11 +860,12 @@ Resources:
           MinNumberOfNodes: !Ref MinNumberOfNodes
           DesiredNumberOfNodes: !Ref DesiredNumberOfNodes
           EKSNodeVolumeSize: !Ref EKSNodeVolumeSize
-          EKSClusterName: !Sub "${AWS::StackName}"
+          EksClusterName: !Sub "${AWS::StackName}"
           KubernetesVersion: !Ref KubernetesVersion
           Environment: !Sub "${Environment}"
 
     IngressControllerPreRequsiteStack:
+      Condition: isCreateEKSPreRequsite
       Type: AWS::CloudFormation::Stack
       DependsOn:
         - EKSNodeGroupStack
@@ -789,7 +898,6 @@ Resources:
             Value: !Sub "${AWS::StackName}-Admin"
         TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/2-subnets/admin.yaml"
         Parameters:
-          # Provision stack params
           Application: !Ref Application
           ApplicationReleaseChannel: !Ref ApplicationReleaseChannel
           VPCID: !Ref VPCID
@@ -800,13 +908,10 @@ Resources:
           ProvisionInstanceType: !Ref ProvisionInstanceType
           ProvisionSecurityGroup: !Ref ProvisionSecurityGroup
           NodeInstanceRoleArn: !GetAtt EKSClusterStack.Outputs.NodeInstanceRoleArn
-          # EKS Worker Node stack params
           TemplateBucketName: !Ref TemplateBucketName
-          Environment: !Ref Environment
           EC2LogGroup: !Ref EC2LogGroup
-          EKSClusterName: !Sub "${AWS::StackName}"
+          EksClusterName: !Sub "${AWS::StackName}"
           K8sNamespace: !Sub "${AWS::StackName}"
-          # pass other stack info
           EKSProvisionAutoScalingGroup: !GetAtt EKSClusterStack.Outputs.EKSProvisionAutoScalingGroup
           DomainName: !Ref DomainName
           KotsDomainName: !Ref KotsDomainName
@@ -840,10 +945,9 @@ Resources:
         TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/privatelink.yaml"
         Parameters:
           Environment: !Sub "${Environment}"
-          EKSClusterName: !Sub "${AWS::StackName}"
+          EksClusterName: !Sub "${AWS::StackName}"
 
 Outputs:
-  # Provision stack
   ProvisionSubstackName:
     Value: !GetAtt EKSClusterStack.Outputs.SubstackName
     Condition: isCreateEKS
@@ -862,20 +966,11 @@ Outputs:
   ProvisionInstanceProfile:
     Value: !GetAtt EKSClusterStack.Outputs.ProvisionInstanceProfile
     Condition: isCreateEKS
-  ProvisionInstanceRole:
-    Value: !GetAtt EKSClusterStack.Outputs.ProvisionInstanceRole
-    Condition: isCreateEKS
-  EC2LogGroup:
-    Value: !Ref EC2LogGroup
-    Condition: isCreateEKS
 
-  # ElasticSearch
-  DomainEndpoint:
-   Value: !GetAtt ElasticSearchStack.Outputs.DomainEndpoint
-   Condition: isCreateElasticSearch
-  
+  ElasticSearchDomainEndpoint:
+    Value: !GetAtt ElasticSearchStack.Outputs.DomainEndpoint
+    Condition: isCreateElasticSearch
 
-  # EKS Cluster
   ControlPanelSecurityGroup:
     Value: !GetAtt EKSPreRequsiteStack.Outputs.ControlPanelSecurityGroup
     Condition: isCreateEKS

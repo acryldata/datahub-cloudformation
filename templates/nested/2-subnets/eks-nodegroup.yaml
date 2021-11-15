@@ -7,7 +7,7 @@ Metadata:
         - Label:
             default: EKS Worker Nodes Stack Configuration
           Parameters:
-            - EKSClusterName
+            - EksClusterName
             - KubernetesVersion
             - Environment
             - TemplateBucketName
@@ -36,7 +36,7 @@ Metadata:
           default: The desired number of nodes to keep running for EKS Worker Node
         EKSNodeVolumeSize:
           default: The Volume Size of EKS Worker node
-        EKSClusterName:
+        EksClusterName:
           default: The EKS cluster name
         KubernetesVersion:
           default: The Kubernetes Version
@@ -101,7 +101,7 @@ Parameters:
       Type: "String"
       MinLength: 1
       Description: "The minimum number of EKS Worker Nodes to run"
-    EKSClusterName:
+    EksClusterName:
       Type: String
       Description: The name of the eks cluster
     KubernetesVersion:
@@ -179,8 +179,8 @@ Resources:
   EKSNodegroup1:
       Type: "AWS::EKS::Nodegroup"
       Properties:
-          NodegroupName: !Sub "${EKSClusterName}-nodegroup1"
-          ClusterName: !Ref EKSClusterName
+          NodegroupName: !Sub "${EksClusterName}-nodegroup1"
+          ClusterName: !Ref EksClusterName
           Version: !Ref KubernetesVersion
           ScalingConfig:
               MinSize: !Ref MinNumberOfNodes
@@ -195,15 +195,15 @@ Resources:
           Labels: {}
           DiskSize: !Ref EKSNodeVolumeSize
           Tags:
-              Name: !Sub "${EKSClusterName}-nodegroup1"
+              Name: !Sub "${EksClusterName}-nodegroup1"
               CloudFormation: "true"
           CapacityType: "ON_DEMAND"
 
   EKSNodegroup2:
       Type: "AWS::EKS::Nodegroup"
       Properties:
-          NodegroupName: !Sub "${EKSClusterName}-nodegroup2"
-          ClusterName: !Ref EKSClusterName
+          NodegroupName: !Sub "${EksClusterName}-nodegroup2"
+          ClusterName: !Ref EksClusterName
           Version: !Ref KubernetesVersion
           ScalingConfig:
               MinSize: !Ref MinNumberOfNodes
@@ -218,7 +218,7 @@ Resources:
           Labels: {}
           DiskSize: !Ref EKSNodeVolumeSize
           Tags:
-              Name: !Sub "${EKSClusterName}-nodegroup2"
+              Name: !Sub "${EksClusterName}-nodegroup2"
               CloudFormation: "true"
           CapacityType: "ON_DEMAND"
 

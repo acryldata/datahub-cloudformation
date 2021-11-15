@@ -1,5 +1,3 @@
-# Datahub Deployment AWS
-
 AWSTemplateFormatVersion: "2010-09-09"
 Description: Master template that set up DataHub Platform in AWS
 Metadata:
@@ -51,8 +49,8 @@ Metadata:
           Parameters:
             - CreateEKS
             - ProvisionInstanceType
-            - EksMgmtIamRoleArn
-            - EksMgmtIamUserArnList
+            - AdditionalEKSAdminRoleArn
+            - AdditionalEKSAdminUserArn
             - KubernetesVersion
         - Label:
             default: EKS Node Group Configuration
@@ -124,9 +122,9 @@ Metadata:
           default: The name of the S3 bucket that holds the templates
         Environment:
           default: The Environment Prefix
-        EksMgmtIamRoleArn:
+        AdditionalEKSAdminRoleArn:
           default: The AWS IAM Role arn that will be allowed to manage EKS. Note do not include path just name of role like "my-role"
-        EksMgmtIamUserArnList:
+        AdditionalEKSAdminUserArn:
           default: The AWS IAM user arns list, who will be authorised to connect the cluster
         KubernetesVersion:
           default: The Kubernetes Version
@@ -271,13 +269,13 @@ Parameters:
       Description: "The Environment Prefix"
       Type: "String"
       Default: "dev"
-    EksMgmtIamRoleArn:
+    AdditionalEKSAdminRoleArn:
       Type: String
       Description: The AWS IAM role arn that will have manage access to EKS
       Default: ""
-    EksMgmtIamUserArnList:
+    AdditionalEKSAdminUserArn:
       Type: String
-      Description: "The AWS IAM user arns list who will be authorised to connect the cluster. Note format is arn:aws:iam::123456789:user/user1,arn:aws:iam::123456789:user/user2"
+      Description: "The AWS IAM user arns who will be authorised to connect the cluster. Note format is arn:aws:iam::123456789:user/user1"
       Default: ""
     KubernetesVersion:
       Description: "The Kubernetes Version"
@@ -726,18 +724,17 @@ Resources:
           PrivateSubnet3ID: !Ref PrivateSubnet3ID
           ProvisionInstanceType: !Ref ProvisionInstanceType
           TemplateBucketName: !Ref TemplateBucketName
-          Environment: !Ref Environment
           EC2LogGroup: !Ref EC2LogGroup
           ProvisionSecurityGroup: !Ref ProvisionSecurityGroup
           NodeSecurityGroup: !GetAtt EKSPreRequsiteStack.Outputs.ControlPanelSecurityGroup
           ControlPanelSecurityGroup: !GetAtt EKSPreRequsiteStack.Outputs.ControlPanelSecurityGroup
           EKSServiceRoleArn: !GetAtt EKSPreRequsiteStack.Outputs.EksServiceRoleArn
           NodeInstanceRoleArn: !GetAtt NodeInstanceRole.Arn
-          EksMgmtIamRoleArn: !Ref EksMgmtIamRoleArn
-          EksMgmtIamUserArnList: !Ref EksMgmtIamUserArnList
+          AdditionalEKSAdminRoleArn: !Ref AdditionalEKSAdminRoleArn
+          AdditionalEKSAdminUserArn: !Ref AdditionalEKSAdminUserArn
           Environment: !Ref Environment
           KubernetesVersion: !Ref KubernetesVersion
-          EKSClusterName: !Sub "${AWS::StackName}"
+          EksClusterName: !Sub "${AWS::StackName}"
           RemoveTempResources: !Ref RemoveTempResources
 
     EKSNodeGroupStack:
@@ -760,7 +757,6 @@ Resources:
           PrivateSubnet2ID: !Ref PrivateSubnet2ID
           PrivateSubnet3ID: !Ref PrivateSubnet3ID
           TemplateBucketName: !Ref TemplateBucketName
-          Environment: !Ref Environment
           NodeSecurityGroup: !GetAtt EKSPreRequsiteStack.Outputs.ControlPanelSecurityGroup
           ControlPanelSecurityGroup: !GetAtt EKSPreRequsiteStack.Outputs.ControlPanelSecurityGroup
           NodeInstanceRole: !Ref NodeInstanceRole
@@ -770,7 +766,7 @@ Resources:
           MinNumberOfNodes: !Ref MinNumberOfNodes
           DesiredNumberOfNodes: !Ref DesiredNumberOfNodes
           EKSNodeVolumeSize: !Ref EKSNodeVolumeSize
-          EKSClusterName: !Sub "${AWS::StackName}"
+          EksClusterName: !Sub "${AWS::StackName}"
           KubernetesVersion: !Ref KubernetesVersion
           Environment: !Sub "${Environment}"
 
@@ -821,9 +817,8 @@ Resources:
           NodeInstanceRoleArn: !GetAtt EKSClusterStack.Outputs.NodeInstanceRoleArn
           # EKS Worker Node stack params
           TemplateBucketName: !Ref TemplateBucketName
-          Environment: !Ref Environment
           EC2LogGroup: !Ref EC2LogGroup
-          EKSClusterName: !Sub "${AWS::StackName}"
+          EksClusterName: !Sub "${AWS::StackName}"
           K8sNamespace: !Sub "${AWS::StackName}"
           # pass other stack info
           EKSProvisionAutoScalingGroup: !GetAtt EKSClusterStack.Outputs.EKSProvisionAutoScalingGroup
@@ -859,7 +854,7 @@ Resources:
         TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/privatelink.yaml"
         Parameters:
           Environment: !Sub "${Environment}"
-          EKSClusterName: !Sub "${AWS::StackName}"
+          EksClusterName: !Sub "${AWS::StackName}"
 
 Outputs:
   # Provision stack
@@ -881,19 +876,15 @@ Outputs:
   ProvisionInstanceProfile:
     Value: !GetAtt EKSClusterStack.Outputs.ProvisionInstanceProfile
     Condition: isCreateEKS
-  ProvisionInstanceRole:
-    Value: !GetAtt EKSClusterStack.Outputs.ProvisionInstanceRole
-    Condition: isCreateEKS
-  EC2LogGroup:
-    Value: !Ref EC2LogGroup
-    Condition: isCreateEKS
+  #EC2LogGroup:
+  #  Value: !Ref EC2LogGroup
+  #  Condition: isCreateEKS
 
   # ElasticSearch
-  DomainEndpoint:
-   Value: !GetAtt ElasticSearchStack.Outputs.DomainEndpoint
-   Condition: isCreateElasticSearch
+  ElasticSearchDomainEndpoint:
+    Value: !GetAtt ElasticSearchStack.Outputs.DomainEndpoint
+    Condition: isCreateElasticSearch
   
-
   # EKS Cluster
   ControlPanelSecurityGroup:
     Value: !GetAtt EKSPreRequsiteStack.Outputs.ControlPanelSecurityGroup
