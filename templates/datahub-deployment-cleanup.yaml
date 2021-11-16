@@ -14,15 +14,16 @@ Metadata:
             default: Old Stack Cleanup Configuration
           Parameters:
             - VPCID
+            - ProvisionInstanceType
             - CreateRoleAndSg
             - ProvisionInstanceRoleName
-            #- ProvisionInstanceProfileName
-            - ProvisionInstanceType
             - OldProvisionInstanceProfileArn
+            #- CFNStackRoleArn
             - PrivateSubnet1ID
             - OldProvisionSecurityGroupID
-            - OldCFNStackName
             - InboundCIDRs
+            - OldCFNStackName
+            - RemoveTempResources
 
       ParameterLabels:
         TemplateBucketName:
@@ -35,12 +36,12 @@ Metadata:
           default: Enable Creation of IAM Role and Security Group
         ProvisionInstanceRoleName:
           default: The instance role name
-        #ProvisionInstanceProfileName:
-        #  default: The instance profile name
         ProvisionInstanceType:
           default: The instance type to deploy Provision to
         OldProvisionInstanceProfileArn:
-          default: The AWS IAM Instance Profile ARNs that was used to create EKS in Old Stack
+          default: The AWS IAM Instance Profile ARN that was used to create EKS in Old Stack
+        #CFNStackRoleArn:
+        #  default: The AWS IAM Role ARN that was used to create Old Cloudformation Stack
         PrivateSubnet1ID:
           Default: The Existing Private Subnet 1 ID
         OldProvisionSecurityGroupID:
@@ -49,6 +50,8 @@ Metadata:
           default: The Name of The Old Cloudformation Stack
         InboundCIDRs:
           default: SSH Inbound CIDRs
+        RemoveTempResources:
+          default: Enable Deletion of Temp Resources
 
 Parameters:
     TemplateBucketName:
@@ -65,18 +68,15 @@ Parameters:
       Default: "vpc-1234"
       Type: String
     CreateRoleAndSg:
-      Description: "Set to true if you want to create Security Group"
+      Description: "Set to true if you want to create IAM Role and Security Group"
       Type: String
-      Default: "false"
+      Default: "true"
       AllowedValues:
         - "true"
         - "false"
     ProvisionInstanceRoleName:
       Type: String
-      Default: ""
-    #ProvisionInstanceProfileName:
-    #  Type: String
-    #  Default: ""
+      Default: "datahub-cleanup-role"
     ProvisionInstanceType:
       Type: "String"
       Default: "t2.micro"
@@ -89,15 +89,17 @@ Parameters:
       ConstraintDescription: "Must contain a valid instance type"
     OldProvisionInstanceProfileArn:
       Type: String
-      Description: The AWS IAM Role arn that was used to create EKS in Old Stack
-      Default: ""
+      Description: The AWS IAM Instance Profile arn that was used to create EKS in Old Stack
+    #CFNStackRoleArn:
+    #  Type: String
+    #  Description: The AWS IAM Role arn that was used to create cloudformation Stack
     PrivateSubnet1ID:
       Default: "subnet-01"
       Type: String
     OldProvisionSecurityGroupID:
       Type: String
       Description: The Old Provision Instance Security Group Id
-      Default: ""
+      Default: "sg-xxx"
     OldCFNStackName:
       Type: String
       Description: The Name of The Old Cloudformation Stack
@@ -106,6 +108,13 @@ Parameters:
       ConstraintDescription: The Elastic Load Balancer Inbound CIDRs
       Type: String
       Default: "10.0.0.0/8,192.0.0.0/8,172.0.0.0/8"
+    RemoveTempResources:
+      Description: "Set to true if you don't want to keep cleanup provision host"
+      Type: String
+      Default: "true"
+      AllowedValues:
+        - "true"
+        - "false"
 
 
 Conditions:
@@ -247,11 +256,15 @@ Resources:
             Version: "2012-10-17"
             Statement:
               - Action:
+                  - cloudformation:ListStacks
+                  - cloudformation:DescribeStacks
+                  - cloudformation:DeleteStack
                   - elasticloadbalancing:DescribeLoadBalancers
                   - elasticloadbalancing:DescribeTags
                   - elasticloadbalancing:DeleteLoadBalancers
                   - elasticloadbalancing:DeleteLoadBalancer 
                   - elasticloadbalancing:DescribeTargetGroups
+                  - elasticloadbalancing:DeleteTargetGroup
                   - sts:*
                   - ec2:DescribeTags
                   - ec2:RevokeSecurityGroupIngress
@@ -266,6 +279,15 @@ Resources:
                   - secretsmanager:DeleteSecret
                   - ssm:DeleteParameters
                   - ssm:DeleteParameter
+                  ### to support cfn stack deletion
+                  - iam:DeleteRolePolicy
+                  - iam:RemoveRoleFromInstanceProfile
+                  - es:DeleteElasticsearchDomain 
+                  - kafka:DeleteCluster 
+                  - logs:DeleteLogGroup
+                  - rds:DescribeDBInstances 
+                  - rds:DescribeDBClusters 
+                  - rds:DeleteDBSubnetGroup
                 Resource: "*"
                 Effect: Allow
       Path: /
@@ -470,16 +492,44 @@ Resources:
                   if [ $? -eq 0 ]; then
                     echo "namespace ${OldCFNStackName} deleted..."
                   fi
+                  #echo "delete cloudformation stack: ${OldCFNStackName} first run..."
+                  #aws cloudformation --region ${AWS::Region} delete-stack --stack-name ${OldCFNStackName} --role-arn ${CFNStackRoleArn}
+                  #if [ $? -eq 0 ];then
+                  #  STACK_ARN=$(aws cloudformation --region ${AWS::Region} describe-stacks --stack-name ${OldCFNStackName} --query Stacks[].StackId --output text)
+                  #  STACK_STATUS=$(aws cloudformation --region ${AWS::Region} describe-stacks --stack-name ${OldCFNStackName} --query Stacks[].StackStatus --output text)
+                  #  while [ \"$STACK_STATUS\" != \"DELETE_FAILED\" ]; do
+                  #    echo "Stack deletion still in process, sleeping for 30 seconds..."
+                  #    sleep 30
+                  #    STACK_STATUS=$(aws cloudformation --region ${AWS::Region} describe-stacks --stack-name ${OldCFNStackName} --query Stacks[].StackStatus --output text)
+                  #  done
+                  #  echo "delete cloudformation stack: ${OldCFNStackName} first run failed ..."
+                  #fi
                   echo "deleting EKS cluster: ${OldCFNStackName}..."
                   aws eks delete-cluster --region ${AWS::Region} --name ${OldCFNStackName}
-                  aws eks describe-cluster --region ${AWS::Region} --name ${OldCFNStackName} --query cluster.status --output text
-                  while [ $? -eq 0 ]; do
-                    echo "Cluster is still deleting, sleeping for 10 seconds..."
-                    sleep 10
+                  if [ $? -eq 0 ];then
                     aws eks describe-cluster --region ${AWS::Region} --name ${OldCFNStackName} --query cluster.status --output text
-                  done
-                  echo "EKS cluster: ${OldCFNStackName} deleted..."
-                fi
+                    while [ $? -eq 0 ]; do
+                      echo "Cluster is still deleting, sleeping for 10 seconds..."
+                      sleep 10
+                      aws eks describe-cluster --region ${AWS::Region} --name ${OldCFNStackName} --query cluster.status --output text
+                    done
+                    echo "EKS cluster: ${OldCFNStackName} deleted..."
+                    #echo "delete cloudformation stack: ${OldCFNStackName} 2nd run ......"
+                    #aws cloudformation --region ${AWS::Region} delete-stack --stack-name ${OldCFNStackName} --role-arn ${CFNStackRoleArn}
+                    #if [ $? -eq 0 ];then
+                    #  STACK_ARN=$(aws cloudformation --region ${AWS::Region} describe-stacks --stack-name ${OldCFNStackName} --query Stacks[].StackId --output text)
+                    #  STACK_STATUS=$(aws cloudformation --region ${AWS::Region} describe-stacks --stack-name ${OldCFNStackName} --query Stacks[].StackStatus --output text)
+                    #  while [ $? -eq 0 ]; do
+                    #    echo "Stack deletion still in process, sleeping for 30 seconds......"
+                    #    sleep 30
+                    #    STACK_STATUS=$(aws cloudformation --region ${AWS::Region} describe-stacks --stack-name ${OldCFNStackName} --query Stacks[].StackStatus --output text)
+                    #  done
+                    #  echo "delete cloudformation stack: ${OldCFNStackName} 2nd run completed ......"
+                    #fi
+                    #else
+                    #  echo "delete cloudformation stack: ${OldCFNStackName} 2nd run failed ......"
+                   fi
+                 fi
                 ALB_RESOURCE_ARN=$(aws elbv2 describe-load-balancers --names ${OldCFNStackName}-datahub --query 'LoadBalancers[*].LoadBalancerArn' --region ${AWS::Region} --no-paginate --output text)
                 ALB_TAG=$(aws elbv2 describe-tags --resource-arns $ALB_RESOURCE_ARN --region ${AWS::Region} --no-paginate --output text|grep "elbv2.k8s.aws/cluster"|awk '{print $3}')
                 if [ "$ALB_TAG" == "${OldCFNStackName}" ]; then
@@ -487,6 +537,7 @@ Resources:
                   echo "ALB_TG: $ALB_TG"
                   echo "deleting ingress ALB from: ${OldCFNStackName}......"
                   aws elbv2 delete-load-balancer --load-balancer-arn $ALB_RESOURCE_ARN --region ${AWS::Region}
+                  sleep 10
                   echo "deleting ingress ALB target group from ${OldCFNStackName}..."
                   aws elbv2 delete-target-group --target-group-arn $ALB_TG  --region ${AWS::Region} --no-paginate
                 fi
@@ -497,6 +548,7 @@ Resources:
                   echo "NLB_TG: $NLB_TG"
                   echo "deleting ingress NLB from: ${OldCFNStackName}......"
                   aws elbv2 delete-load-balancer --load-balancer-arn $NLB_RESOURCE_ARN --region ${AWS::Region}
+                  sleep 10
                   echo "deleting ingress NLB target group from ${OldCFNStackName}..."
                   aws elbv2 delete-target-group --target-group-arn $NLB_TG  --region ${AWS::Region} --no-paginate
                 fi
@@ -541,3 +593,10 @@ Resources:
             aws-iam-authenticator version
             cfn-init -v --stack ${AWS::StackName} --resource CleanupLaunchConfiguration --region ${AWS::Region}
             cfn-signal -e $? --stack ${AWS::StackName} --resource CleanupAutoScalingGroup --region ${AWS::Region}
+            if [ "${RemoveTempResources}" == "true" ];then
+              echo "terminating admin provision node"
+              INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+              ASG=$(aws autoscaling describe-auto-scaling-instances --region ${AWS::Region} --output text --query=AutoScalingInstances[].AutoScalingGroupName --instance-ids=$INSTANCE_ID)
+              echo "$ASG"
+              nohup aws autoscaling --region ${AWS::Region} update-auto-scaling-group --auto-scaling-group-name $ASG --desired-capacity 0 --min-size 0 --max-size 0 &>/dev/null &
+             fi

@@ -286,6 +286,13 @@ Resources:
                   export KUBECONFIG=/home/ec2-user/.kube/config
                   chmod 600 /home/ec2-user/.kube/config
                 fi
+                kubectl get ns ${K8sNamespace} &> /dev/null
+                if [ $? -eq 0 ]; then
+                  echo "namespace ${K8sNamespace} already exists, stopping..."
+                  exit 0
+                fi
+                echo "Creating namespace..."
+                kubectl create ns ${K8sNamespace}
                 echo "Install Ingress Controller..."
                 set -x
                 curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
@@ -316,8 +323,6 @@ Resources:
                   aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$ZOOKEEPER_CONNECT" --overwrite --no-paginate
                 fi
                 set +x
-                echo "Creating namespace..."
-                kubectl create ns ${K8sNamespace}
                 echo "Generate UUID..."
                 aws kms generate-random --region ${AWS::Region} --number-of-bytes 32  --output text --query Plaintext>uuid_secret
                 aws kms generate-random --region ${AWS::Region} --number-of-bytes 16  --output text --query Plaintext>datahub-password
