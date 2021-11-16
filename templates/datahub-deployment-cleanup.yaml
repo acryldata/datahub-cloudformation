@@ -108,7 +108,7 @@ Parameters:
     RemoveTempResources:
       Description: "Set to true if you don't want to keep cleanup provision host"
       Type: String
-      Default: "true"
+      Default: "false"
       AllowedValues:
         - "true"
         - "false"
