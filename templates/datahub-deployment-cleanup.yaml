@@ -90,9 +90,6 @@ Parameters:
     OldProvisionInstanceProfileArn:
       Type: String
       Description: The AWS IAM Instance Profile arn that was used to create EKS in Old Stack
-    #CFNStackRoleArn:
-    #  Type: String
-    #  Description: The AWS IAM Role arn that was used to create cloudformation Stack
     PrivateSubnet1ID:
       Default: "subnet-01"
       Type: String
@@ -256,9 +253,6 @@ Resources:
             Version: "2012-10-17"
             Statement:
               - Action:
-                  - cloudformation:ListStacks
-                  - cloudformation:DescribeStacks
-                  - cloudformation:DeleteStack
                   - elasticloadbalancing:DescribeLoadBalancers
                   - elasticloadbalancing:DescribeTags
                   - elasticloadbalancing:DeleteLoadBalancers
@@ -279,15 +273,6 @@ Resources:
                   - secretsmanager:DeleteSecret
                   - ssm:DeleteParameters
                   - ssm:DeleteParameter
-                  ### to support cfn stack deletion
-                  - iam:DeleteRolePolicy
-                  - iam:RemoveRoleFromInstanceProfile
-                  - es:DeleteElasticsearchDomain 
-                  - kafka:DeleteCluster 
-                  - logs:DeleteLogGroup
-                  - rds:DescribeDBInstances 
-                  - rds:DescribeDBClusters 
-                  - rds:DeleteDBSubnetGroup
                 Resource: "*"
                 Effect: Allow
       Path: /
@@ -476,7 +461,7 @@ Resources:
                   aws ec2 authorize-security-group-ingress --region ${AWS::Region} --group-id $OldEKSSecurityGroupId --ip-permissions IpProtocol=tcp,FromPort=443,ToPort=443,IpRanges="[{CidrIp=$LOCAL_IP/32,Description='grant access to EKS'}]"
                   sleep 5
 
-                  ### temp grant ssh access, only for troubleshooting 
+                  ### grant ssh access, only for troubleshooting 
                   echo "add ssh ingress rule to provision security group..."
                   for cidr in $(echo ${InboundCIDRs} | sed "s/,/ /g")
                   do
@@ -486,24 +471,10 @@ Resources:
 
 
                   echo "deleting namespace ${OldCFNStackName}..."
-                  #kubectl get ns ${OldCFNStackName} -o json | jq '.spec.finalizers = []' | kubectl replace --raw "/api/v1/namespaces/${OldCFNStackName}/finalize" -f -
-                  #kubectl delete ns ${OldCFNStackName} --grace-period=0 --force
                   kubectl delete ns ${OldCFNStackName} --force
                   if [ $? -eq 0 ]; then
                     echo "namespace ${OldCFNStackName} deleted..."
                   fi
-                  #echo "delete cloudformation stack: ${OldCFNStackName} first run..."
-                  #aws cloudformation --region ${AWS::Region} delete-stack --stack-name ${OldCFNStackName} --role-arn ${CFNStackRoleArn}
-                  #if [ $? -eq 0 ];then
-                  #  STACK_ARN=$(aws cloudformation --region ${AWS::Region} describe-stacks --stack-name ${OldCFNStackName} --query Stacks[].StackId --output text)
-                  #  STACK_STATUS=$(aws cloudformation --region ${AWS::Region} describe-stacks --stack-name ${OldCFNStackName} --query Stacks[].StackStatus --output text)
-                  #  while [ \"$STACK_STATUS\" != \"DELETE_FAILED\" ]; do
-                  #    echo "Stack deletion still in process, sleeping for 30 seconds..."
-                  #    sleep 30
-                  #    STACK_STATUS=$(aws cloudformation --region ${AWS::Region} describe-stacks --stack-name ${OldCFNStackName} --query Stacks[].StackStatus --output text)
-                  #  done
-                  #  echo "delete cloudformation stack: ${OldCFNStackName} first run failed ..."
-                  #fi
                   echo "deleting EKS cluster: ${OldCFNStackName}..."
                   aws eks delete-cluster --region ${AWS::Region} --name ${OldCFNStackName}
                   if [ $? -eq 0 ];then
@@ -514,20 +485,6 @@ Resources:
                       aws eks describe-cluster --region ${AWS::Region} --name ${OldCFNStackName} --query cluster.status --output text
                     done
                     echo "EKS cluster: ${OldCFNStackName} deleted..."
-                    #echo "delete cloudformation stack: ${OldCFNStackName} 2nd run ......"
-                    #aws cloudformation --region ${AWS::Region} delete-stack --stack-name ${OldCFNStackName} --role-arn ${CFNStackRoleArn}
-                    #if [ $? -eq 0 ];then
-                    #  STACK_ARN=$(aws cloudformation --region ${AWS::Region} describe-stacks --stack-name ${OldCFNStackName} --query Stacks[].StackId --output text)
-                    #  STACK_STATUS=$(aws cloudformation --region ${AWS::Region} describe-stacks --stack-name ${OldCFNStackName} --query Stacks[].StackStatus --output text)
-                    #  while [ $? -eq 0 ]; do
-                    #    echo "Stack deletion still in process, sleeping for 30 seconds......"
-                    #    sleep 30
-                    #    STACK_STATUS=$(aws cloudformation --region ${AWS::Region} describe-stacks --stack-name ${OldCFNStackName} --query Stacks[].StackStatus --output text)
-                    #  done
-                    #  echo "delete cloudformation stack: ${OldCFNStackName} 2nd run completed ......"
-                    #fi
-                    #else
-                    #  echo "delete cloudformation stack: ${OldCFNStackName} 2nd run failed ......"
                    fi
                  fi
                 ALB_RESOURCE_ARN=$(aws elbv2 describe-load-balancers --names ${OldCFNStackName}-datahub --query 'LoadBalancers[*].LoadBalancerArn' --region ${AWS::Region} --no-paginate --output text)
