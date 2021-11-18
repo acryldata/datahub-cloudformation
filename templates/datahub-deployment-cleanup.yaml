@@ -10,6 +10,7 @@ Metadata:
           Parameters:
             - TemplateBucketName
             - Environment
+            - RemoveTempResources
         - Label:
             default: Old Stack Cleanup Configuration
           Parameters:
@@ -18,7 +19,6 @@ Metadata:
             - CreateRoleAndSg
             - ProvisionInstanceRoleName
             - OldProvisionInstanceProfileArn
-            #- CFNStackRoleArn
             - PrivateSubnet1ID
             - OldProvisionSecurityGroupID
             - InboundCIDRs
@@ -30,6 +30,8 @@ Metadata:
           default: The name of the S3 bucket that holds the templates
         Environment:
           default: The Environment Prefix
+        RemoveTempResources:
+          default: Enable Deletion of Temp Resources
         VPCID:
           Default: The Existing VPC ID
         CreateRoleAndSg:
@@ -40,8 +42,6 @@ Metadata:
           default: The instance type to deploy Provision to
         OldProvisionInstanceProfileArn:
           default: The AWS IAM Instance Profile ARN that was used to create EKS in Old Stack
-        #CFNStackRoleArn:
-        #  default: The AWS IAM Role ARN that was used to create Old Cloudformation Stack
         PrivateSubnet1ID:
           Default: The Existing Private Subnet 1 ID
         OldProvisionSecurityGroupID:
@@ -54,6 +54,13 @@ Metadata:
           default: Enable Deletion of Temp Resources
 
 Parameters:
+    RemoveTempResources:
+      Description: "Set to true if you don't want to keep cleanup host, set to false if you want to manually run the cleanup script"
+      Type: String
+      Default: "true"
+      AllowedValues:
+        - "true"
+        - "false"
     TemplateBucketName:
       AllowedPattern: "^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$"
       ConstraintDescription: "Bucket name can include numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen (-)."
@@ -90,6 +97,7 @@ Parameters:
     OldProvisionInstanceProfileArn:
       Type: String
       Description: The AWS IAM Instance Profile arn that was used to create EKS in Old Stack
+      Default: "datahub-provision-role"
     PrivateSubnet1ID:
       Default: "subnet-01"
       Type: String
@@ -443,7 +451,10 @@ Resources:
                 done
                 sleep 5
 
-                exit 0
+                if [ "${RemoveTempResources}" == "false" ];then
+                  echo "RemoveTempResources is false, cancel auto cleanup..."
+                  exit 0
+                fi
 
                 aws eks --region ${AWS::Region} update-kubeconfig --name ${OldCFNStackName}
                 echo "Deleting leftover secrets/parameter stores used by Environment: ${Environment}, Stack: ${OldCFNStackName}..."
