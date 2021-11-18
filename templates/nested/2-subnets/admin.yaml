@@ -362,6 +362,10 @@ Resources:
                 echo "Install kots..."
                 kubectl kots install ${Application}/${ApplicationReleaseChannel} -n ${K8sNamespace} --shared-password "${KOTSUserPassword}" --license-file /tmp/license.yaml --config-values /home/ec2-user/configvalues.yaml --wait-duration 120s --port-forward=false
                 echo "Install kotsadm svc..."
+                if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
+                  EXTRA_TAGS_V1=$(/tmp/check_extra_tags.sh ${Environment} ${EKSClusterName})
+                  sed -i "s|Project=DataHub|$EXTRA_TAGS_V1|g" /home/ec2-user/kotsadm-svc.yaml
+                fi
                 kubectl apply -f /home/ec2-user/kotsadm-svc.yaml
                 echo "Waiting ${EKSClusterName}-kotsadm to be Active..."
                 aws elbv2 describe-load-balancers --region ${AWS::Region} --names ${EKSClusterName}-kotsadm
@@ -449,6 +453,7 @@ Resources:
                     service.beta.kubernetes.io/aws-load-balancer-ssl-cert: "${KotsElbCertArn}"
                     service.beta.kubernetes.io/aws-load-balancer-subnets: ${PrivateSubnet1ID},${PrivateSubnet2ID}
                     service.beta.kubernetes.io/aws-load-balancer-type: external
+                    service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags: "Project=DataHub"
                   labels:
                     kots.io/kotsadm: "true"
                   name: kotsadm-nlb
