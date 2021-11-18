@@ -1,10 +1,11 @@
+#!/bin/bash
 echo "====================================================================================="
 echo "0) delete PrivateLinkStack (Acryl needs to delete private vpc endpoint if they are connected to your privatelink)"
 echo "1) run 'kubectl delete ns <StackName>' to delete ALB/NLB/target groups created by ingress controller"
 echo "2) trigger deletion of master Cloudformation Stack (i.e. dev-datahub),wait till EKSNodeGroupStack is deleted, then manually delete EKS cluster"
 echo "3) after Cloudformation Stack is deleted, run below CleanUp-after-Stack-Deletion.sh"
 echo "====================================================================================="
-if [ $# -ne 2 ]; then
+if [ $# -ne 3 ]; then
   echo "Usage: CleanUp-after-Stack-Deletion.sh <Environment> <StackName> <Region>"
   echo "For Example: ./CleanUp-after-Stack-Deletion.sh dev dev-datahub region"
   exit 1
@@ -17,8 +18,9 @@ fi
 echo "Did you complete above step 0 to 3?"
 select yn in "Yes" "No"; do
     case $yn in
-#===Secrets===
         Yes )  
+set -x
+#===Secrets===
 aws secretsmanager delete-secret --secret-id /${Environment}/${StackName}/admin/apikey --force-delete-without-recovery --region ${Region}--no-cli-pager;
 
 
