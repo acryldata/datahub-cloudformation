@@ -446,8 +446,8 @@ Resources:
                 OIDC=$(aws eks describe-cluster --region ${AWS::Region}  --name ${EKSClusterName} --query cluster.identity.oidc --output text --no-paginate |cut -c 9-)
                 parameter="/${Environment}/${EKSClusterName}/eks/oidc"
                 if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
-                  EXTRA_TAGS=$(/tmp/check_extra_tags-v2.sh ${Environment} ${EKSClusterName})
-                  aws ssm put-parameter --tags $EXTRA_TAGS --region ${AWS::Region} --name "$parameter" --type "String" --value "$OIDC" --no-paginate
+                  EXTRA_TAGS_V2=$(/tmp/check_extra_tags-v2.sh ${Environment} ${EKSClusterName})
+                  aws ssm put-parameter --tags $EXTRA_TAGS_V2 --region ${AWS::Region} --name "$parameter" --type "String" --value "$OIDC" --no-paginate
                 else
                   aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$OIDC" --overwrite --no-paginate
                 fi
@@ -461,8 +461,8 @@ Resources:
                 clusterSecurityGroupId=$(aws eks describe-cluster --region ${AWS::Region}  --name ${EKSClusterName} --query cluster.resourcesVpcConfig.clusterSecurityGroupId  --output text)
                 parameter="/${Environment}/${EKSClusterName}/eks/clusterSecurityGroupId"
                 if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
-                  EXTRA_TAGS=$(/tmp/check_extra_tags-v2.sh ${Environment} ${EKSClusterName})
-                  aws ssm put-parameter --tags $EXTRA_TAGS --region ${AWS::Region} --name "$parameter" --type "String" --value "$clusterSecurityGroupId" --no-paginate
+                  EXTRA_TAGS_V2=$(/tmp/check_extra_tags-v2.sh ${Environment} ${EKSClusterName})
+                  aws ssm put-parameter --tags $EXTRA_TAGS_V2 --region ${AWS::Region} --name "$parameter" --type "String" --value "$clusterSecurityGroupId" --no-paginate
                 else
                   aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$clusterSecurityGroupId" --overwrite --no-paginate
                 fi
