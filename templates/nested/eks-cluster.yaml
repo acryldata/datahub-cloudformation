@@ -238,7 +238,7 @@ Resources:
                   - secretsmanager:CreateSecret
                   - secretsmanager:GetSecretValue
                   - secretsmanager:DescribeSecret
-                Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${Environment}/${EKSClusterName}/*"
+                Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:/${Environment}/${EKSClusterName}/*"
                 #Resource: "*"
                 Effect: Allow
         - PolicyName: provision-iam-policy

@@ -431,7 +431,7 @@ Parameters:
       Default: "internal"
       AllowedValues:
       - "internal"
-      - "internet-facing"
+      #- "internet-facing"
     Application:
       Description: Application Name
       Type: String
@@ -516,6 +516,38 @@ Resources:
           PasswordLength: 16
           ExcludeCharacters: '"@/\<>()$?+-`'
           ExcludePunctuation: true
+        Tags:
+          -
+            Key: CloudFormation
+            Value: "true"
+
+    PasswordSecret:
+      Type: AWS::SecretsManager::Secret
+      Properties:
+        Name: !Sub "/${Environment}/${AWS::StackName}/admin/password"
+        Description: !Sub "${Environment}/${AWS::StackName}: Secrets for Admin Password"
+        GenerateSecretString:
+          SecretStringTemplate: '{"username": "admin"}'
+          GenerateStringKey: password
+          PasswordLength: 16
+          ExcludeCharacters: '"@/\<>()$?+-`'
+          ExcludePunctuation: true
+        Tags:
+          -
+            Key: CloudFormation
+            Value: "true"
+
+    UUIDSecret:
+      Type: AWS::SecretsManager::Secret
+      Properties:
+        Name: !Sub "/${Environment}/${AWS::StackName}/admin/uuid"
+        Description: !Sub "${Environment}/${AWS::StackName}: Secrets for Admin UUID"
+        GenerateSecretString:
+          SecretStringTemplate: '{"username": "admin"}'
+          GenerateStringKey: uuid 
+          PasswordLength: 32
+          ExcludeCharacters: '"@/\<>()$?+-`'
+          #ExcludePunctuation: true
         Tags:
           -
             Key: CloudFormation

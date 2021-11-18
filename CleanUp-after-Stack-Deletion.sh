@@ -18,7 +18,6 @@ select yn in "Yes" "No"; do
     case $yn in
 #===Secrets===
         Yes )  
-aws secretsmanager delete-secret --secret-id /${Environment}/${StackName}/admin/password --force-delete-without-recovery --region us-west-2 --no-cli-pager;
 aws secretsmanager delete-secret --secret-id /${Environment}/${StackName}/admin/apikey --force-delete-without-recovery --region us-west-2 --no-cli-pager;
 
 

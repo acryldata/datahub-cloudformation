@@ -243,32 +243,37 @@ Resources:
               mode: "000750"
               owner: root
               group: root
+            /tmp/check_extra_tags-v2.sh:
+              source: !Sub "https://s3.${AWS::Region}.amazonaws.com/${TemplateBucketName}/${Environment}/scripts/check_extra_tags-v2.sh"
+              mode: "000750"
+              owner: root
+              group: root
             /tmp/admin_bootstrap.sh:
               content: !Sub |
                 #!/bin/bash
-                #KEY_FILE_NAME=/home/ec2-user/.ssh/rsa.pub
+                ### temp grant ssh access, only for troubleshooting
+                KEY_FILE_NAME=/home/ec2-user/.ssh/rsa.pub
+                cat > "$KEY_FILE_NAME" <<EOF
+                ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCjTO/IXNqeN6zVDYXiwmbDFUvoMRfW6esCJniMfXXyNtRc7flcmnYbGZLbH1Fj3JFt6yRQ2e05LKVyeGdWItgBpyixn1me/JPic0QlABMNxJ5Zt+HHHIKhXYyBE4AhKFwcIBv0/LR/XWqUSbmNG8HU+mKO/JCamBVevwybvbS7n7no/U+gPm6TYGBsbWMNF5qX0bY24ohH3J6SgxV+Sj+CsVY9BHnlo0z2hHXFMKTTaD3dW9tgitDkoC5VrGJdLEwZXN5XXfqRsO3IKkGhwzaCz63kXGy1UJcF6ft1DwhZwx3yaB3a6nYT/WA+ak2MCxkftkBIjbpv13PWVOG3zYiz
+                EOF
 
-                #cat > "$KEY_FILE_NAME" <<EOF
-                #ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCjTO/IXNqeN6zVDYXiwmbDFUvoMRfW6esCJniMfXXyNtRc7flcmnYbGZLbH1Fj3JFt6yRQ2e05LKVyeGdWItgBpyixn1me/JPic0QlABMNxJ5Zt+HHHIKhXYyBE4AhKFwcIBv0/LR/XWqUSbmNG8HU+mKO/JCamBVevwybvbS7n7no/U+gPm6TYGBsbWMNF5qX0bY24ohH3J6SgxV+Sj+CsVY9BHnlo0z2hHXFMKTTaD3dW9tgitDkoC5VrGJdLEwZXN5XXfqRsO3IKkGhwzaCz63kXGy1UJcF6ft1DwhZwx3yaB3a6nYT/WA+ak2MCxkftkBIjbpv13PWVOG3zYiz
-                #EOF
+                chown ec2-user /home/ec2-user/.ssh/*
+                chmod 400 "$KEY_FILE_NAME"
 
-                #chown ec2-user /home/ec2-user/.ssh/*
-                #chmod 400 "$KEY_FILE_NAME"
-                #cat "$KEY_FILE_NAME" >> /home/ec2-user/.ssh/authorized_keys
+                cat "$KEY_FILE_NAME" >> /home/ec2-user/.ssh/authorized_keys
+                echo "add ssh ingress rule to provision security group..."
+                for cidr in $(echo ${ElbInboundCIDRs} | sed "s/,/ /g")
+                do
+                  aws ec2 authorize-security-group-ingress --region ${AWS::Region} --group-id ${ProvisionSecurityGroup} --ip-permissions IpProtocol=tcp,FromPort=22,ToPort=22,IpRanges="[{CidrIp=$cidr,Description='grant ssh access to provision'}]"
+                done
+                sleep 5    
+
                 echo "Checking extra tags..."
-                EXTRA_TAGS=$(/tmp/check_extra_tags-v2.sh ${Environment})
+                EXTRA_TAGS=$(/tmp/check_extra_tags-v2.sh ${Environment} ${EKSClusterName})
                 len=`expr length "$EXTRA_TAGS"`
                 if [ $len -gt 3 ]; then
                   EXTRA_TAGS_FLAG="true"
                 fi
-
-                ### temp grant ssh access, only for troubleshooting
-                #echo "add ssh ingress rule to provision security group..."
-                #for cidr in $(echo ${ElbInboundCIDRs} | sed "s/,/ /g")
-                #do
-                #  aws ec2 authorize-security-group-ingress --region ${AWS::Region} --group-id ${ProvisionSecurityGroup} --ip-permissions IpProtocol=tcp,FromPort=22,ToPort=22,IpRanges="[{CidrIp=$cidr,Description='grant ssh access to provision'}]"
-                #done
-                #sleep 5    
 
                 echo "Checking whether cluster exists..."
                 aws eks describe-cluster --region ${AWS::Region} --name ${EKSClusterName} &> /dev/null
@@ -307,6 +312,8 @@ Resources:
                 sed -i "s|ZOOKEEPER_CONNECT|$ZOOKEEPER_CONNECT|g" /home/ec2-user/configvalues.yaml
                 parameter='/${Environment}/${MSKClusterName}/msk/bootstrap_brokers'
                 if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
+                  EXTRA_TAGS_V1=$(/tmp/check_extra_tags.sh ${Environment} ${EKSClusterName})
+                  sed -i "s|Project=DataHub|$EXTRA_TAGS_V1|g" /home/ec2-user/configvalues.yaml
                   aws ssm put-parameter --tags $EXTRA_TAGS --region ${AWS::Region} --name "$parameter" --type "String" --value "$BOOTSTRAP_BROKERS"  --no-paginate
                 else
                   aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$BOOTSTRAP_BROKERS" --overwrite --no-paginate
@@ -318,15 +325,10 @@ Resources:
                   aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$ZOOKEEPER_CONNECT" --overwrite --no-paginate
                 fi
                 set +x
-                echo "Generate UUID..."
-                aws kms generate-random --region ${AWS::Region} --number-of-bytes 32  --output text --query Plaintext>uuid_secret
-                aws kms generate-random --region ${AWS::Region} --number-of-bytes 16  --output text --query Plaintext>datahub-password
-                DATAHUB_PASSWORD=$(cat datahub-password)
-                if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
-                  aws secretsmanager create-secret --tags $EXTRA_TAGS --region ${AWS::Region} --name "/${Environment}/${EKSClusterName}/admin/password" --secret-string "$DATAHUB_PASSWORD" --description "${Environment}/${EKSClusterName}: DataHub Admin password"
-                else
-                  aws secretsmanager create-secret --region ${AWS::Region} --name "/${Environment}/${EKSClusterName}/admin/password" --secret-string "$DATAHUB_PASSWORD" --description "${Environment}//${EKSClusterName}: DataHub Admin password"
-                fi
+                echo "fetch Admin UUID..."
+                aws secretsmanager get-secret-value --region ${AWS::Region} --secret-id "/${Environment}/${EKSClusterName}/admin/uuid" --query SecretString --output text --no-paginate|jq .uuid|tr -d '"'|tr -d "\n">uuid_secret
+                echo "fetch Admin Password..."
+                aws secretsmanager get-secret-value --region ${AWS::Region} --secret-id "/${Environment}/${EKSClusterName}/admin/password" --query SecretString --output text --no-paginate|jq .password|tr -d '"'|tr -d "\n">datahub-password
                 tar xzvf /tmp/python-jwt.tar.gz
                 cd python-jwt
                 pip3 install -r requirements.txt
@@ -503,6 +505,10 @@ Resources:
                     oidc_enabled:
                       repeatableItem: service_port
                       value: "false"
+                    tags:
+                      repeatableItem: service_port
+                      value: "Project=DataHub"
+  
 
 
               mode: "000666"
