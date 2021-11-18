@@ -323,15 +323,6 @@ Resources:
                   aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$ZOOKEEPER_CONNECT" --overwrite --no-paginate
                 fi
                 set +x
-                echo "Generate UUID..."
-                aws kms generate-random --region ${AWS::Region} --number-of-bytes 32  --output text --query Plaintext>uuid_secret
-                aws kms generate-random --region ${AWS::Region} --number-of-bytes 16  --output text --query Plaintext>datahub-password
-                DATAHUB_PASSWORD=$(cat datahub-password)
-                if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
-                  aws secretsmanager create-secret --tags $EXTRA_TAGS --region ${AWS::Region} --name "/${Environment}/${EKSClusterName}/admin/password" --secret-string "$DATAHUB_PASSWORD" --description "${Environment}/${EKSClusterName}: DataHub Admin password"
-                else
-                  aws secretsmanager create-secret --region ${AWS::Region} --name "/${Environment}/${EKSClusterName}/admin/password" --secret-string "$DATAHUB_PASSWORD" --description "${Environment}//${EKSClusterName}: DataHub Admin password"
-                fi
                 tar xzvf /tmp/python-jwt.tar.gz
                 cd python-jwt
                 pip3 install -r requirements.txt

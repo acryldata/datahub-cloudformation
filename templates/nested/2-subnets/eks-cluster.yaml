@@ -200,14 +200,6 @@ Resources:
                 Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${Environment}/${EKSClusterName}/*"
                 #Resource: "*"
                 Effect: Allow
-        - PolicyName: provision-kms-policy
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Action:
-                  - kms:GenerateRandom
-                Resource: "*"
-                Effect: Allow
         - PolicyName: provision-OpenID-policy
           PolicyDocument:
             Version: "2012-10-17"
