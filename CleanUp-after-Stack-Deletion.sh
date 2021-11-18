@@ -21,7 +21,7 @@ select yn in "Yes" "No"; do
         Yes )  
 set -x
 #===Secrets===
-aws secretsmanager delete-secret --secret-id /${Environment}/${StackName}/admin/apikey --force-delete-without-recovery --region ${Region}--no-cli-pager;
+aws secretsmanager delete-secret --secret-id /${Environment}/${StackName}/admin/apikey --force-delete-without-recovery --region ${Region} --no-cli-pager;
 
 
 #===SSM Parameter Store===
