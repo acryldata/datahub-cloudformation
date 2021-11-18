@@ -10,7 +10,7 @@ Metadata:
           Parameters:
             - TemplateBucketName
             - Environment
-            - RemoveTempResources
+            - AutoCleanup
         - Label:
             default: Old Stack Cleanup Configuration
           Parameters:
@@ -23,14 +23,14 @@ Metadata:
             - OldProvisionSecurityGroupID
             - InboundCIDRs
             - OldCFNStackName
-            - RemoveTempResources
+            - AutoCleanup
 
       ParameterLabels:
         TemplateBucketName:
           default: The name of the S3 bucket that holds the templates
         Environment:
           default: The Environment Prefix
-        RemoveTempResources:
+        AutoCleanup:
           default: Enable Deletion of Temp Resources
         VPCID:
           Default: The Existing VPC ID
@@ -50,11 +50,11 @@ Metadata:
           default: The Name of The Old Cloudformation Stack
         InboundCIDRs:
           default: SSH Inbound CIDRs
-        RemoveTempResources:
+        AutoCleanup:
           default: Enable Deletion of Temp Resources
 
 Parameters:
-    RemoveTempResources:
+    AutoCleanup:
       Description: "Set to true if you don't want to keep cleanup host, set to false if you want to manually run the cleanup script"
       Type: String
       Default: "true"
@@ -113,8 +113,8 @@ Parameters:
       ConstraintDescription: The Elastic Load Balancer Inbound CIDRs
       Type: String
       Default: "10.0.0.0/8,192.0.0.0/8,172.0.0.0/8"
-    RemoveTempResources:
-      Description: "Set to true if you don't want to keep cleanup provision host"
+    AutoCleanup:
+      Description: "Set to false if you want to run cleanup script manually"
       Type: String
       Default: "false"
       AllowedValues:
@@ -441,8 +441,8 @@ Resources:
                 done
                 sleep 5
 
-                if [ "${RemoveTempResources}" == "false" ];then
-                  echo "RemoveTempResources is false, cancel auto cleanup..."
+                if [ "${AutoCleanup}" == "false" ];then
+                  echo "AutoCleanup is false, cancel auto cleanup..."
                   exit 0
                 fi
 
@@ -557,10 +557,3 @@ Resources:
             aws-iam-authenticator version
             cfn-init -v --stack ${AWS::StackName} --resource CleanupLaunchConfiguration --region ${AWS::Region}
             cfn-signal -e $? --stack ${AWS::StackName} --resource CleanupAutoScalingGroup --region ${AWS::Region}
-            #if [ "${RemoveTempResources}" == "true" ];then
-            #  echo "terminating admin provision node"
-            #  INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
-            #  ASG=$(aws autoscaling describe-auto-scaling-instances --region ${AWS::Region} --output text --query=AutoScalingInstances[].AutoScalingGroupName --instance-ids=$INSTANCE_ID)
-            #  echo "$ASG"
-            #  nohup aws autoscaling --region ${AWS::Region} update-auto-scaling-group --auto-scaling-group-name $ASG --desired-capacity 0 --min-size 0 --max-size 0 &>/dev/null &
-            # fi
