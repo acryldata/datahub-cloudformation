@@ -482,7 +482,7 @@ Resources:
           SecretStringTemplate: '{"username": "admin"}'
           GenerateStringKey: password
           PasswordLength: 16
-          ExcludeCharacters: '"@/\<>()$?+-`'
+          ExcludeCharacters: '#"@/\<>()$?+-`'
           ExcludePunctuation: true
         Tags:
           -
@@ -499,7 +499,7 @@ Resources:
           SecretStringTemplate: '{"username": "admin"}'
           GenerateStringKey: password
           PasswordLength: 16
-          ExcludeCharacters: '"@/\<>()$?+-`'
+          ExcludeCharacters: '#"@/\<>()$?+-`'
         Tags:
           -
             Key: CloudFormation
@@ -514,7 +514,7 @@ Resources:
           SecretStringTemplate: '{"username": "admin"}'
           GenerateStringKey: password
           PasswordLength: 16
-          ExcludeCharacters: '"@/\<>()$?+-`'
+          ExcludeCharacters: '#"@/\<>()$?+-`'
           ExcludePunctuation: true
         Tags:
           -
@@ -530,8 +530,8 @@ Resources:
           SecretStringTemplate: '{"username": "admin"}'
           GenerateStringKey: password
           PasswordLength: 16
-          ExcludeCharacters: '"@/\<>()$?+-`'
-          ExcludePunctuation: true
+          ExcludeCharacters: '#"@/\<>()$?+-`'
+          #ExcludePunctuation: true
         Tags:
           -
             Key: CloudFormation
@@ -547,7 +547,7 @@ Resources:
           GenerateStringKey: uuid 
           PasswordLength: 32
           ExcludeCharacters: '"@/\<>()$?+-`'
-          #ExcludePunctuation: true
+          ExcludePunctuation: true
         Tags:
           -
             Key: CloudFormation
