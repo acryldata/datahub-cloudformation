@@ -516,9 +516,9 @@ Resources:
                 echo "deleting ingress security group from ${OldCFNStackName}..."
                 LB_SG=$(aws ec2 describe-security-groups --filters Name=tag:elbv2.k8s.aws/cluster,Values=${OldCFNStackName} --region ${AWS::Region} --query 'SecurityGroups[*].GroupId' --output text --no-paginate)
                 aws ec2 delete-security-group --group-id $LB_SG --region ${AWS::Region} --no-paginate
-                echo "deleting log group from .${OldCFNStackName}.."
-                aws logs delete-log-group --log-group-name "/aws/eks/${StackName}/cluster" --region ${AWS::Region} --no-paginate
-                aws logs delete-log-group --log-group-name "/aws/rds/cluster/${StackName}/error" --region ${AWS::Region} --no-paginate
+                echo "deleting log group from ${OldCFNStackName}.."
+                aws logs delete-log-group --log-group-name "/aws/eks/${OldCFNStackName}/cluster" --region ${AWS::Region} --no-paginate
+                aws logs delete-log-group --log-group-name "/aws/rds/cluster/${OldCFNStackName}/error" --region ${AWS::Region} --no-paginate
               mode: "000750"
               owner: root
               group: root
