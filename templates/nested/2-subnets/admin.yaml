@@ -335,6 +335,7 @@ Resources:
                 export API_KEY_SECRET=$(cat /uuid_secret)
                 python3 create_jwt.py>apikey
                 APIKEY=$(cat apikey)
+                cd ..
                 if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
                   aws secretsmanager create-secret --tags $EXTRA_TAGS --region ${AWS::Region} --name "/${Environment}/${EKSClusterName}/admin/apikey" --secret-string "$APIKEY" --description "${Environment}//${EKSClusterName}: DataHub Admin Apikey" 
                 else
