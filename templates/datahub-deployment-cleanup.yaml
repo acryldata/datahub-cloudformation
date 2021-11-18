@@ -10,10 +10,10 @@ Metadata:
           Parameters:
             - TemplateBucketName
             - Environment
-            - AutoCleanup
         - Label:
             default: Old Stack Cleanup Configuration
           Parameters:
+            - AutoCleanup
             - VPCID
             - ProvisionInstanceType
             - CreateRoleAndSg
@@ -23,7 +23,6 @@ Metadata:
             - OldProvisionSecurityGroupID
             - InboundCIDRs
             - OldCFNStackName
-            - AutoCleanup
 
       ParameterLabels:
         TemplateBucketName:
@@ -31,7 +30,7 @@ Metadata:
         Environment:
           default: The Environment Prefix
         AutoCleanup:
-          default: Enable Deletion of Temp Resources
+          default: Enable AutoCleanup
         VPCID:
           Default: The Existing VPC ID
         CreateRoleAndSg:
@@ -50,8 +49,6 @@ Metadata:
           default: The Name of The Old Cloudformation Stack
         InboundCIDRs:
           default: SSH Inbound CIDRs
-        AutoCleanup:
-          default: Enable Deletion of Temp Resources
 
 Parameters:
     AutoCleanup:
@@ -173,7 +170,7 @@ Resources:
                   - logs:DescribeLogGroups
                   - logs:DescribeLogStreams
                   - logs:PutRetentionPolicy
-                  #- logs:DeleteLogGroup
+                  - logs:DeleteLogGroup
                 Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:*:*"
                 Effect: Allow
         - PolicyName: provision-ssm-policy
