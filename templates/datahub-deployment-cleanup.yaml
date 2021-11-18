@@ -557,10 +557,10 @@ Resources:
             aws-iam-authenticator version
             cfn-init -v --stack ${AWS::StackName} --resource CleanupLaunchConfiguration --region ${AWS::Region}
             cfn-signal -e $? --stack ${AWS::StackName} --resource CleanupAutoScalingGroup --region ${AWS::Region}
-            if [ "${RemoveTempResources}" == "true" ];then
-              echo "terminating admin provision node"
-              INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
-              ASG=$(aws autoscaling describe-auto-scaling-instances --region ${AWS::Region} --output text --query=AutoScalingInstances[].AutoScalingGroupName --instance-ids=$INSTANCE_ID)
-              echo "$ASG"
-              nohup aws autoscaling --region ${AWS::Region} update-auto-scaling-group --auto-scaling-group-name $ASG --desired-capacity 0 --min-size 0 --max-size 0 &>/dev/null &
-             fi
+            #if [ "${RemoveTempResources}" == "true" ];then
+            #  echo "terminating admin provision node"
+            #  INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+            #  ASG=$(aws autoscaling describe-auto-scaling-instances --region ${AWS::Region} --output text --query=AutoScalingInstances[].AutoScalingGroupName --instance-ids=$INSTANCE_ID)
+            #  echo "$ASG"
+            #  nohup aws autoscaling --region ${AWS::Region} update-auto-scaling-group --auto-scaling-group-name $ASG --desired-capacity 0 --min-size 0 --max-size 0 &>/dev/null &
+            # fi
