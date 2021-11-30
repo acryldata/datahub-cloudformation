@@ -110,7 +110,8 @@ Resources:
         Type: "AWS::EC2::SecurityGroupIngress"
         Properties:
             GroupId: !Ref RDSSecurityGroup
-            SourceSecurityGroupId: !Sub "{{resolve:ssm:/${Environment}/${EksClusterName}/eks/clusterSecurityGroupId}}"
+            #SourceSecurityGroupId: !Sub "{{resolve:ssm:/${Environment}/${EksClusterName}/eks/clusterSecurityGroupId}}"
+            SourceSecurityGroupId: !Ref NodeSecurityGroup
             SourceSecurityGroupOwnerId: !Ref AWS::AccountId
             FromPort: 3306
             IpProtocol: "tcp"

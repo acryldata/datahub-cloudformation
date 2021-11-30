@@ -23,6 +23,8 @@ else
     exit 1
   fi
 
-  aws s3 cp ./templates s3://$S3_BUCKET/$S3_KEY_PREFIX/templates --recursive
-  aws s3 cp ./scripts s3://$S3_BUCKET/$S3_KEY_PREFIX/scripts --recursive
+  #aws s3 cp ./templates s3://$S3_BUCKET/$S3_KEY_PREFIX/templates --recursive
+  #aws s3 cp ./scripts s3://$S3_BUCKET/$S3_KEY_PREFIX/scripts --recursive
+  aws s3 sync ./templates s3://$S3_BUCKET/$S3_KEY_PREFIX/templates --exclude 'nested/quickstart-amazon-eks/*' --exclude 'nested/quickstart-amazon-eks.ORIG/*'
+  aws s3 sync ./scripts s3://$S3_BUCKET/$S3_KEY_PREFIX/scripts
 fi

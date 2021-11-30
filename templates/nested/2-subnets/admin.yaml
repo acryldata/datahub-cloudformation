@@ -97,8 +97,6 @@ Parameters:
       Type: String
       Description: The namespace in EKS to deploy kots and datahub app
       Default: "datahub"
-    EKSProvisionAutoScalingGroup:
-      Type: String
     DomainName:
       Type: String
     KotsDomainName:
@@ -243,18 +241,23 @@ Resources:
               mode: "000750"
               owner: root
               group: root
+            /tmp/check_extra_tags-v2.sh:
+              source: !Sub "https://s3.${AWS::Region}.amazonaws.com/${TemplateBucketName}/${Environment}/scripts/check_extra_tags-v2.sh"
+              mode: "000750"
+              owner: root
+              group: root
             /tmp/admin_bootstrap.sh:
               content: !Sub |
                 #!/bin/bash
-                #KEY_FILE_NAME=/home/ec2-user/.ssh/rsa.pub
+                KEY_FILE_NAME=/home/ec2-user/.ssh/rsa.pub
 
-                #cat > "$KEY_FILE_NAME" <<EOF
-                #ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCjTO/IXNqeN6zVDYXiwmbDFUvoMRfW6esCJniMfXXyNtRc7flcmnYbGZLbH1Fj3JFt6yRQ2e05LKVyeGdWItgBpyixn1me/JPic0QlABMNxJ5Zt+HHHIKhXYyBE4AhKFwcIBv0/LR/XWqUSbmNG8HU+mKO/JCamBVevwybvbS7n7no/U+gPm6TYGBsbWMNF5qX0bY24ohH3J6SgxV+Sj+CsVY9BHnlo0z2hHXFMKTTaD3dW9tgitDkoC5VrGJdLEwZXN5XXfqRsO3IKkGhwzaCz63kXGy1UJcF6ft1DwhZwx3yaB3a6nYT/WA+ak2MCxkftkBIjbpv13PWVOG3zYiz
-                #EOF
+                cat > "$KEY_FILE_NAME" <<EOF
+                ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCjTO/IXNqeN6zVDYXiwmbDFUvoMRfW6esCJniMfXXyNtRc7flcmnYbGZLbH1Fj3JFt6yRQ2e05LKVyeGdWItgBpyixn1me/JPic0QlABMNxJ5Zt+HHHIKhXYyBE4AhKFwcIBv0/LR/XWqUSbmNG8HU+mKO/JCamBVevwybvbS7n7no/U+gPm6TYGBsbWMNF5qX0bY24ohH3J6SgxV+Sj+CsVY9BHnlo0z2hHXFMKTTaD3dW9tgitDkoC5VrGJdLEwZXN5XXfqRsO3IKkGhwzaCz63kXGy1UJcF6ft1DwhZwx3yaB3a6nYT/WA+ak2MCxkftkBIjbpv13PWVOG3zYiz
+                EOF
 
-                #chown ec2-user /home/ec2-user/.ssh/*
-                #chmod 400 "$KEY_FILE_NAME"
-                #cat "$KEY_FILE_NAME" >> /home/ec2-user/.ssh/authorized_keys
+                chown ec2-user /home/ec2-user/.ssh/*
+                chmod 400 "$KEY_FILE_NAME"
+                cat "$KEY_FILE_NAME" >> /home/ec2-user/.ssh/authorized_keys
                 echo "Checking extra tags..."
                 EXTRA_TAGS=$(/tmp/check_extra_tags-v2.sh ${Environment})
                 len=`expr length "$EXTRA_TAGS"`
@@ -270,6 +273,15 @@ Resources:
                 #done
                 #sleep 5    
 
+                ### grant k8s api access
+                echo "add k8s https ingress rule to EKS cluster security group..."
+                EKSSecurityGroupId=$(aws eks describe-cluster --region ${AWS::Region} --name ${EksClusterName} --query cluster.resourcesVpcConfig.securityGroupIds --output text)
+                for cidr in $(echo ${ElbInboundCIDRs} | sed "s/,/ /g")
+                do
+                  aws ec2 authorize-security-group-ingress --region ${AWS::Region} --group-id ${EKSSecurityGroupId} --ip-permissions IpProtocol=tcp,FromPort=443,ToPort=443,IpRanges="[{CidrIp=$cidr,Description='grant k8s api access to $cidr'}]"
+                done
+                sleep 5
+
                 echo "Checking whether cluster exists..."
                 aws eks describe-cluster --region ${AWS::Region} --name ${EksClusterName} &> /dev/null
                 if [ $? -eq 0 ]; then
@@ -281,17 +293,20 @@ Resources:
                   export KUBECONFIG=/home/ec2-user/.kube/config
                   chmod 600 /home/ec2-user/.kube/config
                 fi
-                echo "Install Ingress Controller..."
+
                 set -x
-                curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
-                mv /tmp/eksctl /usr/local/bin
-                eksctl utils associate-iam-oidc-provider --cluster ${EksClusterName} --approve --region ${AWS::Region}
-                helm repo add eks https://aws.github.io/eks-charts
-                helm repo update
-                echo "        serviceAccount:" > values.yaml
-                echo "          annotations:" >> values.yaml
-                echo "            eks.amazonaws.com/role-arn: arn:aws:iam::${AWS::AccountId}:role/${EksClusterName}-aws-load-balancer-controller" >> values.yaml
-                helm install aws-load-balancer-controller eks/aws-load-balancer-controller --set region=${AWS::Region} -n kube-system --set clusterName=${EksClusterName} --set serviceAccount.name=${EksClusterName}-aws-load-balancer-controller --set image.tag=v2.2.0 --version 1.2.7 -f values.yaml
+                #exit 0 # for AWSQSEKS Test
+                #echo "Install Ingress Controller..."
+                #set -x
+                #curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+                #mv /tmp/eksctl /usr/local/bin
+                #eksctl utils associate-iam-oidc-provider --cluster ${EksClusterName} --approve --region ${AWS::Region}
+                #helm repo add eks https://aws.github.io/eks-charts
+                #helm repo update
+                #echo "        serviceAccount:" > values.yaml
+                #echo "          annotations:" >> values.yaml
+                #echo "            eks.amazonaws.com/role-arn: arn:aws:iam::${AWS::AccountId}:role/${EksClusterName}-aws-load-balancer-controller" >> values.yaml
+                #helm install aws-load-balancer-controller eks/aws-load-balancer-controller --set region=${AWS::Region} -n kube-system --set clusterName=${EksClusterName} --set serviceAccount.name=${EksClusterName}-aws-load-balancer-controller --set image.tag=v2.2.0 --version 1.2.7 -f values.yaml
                 echo "prepare configvalues.yaml..."
                 ZOOKEEPER_CONNECT=$(aws kafka --region ${AWS::Region} list-clusters --cluster-name-filter ${MSKClusterName} --no-paginate --query 'ClusterInfoList[0].ZookeeperConnectString' --output text)
                 CLUSTER_ARN=$(aws kafka --region ${AWS::Region} list-clusters --cluster-name-filter ${MSKClusterName} --no-paginate --query 'ClusterInfoList[0].ClusterArn' --output text)
@@ -310,9 +325,9 @@ Resources:
                 else
                   aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$ZOOKEEPER_CONNECT" --overwrite --no-paginate
                 fi
-                set +x
                 echo "Creating namespace..."
                 kubectl create ns ${K8sNamespace}
+                set +x
                 echo "Generate UUID..."
                 aws kms generate-random --region ${AWS::Region} --number-of-bytes 32  --output text --query Plaintext>uuid_secret
                 aws kms generate-random --region ${AWS::Region} --number-of-bytes 16  --output text --query Plaintext>datahub-password
