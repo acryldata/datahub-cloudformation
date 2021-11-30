@@ -750,7 +750,7 @@ Resources:
           VPCID: !Ref VPCID
           PrivateSubnet1: !Ref PrivateSubnet1ID
           PrivateSubnet2: !Ref PrivateSubnet2ID
-          NodeSecurityGroup: !GetAtt AWSQSEKSClusterStack.Outputs.ControlPlaneSecurityGroup
+          NodeSecurityGroup: !GetAtt AWSQSEKSClusterStack.Outputs.NodeGroupSecurityGroup
           ESDataNodeCount: !Ref ESDataNodeCount
           ESInstanceType: !Ref ESInstanceType
           ESVolumeSize: !Ref ESVolumeSize
@@ -781,7 +781,7 @@ Resources:
           VPCID: !Ref VPCID
           DBSubnet1: !Ref PrivateSubnet1ID
           DBSubnet2: !Ref PrivateSubnet2ID
-          NodeSecurityGroup: !GetAtt AWSQSEKSClusterStack.Outputs.ControlPlaneSecurityGroup
+          NodeSecurityGroup: !GetAtt AWSQSEKSClusterStack.Outputs.NodeGroupSecurityGroup
           MasterUser:
             Fn::Sub: "{{resolve:secretsmanager:${RDSSecret}::username}}"
           MasterUserPassword:
@@ -809,7 +809,7 @@ Resources:
           VPCID: !Ref VPCID
           DBSubnet1: !Ref PrivateSubnet1ID
           DBSubnet2: !Ref PrivateSubnet2ID
-          NodeSecurityGroup: !GetAtt AWSQSEKSClusterStack.Outputs.ControlPlaneSecurityGroup
+          NodeSecurityGroup: !GetAtt AWSQSEKSClusterStack.Outputs.NodeGroupSecurityGroup
           MSKClusterName: !Sub "${AWS::StackName}"
           Environment: !Ref Environment
           EksClusterName: !Sub "${AWS::StackName}"
@@ -861,7 +861,7 @@ Resources:
           TemplateBucketName: !Ref TemplateBucketName
           EC2LogGroup: !Ref EC2LogGroup
           ProvisionSecurityGroup: !Ref ProvisionSecurityGroup
-          NodeSecurityGroup: !GetAtt EKSPreRequsiteStack.Outputs.ControlPanelSecurityGroup
+          NodeSecurityGroup: !GetAtt EKSPreRequsiteStack.Outputs.NodeGroupSecurityGroup
           ControlPanelSecurityGroup: !GetAtt EKSPreRequsiteStack.Outputs.ControlPanelSecurityGroup
           EKSServiceRoleArn: !GetAtt EKSPreRequsiteStack.Outputs.EksServiceRoleArn
           NodeInstanceRoleArn: !GetAtt NodeInstanceRole.Arn
