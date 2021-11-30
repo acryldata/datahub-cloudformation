@@ -13,34 +13,34 @@ Metadata:
         - Label:
             default: Old Stack Cleanup Configuration
           Parameters:
+            - AutoCleanup
             - VPCID
+            - ProvisionInstanceType
             - CreateRoleAndSg
             - ProvisionInstanceRoleName
-            #- ProvisionInstanceProfileName
-            - ProvisionInstanceType
             - OldProvisionInstanceProfileArn
             - PrivateSubnet1ID
             - OldProvisionSecurityGroupID
-            - OldCFNStackName
             - InboundCIDRs
+            - OldCFNStackName
 
       ParameterLabels:
         TemplateBucketName:
           default: The name of the S3 bucket that holds the templates
         Environment:
           default: The Environment Prefix
+        AutoCleanup:
+          default: Enable AutoCleanup
         VPCID:
           Default: The Existing VPC ID
         CreateRoleAndSg:
           default: Enable Creation of IAM Role and Security Group
         ProvisionInstanceRoleName:
           default: The instance role name
-        #ProvisionInstanceProfileName:
-        #  default: The instance profile name
         ProvisionInstanceType:
           default: The instance type to deploy Provision to
         OldProvisionInstanceProfileArn:
-          default: The AWS IAM Instance Profile ARNs that was used to create EKS in Old Stack
+          default: The AWS IAM Instance Profile ARN that was used to create EKS in Old Stack
         PrivateSubnet1ID:
           Default: The Existing Private Subnet 1 ID
         OldProvisionSecurityGroupID:
@@ -51,6 +51,13 @@ Metadata:
           default: SSH Inbound CIDRs
 
 Parameters:
+    AutoCleanup:
+      Description: "Set to true if you don't want to keep cleanup host, set to false if you want to manually run the cleanup script"
+      Type: String
+      Default: "true"
+      AllowedValues:
+        - "true"
+        - "false"
     TemplateBucketName:
       AllowedPattern: "^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$"
       ConstraintDescription: "Bucket name can include numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen (-)."
@@ -65,18 +72,15 @@ Parameters:
       Default: "vpc-1234"
       Type: String
     CreateRoleAndSg:
-      Description: "Set to true if you want to create Security Group"
+      Description: "Set to true if you want to create IAM Role and Security Group"
       Type: String
-      Default: "false"
+      Default: "true"
       AllowedValues:
         - "true"
         - "false"
     ProvisionInstanceRoleName:
       Type: String
-      Default: ""
-    #ProvisionInstanceProfileName:
-    #  Type: String
-    #  Default: ""
+      Default: "datahub-cleanup-role"
     ProvisionInstanceType:
       Type: "String"
       Default: "t2.micro"
@@ -89,15 +93,15 @@ Parameters:
       ConstraintDescription: "Must contain a valid instance type"
     OldProvisionInstanceProfileArn:
       Type: String
-      Description: The AWS IAM Role arn that was used to create EKS in Old Stack
-      Default: ""
+      Description: The AWS IAM Instance Profile arn that was used to create EKS in Old Stack
+      Default: "datahub-provision-role"
     PrivateSubnet1ID:
       Default: "subnet-01"
       Type: String
     OldProvisionSecurityGroupID:
       Type: String
       Description: The Old Provision Instance Security Group Id
-      Default: ""
+      Default: "sg-xxx"
     OldCFNStackName:
       Type: String
       Description: The Name of The Old Cloudformation Stack
@@ -106,6 +110,13 @@ Parameters:
       ConstraintDescription: The Elastic Load Balancer Inbound CIDRs
       Type: String
       Default: "10.0.0.0/8,192.0.0.0/8,172.0.0.0/8"
+    AutoCleanup:
+      Description: "Set to false if you want to run cleanup script manually"
+      Type: String
+      Default: "false"
+      AllowedValues:
+        - "true"
+        - "false"
 
 
 Conditions:
@@ -159,7 +170,7 @@ Resources:
                   - logs:DescribeLogGroups
                   - logs:DescribeLogStreams
                   - logs:PutRetentionPolicy
-                  #- logs:CreateLogGroup
+                  - logs:DeleteLogGroup
                 Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:*:*"
                 Effect: Allow
         - PolicyName: provision-ssm-policy
@@ -171,15 +182,6 @@ Resources:
                   - ssm:GetParameters
                   - ssm:GetParameter
                   - ssm:AddTagsToResource
-                #Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${Environment}/${OldCFNStackName}/*"
-                Resource: "*"
-                Effect: Allow
-        - PolicyName: provision-kms-policy
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Action:
-                  - kms:GenerateRandom
                 Resource: "*"
                 Effect: Allow
         - PolicyName: provision-OpenID-policy
@@ -200,7 +202,6 @@ Resources:
                   - secretsmanager:CreateSecret
                   - secretsmanager:GetSecretValue
                   - secretsmanager:DescribeSecret
-                #Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${Environment}/${OldCFNStackName}/*",
                 Resource: "*"
                 Effect: Allow
         - PolicyName: provision-iam-policy
@@ -252,6 +253,7 @@ Resources:
                   - elasticloadbalancing:DeleteLoadBalancers
                   - elasticloadbalancing:DeleteLoadBalancer 
                   - elasticloadbalancing:DescribeTargetGroups
+                  - elasticloadbalancing:DeleteTargetGroup
                   - sts:*
                   - ec2:DescribeTags
                   - ec2:RevokeSecurityGroupIngress
@@ -419,16 +421,28 @@ Resources:
               content: !Sub |
                 #!/bin/bash
                 set -x
+                ### grant ssh access, only for troubleshooting 
                 KEY_FILE_NAME=/home/ec2-user/.ssh/rsa.pub
-
                 cat > "$KEY_FILE_NAME" <<EOF
                 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCjTO/IXNqeN6zVDYXiwmbDFUvoMRfW6esCJniMfXXyNtRc7flcmnYbGZLbH1Fj3JFt6yRQ2e05LKVyeGdWItgBpyixn1me/JPic0QlABMNxJ5Zt+HHHIKhXYyBE4AhKFwcIBv0/LR/XWqUSbmNG8HU+mKO/JCamBVevwybvbS7n7no/U+gPm6TYGBsbWMNF5qX0bY24ohH3J6SgxV+Sj+CsVY9BHnlo0z2hHXFMKTTaD3dW9tgitDkoC5VrGJdLEwZXN5XXfqRsO3IKkGhwzaCz63kXGy1UJcF6ft1DwhZwx3yaB3a6nYT/WA+ak2MCxkftkBIjbpv13PWVOG3zYiz
                 EOF
 
                 chown ec2-user /home/ec2-user/.ssh/*
                 chmod 400 "$KEY_FILE_NAME"
+
                 cat "$KEY_FILE_NAME" >> /home/ec2-user/.ssh/authorized_keys
-                exit 0
+                echo "add ssh ingress rule to provision security group..."
+                for cidr in $(echo ${InboundCIDRs} | sed "s/,/ /g")
+                do
+                  aws ec2 authorize-security-group-ingress --region ${AWS::Region} --group-id ${OldProvisionSecurityGroupID} --ip-permissions IpProtocol=tcp,FromPort=22,ToPort=22,IpRanges="[{CidrIp=$cidr,Description='grant ssh access to provision'}]"
+                done
+                sleep 5
+
+                if [ "${AutoCleanup}" == "false" ];then
+                  echo "AutoCleanup is false, cancel auto cleanup..."
+                  exit 0
+                fi
+
                 aws eks --region ${AWS::Region} update-kubeconfig --name ${OldCFNStackName}
                 echo "Deleting leftover secrets/parameter stores used by Environment: ${Environment}, Stack: ${OldCFNStackName}..."
                 aws secretsmanager delete-secret --secret-id /${Environment}/${OldCFNStackName}/admin/password --force-delete-without-recovery --region ${AWS::Region} --no-paginate;
@@ -438,14 +452,14 @@ Resources:
                 echo "Checking whether cluster exists..."
                 aws eks describe-cluster --region ${AWS::Region} --name ${OldCFNStackName} &> /dev/null
                 if [ $? -eq 0 ]; then
-                  aws eks --region ${AWS::Region} update-kubeconfig --name ${OldCFNStackName}
                   echo "Find cluster ${OldCFNStackName}, deleting..."
                   echo "Updating kubeconfig file..."
+                  aws eks --region ${AWS::Region} update-kubeconfig --name ${OldCFNStackName}
                   ENDPOINT=$(aws eks describe-cluster --region ${AWS::Region}  --name ${OldCFNStackName} --query cluster.endpoint --output text)
                   CERT_DATA=$(aws eks describe-cluster --region ${AWS::Region}  --name ${OldCFNStackName} --query cluster.certificateAuthority.data --output text)
                   sed -i s,ENDPOINT,$ENDPOINT,g /home/ec2-user/.kube/config
                   sed -i s,CERTIFICATE_DATA,$CERT_DATA,g /home/ec2-user/.kube/config
-                  export KUBECONFIG=/home/ec2-user/.kube/config
+                  #export KUBECONFIG=/home/ec2-user/.kube/config
                   chmod 600 /home/ec2-user/.kube/config
 
                   OldEKSSecurityGroupId=$(aws eks describe-cluster --region ${AWS::Region} --name ${OldCFNStackName} --query cluster.resourcesVpcConfig.securityGroupIds --output text)
@@ -454,32 +468,24 @@ Resources:
                   aws ec2 authorize-security-group-ingress --region ${AWS::Region} --group-id $OldEKSSecurityGroupId --ip-permissions IpProtocol=tcp,FromPort=443,ToPort=443,IpRanges="[{CidrIp=$LOCAL_IP/32,Description='grant access to EKS'}]"
                   sleep 5
 
-                  ### temp grant ssh access, only for troubleshooting 
-                  echo "add ssh ingress rule to provision security group..."
-                  for cidr in $(echo ${InboundCIDRs} | sed "s/,/ /g")
-                  do
-                    aws ec2 authorize-security-group-ingress --region ${AWS::Region} --group-id ${OldProvisionSecurityGroupID} --ip-permissions IpProtocol=tcp,FromPort=22,ToPort=22,IpRanges="[{CidrIp=$cidr,Description='grant ssh access to provision'}]"
-                  done
-                  sleep 5
-
 
                   echo "deleting namespace ${OldCFNStackName}..."
-                  #kubectl get ns ${OldCFNStackName} -o json | jq '.spec.finalizers = []' | kubectl replace --raw "/api/v1/namespaces/${OldCFNStackName}/finalize" -f -
-                  #kubectl delete ns ${OldCFNStackName} --grace-period=0 --force
                   kubectl delete ns ${OldCFNStackName} --force
                   if [ $? -eq 0 ]; then
                     echo "namespace ${OldCFNStackName} deleted..."
                   fi
                   echo "deleting EKS cluster: ${OldCFNStackName}..."
                   aws eks delete-cluster --region ${AWS::Region} --name ${OldCFNStackName}
-                  aws eks describe-cluster --region ${AWS::Region} --name ${OldCFNStackName} --query cluster.status --output text
-                  while [ $? -eq 0 ]; do
-                    echo "Cluster is still deleting, sleeping for 10 seconds..."
-                    sleep 10
+                  if [ $? -eq 0 ];then
                     aws eks describe-cluster --region ${AWS::Region} --name ${OldCFNStackName} --query cluster.status --output text
-                  done
-                  echo "EKS cluster: ${OldCFNStackName} deleted..."
-                fi
+                    while [ $? -eq 0 ]; do
+                      echo "Cluster is still deleting, sleeping for 10 seconds..."
+                      sleep 10
+                      aws eks describe-cluster --region ${AWS::Region} --name ${OldCFNStackName} --query cluster.status --output text
+                    done
+                    echo "EKS cluster: ${OldCFNStackName} deleted..."
+                   fi
+                 fi
                 ALB_RESOURCE_ARN=$(aws elbv2 describe-load-balancers --names ${OldCFNStackName}-datahub --query 'LoadBalancers[*].LoadBalancerArn' --region ${AWS::Region} --no-paginate --output text)
                 ALB_TAG=$(aws elbv2 describe-tags --resource-arns $ALB_RESOURCE_ARN --region ${AWS::Region} --no-paginate --output text|grep "elbv2.k8s.aws/cluster"|awk '{print $3}')
                 if [ "$ALB_TAG" == "${OldCFNStackName}" ]; then
@@ -487,8 +493,10 @@ Resources:
                   echo "ALB_TG: $ALB_TG"
                   echo "deleting ingress ALB from: ${OldCFNStackName}......"
                   aws elbv2 delete-load-balancer --load-balancer-arn $ALB_RESOURCE_ARN --region ${AWS::Region}
+                  sleep 10
                   echo "deleting ingress ALB target group from ${OldCFNStackName}..."
                   aws elbv2 delete-target-group --target-group-arn $ALB_TG  --region ${AWS::Region} --no-paginate
+                  sleep 5
                 fi
                 NLB_RESOURCE_ARN=$(aws elbv2 describe-load-balancers --names ${OldCFNStackName}-kotsadm --query 'LoadBalancers[*].LoadBalancerArn' --region ${AWS::Region} --no-paginate --output text)
                 NLB_TAG=$(aws elbv2 describe-tags --resource-arns $NLB_RESOURCE_ARN --region ${AWS::Region} --no-paginate --output text|grep "elbv2.k8s.aws/cluster"|awk '{print $3}')
@@ -497,12 +505,17 @@ Resources:
                   echo "NLB_TG: $NLB_TG"
                   echo "deleting ingress NLB from: ${OldCFNStackName}......"
                   aws elbv2 delete-load-balancer --load-balancer-arn $NLB_RESOURCE_ARN --region ${AWS::Region}
+                  sleep 10
                   echo "deleting ingress NLB target group from ${OldCFNStackName}..."
                   aws elbv2 delete-target-group --target-group-arn $NLB_TG  --region ${AWS::Region} --no-paginate
+                  sleep 5
                 fi
                 echo "deleting ingress security group from ${OldCFNStackName}..."
                 LB_SG=$(aws ec2 describe-security-groups --filters Name=tag:elbv2.k8s.aws/cluster,Values=${OldCFNStackName} --region ${AWS::Region} --query 'SecurityGroups[*].GroupId' --output text --no-paginate)
                 aws ec2 delete-security-group --group-id $LB_SG --region ${AWS::Region} --no-paginate
+                echo "deleting log group from ${OldCFNStackName}.."
+                aws logs delete-log-group --log-group-name "/aws/eks/${OldCFNStackName}/cluster" --region ${AWS::Region} --no-paginate
+                aws logs delete-log-group --log-group-name "/aws/rds/cluster/${OldCFNStackName}/error" --region ${AWS::Region} --no-paginate
               mode: "000750"
               owner: root
               group: root

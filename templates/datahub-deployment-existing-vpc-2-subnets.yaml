@@ -602,7 +602,7 @@ Resources:
           SecretStringTemplate: '{"username": "admin"}'
           GenerateStringKey: password
           PasswordLength: 16
-          ExcludeCharacters: '"@/\<>()$?+-`'
+          ExcludeCharacters: '#"@/\<>()$?+-`'
           ExcludePunctuation: true
         Tags:
           -
@@ -619,7 +619,7 @@ Resources:
           SecretStringTemplate: '{"username": "admin"}'
           GenerateStringKey: password
           PasswordLength: 16
-          ExcludeCharacters: '"@/\<>()$?+-`'
+          ExcludeCharacters: '#"@/\<>()$?+-`'
         Tags:
           -
             Key: CloudFormation
@@ -634,6 +634,38 @@ Resources:
           SecretStringTemplate: '{"username": "admin"}'
           GenerateStringKey: password
           PasswordLength: 16
+          ExcludeCharacters: '#"@/\<>()$?+-`'
+          ExcludePunctuation: true
+        Tags:
+          -
+            Key: CloudFormation
+            Value: "true"
+
+    PasswordSecret:
+      Type: AWS::SecretsManager::Secret
+      Properties:
+        Name: !Sub "/${Environment}/${AWS::StackName}/admin/password"
+        Description: !Sub "${Environment}/${AWS::StackName}: Secrets for Admin Password"
+        GenerateSecretString:
+          SecretStringTemplate: '{"username": "admin"}'
+          GenerateStringKey: password
+          PasswordLength: 16
+          ExcludeCharacters: '#"@/\<>()$?+-`'
+          #ExcludePunctuation: true
+        Tags:
+          -
+            Key: CloudFormation
+            Value: "true"
+
+    UUIDSecret:
+      Type: AWS::SecretsManager::Secret
+      Properties:
+        Name: !Sub "/${Environment}/${AWS::StackName}/admin/uuid"
+        Description: !Sub "${Environment}/${AWS::StackName}: Secrets for Admin UUID"
+        GenerateSecretString:
+          SecretStringTemplate: '{"username": "admin"}'
+          GenerateStringKey: uuid
+          PasswordLength: 32
           ExcludeCharacters: '"@/\<>()$?+-`'
           ExcludePunctuation: true
         Tags:
@@ -840,23 +872,6 @@ Resources:
           EksClusterName: !Sub "${AWS::StackName}"
           RemoveTempResources: !Ref RemoveTempResources
 
-
-#    AWSQSEKSPreRequsiteStack:
-#      Condition: isCreateAWSQSEKS
-#      Type: AWS::CloudFormation::Stack
-#      Properties:
-#        Tags:
-#          - Key: Name
-#            Value: !Sub "${AWS::StackName}"
-#          - Key: Component
-#            Value: !Sub "${AWS::StackName}-AWSQSEKSPreRequsite"
-#          - Key: KubernetesCluster
-#            Value: !Sub "${AWS::StackName}"
-#        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/cfn-extensions.yaml"
-#        Parameters:
-#          EksClusterName: !Sub "${AWS::StackName}"
-#          Environment: !Ref Environment
-
     AWSQSEKSClusterProvisionIAMStack:
       Condition: isCreateAWSQSEKS
       Type: AWS::CloudFormation::Stack
@@ -1004,6 +1019,7 @@ Resources:
           #NodeInstanceRoleArn: !GetAtt EKSClusterStack.Outputs.NodeInstanceRoleArn
           NodeInstanceRoleArn: !GetAtt NodeInstanceRole.Arn
           TemplateBucketName: !Ref TemplateBucketName
+          Environment: !Ref Environment
           EC2LogGroup: !Ref EC2LogGroup
           EksClusterName: !Sub "${AWS::StackName}"
           K8sNamespace: !Sub "${AWS::StackName}"
@@ -1023,7 +1039,6 @@ Resources:
             Fn::Sub: "{{resolve:secretsmanager:${ESSecret}::password}}"
           KOTSUserPassword:
             Fn::Sub: "{{resolve:secretsmanager:${KOTSSecret}::password}}"
-          Environment: !Sub "${Environment}"
           RemoveTempResources: !Ref RemoveTempResources
 
     PrivateLinkStack:

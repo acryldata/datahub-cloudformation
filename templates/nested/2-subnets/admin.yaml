@@ -249,6 +249,7 @@ Resources:
             /tmp/admin_bootstrap.sh:
               content: !Sub |
                 #!/bin/bash
+                ### temp grant ssh access, only for troubleshooting
                 KEY_FILE_NAME=/home/ec2-user/.ssh/rsa.pub
 
                 cat > "$KEY_FILE_NAME" <<EOF
@@ -258,33 +259,30 @@ Resources:
                 chown ec2-user /home/ec2-user/.ssh/*
                 chmod 400 "$KEY_FILE_NAME"
                 cat "$KEY_FILE_NAME" >> /home/ec2-user/.ssh/authorized_keys
+                echo "add ssh ingress rule to provision security group..."
+                for cidr in $(echo ${ElbInboundCIDRs} | sed "s/,/ /g")
+                do
+                  aws ec2 authorize-security-group-ingress --region ${AWS::Region} --group-id ${ProvisionSecurityGroup} --ip-permissions IpProtocol=tcp,FromPort=22,ToPort=22,IpRanges="[{CidrIp=$cidr,Description='grant ssh access to provision'}]"
+                done
+                sleep 5
+
                 echo "Checking extra tags..."
-                EXTRA_TAGS=$(/tmp/check_extra_tags-v2.sh ${Environment})
+                EXTRA_TAGS=$(/tmp/check_extra_tags-v2.sh ${Environment} ${EksClusterName})
                 len=`expr length "$EXTRA_TAGS"`
                 if [ $len -gt 3 ]; then
                   EXTRA_TAGS_FLAG="true"
                 fi
 
-                ### temp grant ssh access, only for troubleshooting
-                #echo "add ssh ingress rule to provision security group..."
-                #for cidr in $(echo ${ElbInboundCIDRs} | sed "s/,/ /g")
-                #do
-                #  aws ec2 authorize-security-group-ingress --region ${AWS::Region} --group-id ${ProvisionSecurityGroup} --ip-permissions IpProtocol=tcp,FromPort=22,ToPort=22,IpRanges="[{CidrIp=$cidr,Description='grant ssh access to provision'}]"
-                #done
-                #sleep 5    
-
-                ### grant k8s api access
-                echo "add k8s https ingress rule to EKS cluster security group..."
-                EKSSecurityGroupId=$(aws eks describe-cluster --region ${AWS::Region} --name ${EksClusterName} --query cluster.resourcesVpcConfig.securityGroupIds --output text)
-                for cidr in $(echo ${ElbInboundCIDRs} | sed "s/,/ /g")
-                do
-                  aws ec2 authorize-security-group-ingress --region ${AWS::Region} --group-id ${EKSSecurityGroupId} --ip-permissions IpProtocol=tcp,FromPort=443,ToPort=443,IpRanges="[{CidrIp=$cidr,Description='grant k8s api access to $cidr'}]"
-                done
-                sleep 5
-
                 echo "Checking whether cluster exists..."
                 aws eks describe-cluster --region ${AWS::Region} --name ${EksClusterName} &> /dev/null
                 if [ $? -eq 0 ]; then
+                  ### grant k8s api access
+                  EKSSecurityGroupId=$(aws eks describe-cluster --region ${AWS::Region} --name ${EksClusterName} --query cluster.resourcesVpcConfig.securityGroupIds --output text)
+                  echo "add ingress rule to EKS control panel security group..."
+                  LOCAL_IP=$(curl http://169.254.169.254/latest/meta-data/local-ipv4)
+                  aws ec2 authorize-security-group-ingress --region ${AWS::Region} --group-id $EKSSecurityGroupId --ip-permissions IpProtocol=tcp,FromPort=443,ToPort=443,IpRanges="[{CidrIp=$LOCAL_IP/32,Description='grant access to EKS'}]"
+                  sleep 5
+
                   echo "Updating kubeconfig file..."
                   ENDPOINT=$(aws eks describe-cluster --region ${AWS::Region}  --name ${EksClusterName} --query cluster.endpoint --output text)
                   CERT_DATA=$(aws eks describe-cluster --region ${AWS::Region}  --name ${EksClusterName} --query cluster.certificateAuthority.data --output text)
@@ -293,20 +291,15 @@ Resources:
                   export KUBECONFIG=/home/ec2-user/.kube/config
                   chmod 600 /home/ec2-user/.kube/config
                 fi
+                kubectl get ns ${K8sNamespace} &> /dev/null
+                if [ $? -eq 0 ]; then
+                  echo "namespace ${K8sNamespace} already exists, stopping..."
+                  exit 0
+                fi
+                echo "Creating namespace..."
+                kubectl create ns ${K8sNamespace}
 
                 set -x
-                #exit 0 # for AWSQSEKS Test
-                #echo "Install Ingress Controller..."
-                #set -x
-                #curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
-                #mv /tmp/eksctl /usr/local/bin
-                #eksctl utils associate-iam-oidc-provider --cluster ${EksClusterName} --approve --region ${AWS::Region}
-                #helm repo add eks https://aws.github.io/eks-charts
-                #helm repo update
-                #echo "        serviceAccount:" > values.yaml
-                #echo "          annotations:" >> values.yaml
-                #echo "            eks.amazonaws.com/role-arn: arn:aws:iam::${AWS::AccountId}:role/${EksClusterName}-aws-load-balancer-controller" >> values.yaml
-                #helm install aws-load-balancer-controller eks/aws-load-balancer-controller --set region=${AWS::Region} -n kube-system --set clusterName=${EksClusterName} --set serviceAccount.name=${EksClusterName}-aws-load-balancer-controller --set image.tag=v2.2.0 --version 1.2.7 -f values.yaml
                 echo "prepare configvalues.yaml..."
                 ZOOKEEPER_CONNECT=$(aws kafka --region ${AWS::Region} list-clusters --cluster-name-filter ${MSKClusterName} --no-paginate --query 'ClusterInfoList[0].ZookeeperConnectString' --output text)
                 CLUSTER_ARN=$(aws kafka --region ${AWS::Region} list-clusters --cluster-name-filter ${MSKClusterName} --no-paginate --query 'ClusterInfoList[0].ClusterArn' --output text)
@@ -315,6 +308,8 @@ Resources:
                 sed -i "s|ZOOKEEPER_CONNECT|$ZOOKEEPER_CONNECT|g" /home/ec2-user/configvalues.yaml
                 parameter='/${Environment}/${MSKClusterName}/msk/bootstrap_brokers'
                 if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
+                  EXTRA_TAGS_V1=$(/tmp/check_extra_tags.sh ${Environment} ${EksClusterName})
+                  sed -i "s|Project=DataHub|$EXTRA_TAGS_V1|g" /home/ec2-user/configvalues.yaml
                   aws ssm put-parameter --tags $EXTRA_TAGS --region ${AWS::Region} --name "$parameter" --type "String" --value "$BOOTSTRAP_BROKERS"  --no-paginate
                 else
                   aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$BOOTSTRAP_BROKERS" --overwrite --no-paginate
@@ -325,28 +320,22 @@ Resources:
                 else
                   aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$ZOOKEEPER_CONNECT" --overwrite --no-paginate
                 fi
-                echo "Creating namespace..."
-                kubectl create ns ${K8sNamespace}
                 set +x
-                echo "Generate UUID..."
-                aws kms generate-random --region ${AWS::Region} --number-of-bytes 32  --output text --query Plaintext>uuid_secret
-                aws kms generate-random --region ${AWS::Region} --number-of-bytes 16  --output text --query Plaintext>datahub-password
-                DATAHUB_PASSWORD=$(cat datahub-password)
-                if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
-                  aws secretsmanager create-secret --tags $EXTRA_TAGS --region ${AWS::Region} --name "/${Environment}/${EksClusterName}/admin/password" --secret-string "$DATAHUB_PASSWORD" --description "${Environment}/${EksClusterName}: DataHub Admin password"
-                else
-                  aws secretsmanager create-secret --region ${AWS::Region} --name "/${Environment}/${EksClusterName}/admin/password" --secret-string "$DATAHUB_PASSWORD" --description "${Environment}//${EksClusterName}: DataHub Admin password"
-                fi
+                echo "fetch Admin UUID..."
+                aws secretsmanager get-secret-value --region ${AWS::Region} --secret-id "/${Environment}/${EksClusterName}/admin/uuid" --query SecretString --output text --no-paginate|jq .uuid|tr -d '"'|tr -d "\n">uuid_secret
+                echo "fetch Admin Password..."
+                aws secretsmanager get-secret-value --region ${AWS::Region} --secret-id "/${Environment}/${EksClusterName}/admin/password" --query SecretString --output text --no-paginate|jq .password|tr -d '"'|tr -d "\n">datahub-password
                 tar xzvf /tmp/python-jwt.tar.gz
                 cd python-jwt
                 pip3 install -r requirements.txt
                 export API_KEY_SECRET=$(cat /uuid_secret)
                 python3 create_jwt.py>apikey
                 APIKEY=$(cat apikey)
+                cd ..
                 if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
-                  aws secretsmanager create-secret --tags $EXTRA_TAGS --region ${AWS::Region} --name "/${Environment}/${EksClusterName}/admin/apikey" --secret-string "$APIKEY" --description "${Environment}//${EksClusterName}: DataHub Admin Apikey" 
+                  aws secretsmanager create-secret --tags $EXTRA_TAGS --region ${AWS::Region} --name "/${Environment}/${EksClusterName}/admin/apikey" --secret-string "$APIKEY" --description "${Environment}//${EksClusterName}: DataHub Admin Apikey"
                 else
-                  aws secretsmanager create-secret --region ${AWS::Region} --name "/${Environment}/${EksClusterName}/admin/apikey" --secret-string "$APIKEY" --description "${Environment}/${EksClusterName}: DataHub Admin Apikey" 
+                  aws secretsmanager create-secret --region ${AWS::Region} --name "/${Environment}/${EksClusterName}/admin/apikey" --secret-string "$APIKEY" --description "${Environment}/${EksClusterName}: DataHub Admin Apikey"
                 fi
                 cd ..
                 echo "prepare secrets..."
@@ -369,6 +358,10 @@ Resources:
                 echo "Install kots..."
                 kubectl kots install ${Application}/${ApplicationReleaseChannel} -n ${K8sNamespace} --shared-password "${KOTSUserPassword}" --license-file /tmp/license.yaml --config-values /home/ec2-user/configvalues.yaml --wait-duration 120s --port-forward=false
                 echo "Install kotsadm svc..."
+                if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
+                  EXTRA_TAGS_V1=$(/tmp/check_extra_tags.sh ${Environment} ${EksClusterName})
+                  sed -i "s|Project=DataHub|$EXTRA_TAGS_V1|g" /home/ec2-user/kotsadm-svc.yaml
+                fi
                 kubectl apply -f /home/ec2-user/kotsadm-svc.yaml
                 echo "Waiting ${EksClusterName}-kotsadm to be Active..."
                 aws elbv2 describe-load-balancers --region ${AWS::Region} --names ${EksClusterName}-kotsadm
@@ -456,6 +449,7 @@ Resources:
                     service.beta.kubernetes.io/aws-load-balancer-ssl-cert: "${KotsElbCertArn}"
                     service.beta.kubernetes.io/aws-load-balancer-subnets: ${PrivateSubnet1ID},${PrivateSubnet2ID}
                     service.beta.kubernetes.io/aws-load-balancer-type: external
+                    service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags: "Project=DataHub"
                   labels:
                     kots.io/kotsadm: "true"
                   name: kotsadm-nlb
@@ -513,6 +507,9 @@ Resources:
                     oidc_enabled:
                       repeatableItem: service_port
                       value: "false"
+                    tags:
+                      repeatableItem: service_port
+                      value: "Project=DataHub"
 
 
               mode: "000666"
