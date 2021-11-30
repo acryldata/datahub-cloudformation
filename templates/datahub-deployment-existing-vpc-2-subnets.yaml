@@ -597,7 +597,7 @@ Resources:
       Type: AWS::SecretsManager::Secret
       Properties:
         Name: !Sub "/${Environment}/${AWS::StackName}/mysql/password"
-        Description: !Sub "${Environment}/${AWS::StackName}: Secrets for Aurora MySQL"
+        Description: !Sub "/${Environment}/${AWS::StackName}: Secrets for Aurora MySQL"
         GenerateSecretString:
           SecretStringTemplate: '{"username": "admin"}'
           GenerateStringKey: password
@@ -614,7 +614,7 @@ Resources:
       Type: AWS::SecretsManager::Secret
       Properties:
         Name: !Sub "/${Environment}/${AWS::StackName}/elasticsearch/password"
-        Description: !Sub "${Environment}/${AWS::StackName}: Secrets for ElasticSearch"
+        Description: !Sub "/${Environment}/${AWS::StackName}: Secrets for ElasticSearch"
         GenerateSecretString:
           SecretStringTemplate: '{"username": "admin"}'
           GenerateStringKey: password
@@ -645,7 +645,7 @@ Resources:
       Type: AWS::SecretsManager::Secret
       Properties:
         Name: !Sub "/${Environment}/${AWS::StackName}/admin/password"
-        Description: !Sub "${Environment}/${AWS::StackName}: Secrets for Admin Password"
+        Description: !Sub "/${Environment}/${AWS::StackName}: Secrets for Admin Password"
         GenerateSecretString:
           SecretStringTemplate: '{"username": "admin"}'
           GenerateStringKey: password
@@ -661,7 +661,7 @@ Resources:
       Type: AWS::SecretsManager::Secret
       Properties:
         Name: !Sub "/${Environment}/${AWS::StackName}/admin/uuid"
-        Description: !Sub "${Environment}/${AWS::StackName}: Secrets for Admin UUID"
+        Description: !Sub "/${Environment}/${AWS::StackName}: Secrets for Admin UUID"
         GenerateSecretString:
           SecretStringTemplate: '{"username": "admin"}'
           GenerateStringKey: uuid
