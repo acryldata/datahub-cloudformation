@@ -447,7 +447,7 @@ Resources:
                     service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
                     service.beta.kubernetes.io/aws-load-balancer-scheme: "${KotsAdmNLBScheme}"
                     service.beta.kubernetes.io/aws-load-balancer-ssl-cert: "${KotsElbCertArn}"
-                    service.beta.kubernetes.io/aws-load-balancer-subnets: ${PrivateSubnet1ID},${PrivateSubnet2ID}
+                    #service.beta.kubernetes.io/aws-load-balancer-subnets: ${PrivateSubnet1ID},${PrivateSubnet2ID}
                     service.beta.kubernetes.io/aws-load-balancer-type: external
                     service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags: "Project=DataHub"
                   labels:

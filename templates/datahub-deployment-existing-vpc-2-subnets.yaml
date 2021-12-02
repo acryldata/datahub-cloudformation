@@ -58,13 +58,13 @@ Metadata:
             - CreateAWSQSEKS
             - ProvisionBastionHost
             - ALBIngressController
+            - ClusterAutoScaler
             - PrometheusIntegration
             - AdditionalEKSAdminRoleArn
             - AdditionalEKSAdminUserArn
             - KubernetesVersion
             - RemoteAccessCIDR
             - KeyPairName
-            #- ConfigSetName
             - PerAccountSharedResources
             - PerRegionSharedResources
             - EKSPublicAccessEndpoint
@@ -154,8 +154,6 @@ Metadata:
           default: Allowed external access CIDR
         KeyPairName:
           default: SSH key name
-        #ConfigSetName:
-        #  default: Config set name
         PerAccountSharedResources:
           default: Per-account shared resources
         PerRegionSharedResources:
@@ -178,6 +176,8 @@ Metadata:
           default: Prometheus integration
         ALBIngressController:
           default: AWS load balancer controller
+        ClusterAutoScaler:
+          default: Cluster autoscaler
         CreateAdmin:
           default: Enable Creation of Admin
         CreatePrivateLink:
@@ -235,6 +235,7 @@ Parameters:
     AvailabilityZones:
       Description: "List of Availability Zones to use for the subnets in the VPC. Please choose three zones."
       Type: "List<AWS::EC2::AvailabilityZone::Name>"
+      Default: "us-west-2a,us-west-2b"
     PrivateSubnet1ID: 
       Type: "AWS::EC2::Subnet::Id"
       Default: "subnet-0127a3f6a25ae5b7e"
@@ -248,11 +249,11 @@ Parameters:
     PublicSubnet1ID: 
       Type: String
       #Default: "" 
-      Default: "subnet-0127a3f6a25ae5b7e"
+      Default: "subnet-0000136c2838ce061"
     PublicSubnet2ID: 
       Type: String
       #Default: "" 
-      Default: "subnet-06ca286c2d8ef5d80" 
+      Default: "subnet-096f4342d04e00657" 
     PublicSubnet3ID:
       Default: ""
       Type: String
@@ -304,6 +305,7 @@ Parameters:
       ConstraintDescription: "Bucket name can include numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen (-)."
       Description: "S3 bucket name that contains the CFN templates (VPC, Provision etc). This string can include numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen (-)."
       Type: "String"
+      Default: "cf-templates-blrxgroup-us-west-2"
     Environment:
       AllowedPattern: "^[0-9a-zA-Z]+([0-9a-zA-Z]*[0-9a-zA-Z])*$"
       Description: "The Environment Prefix"
@@ -345,13 +347,6 @@ Parameters:
       Description: Name of an existing key pair, which allows you to securely connect to your instance after it launches.
       Type: String
       Default: ""
-    #ConfigSetName:
-    #  Type: String
-    #  Default: ""
-    #  Description: >-
-    #    (Optional) Name used to map advanced parameters to an EKS cluster. If you launched an advanced
-    #    configuration stack and would like to apply it's values to this cluster, this name must match the "Config set name"
-    #    parameter in that stack. If left blank, a new config set is created using default values.
     PerAccountSharedResources:
       Type: String
       AllowedValues: ['AutoDetect', 'Yes', 'No']
@@ -418,6 +413,11 @@ Parameters:
       AllowedValues: [ "Enabled", "Disabled" ]
       Default: "Enabled"
       Description: Choose "Enabled" to deploy the AWS load balancer controller.
+    ClusterAutoScaler:
+      Type: String
+      AllowedValues: [ Enabled, Disabled ]
+      Default: Enabled
+      Description: Choose "Enabled" to enable Kubernetes cluster autoscaler.
     PrometheusIntegration:
       Type: String
       AllowedValues: [ Enabled, Disabled ]
@@ -440,7 +440,7 @@ Parameters:
     RemoveTempResources:
       Description: "Set to true if you don't want to keep admin provision host"
       Type: String
-      Default: "true"
+      Default: "false"
       AllowedValues:
         - "true"
         - "false"
@@ -890,11 +890,25 @@ Resources:
           EksClusterName: !Sub "${AWS::StackName}"
           EC2LogGroup: !Ref EC2LogGroup
 
+    AWSQSEKSClusterAdvancedConfigDefaultsStack:
+      Condition: isCreateAWSQSEKS
+      Type: AWS::CloudFormation::Stack
+      Properties:
+        #TemplateURL: !Sub 'https://${S3Bucket}.s3.${S3Region}.${AWS::URLSuffix}/${QSS3KeyPrefix}templates/amazon-eks-advanced-configuration.template.yaml'
+        TemplateURL: "https://cf-amazon-eks-templates-blrxgroup-us-west-2.s3.us-west-2.amazonaws.com/quickstart-amazon-eks/templates/amazon-eks-advanced-configuration.template.yaml"
+        Parameters:
+          ConfigSetName: !Ref AWS::StackName
+          ConsulUIAccessCIDR: !Ref RemoteAccessCIDR
+          VaultUIAccessCIDR: !Ref RemoteAccessCIDR
+          NodeVolumeSize: !Ref EKSNodeVolumeSize
+          KubernetesVersion: !Ref KubernetesVersion
+
     AWSQSEKSClusterStack:
       Condition: isCreateAWSQSEKS
       Type: AWS::CloudFormation::Stack
       DependsOn:
         - AWSQSEKSClusterProvisionIAMStack
+        - AWSQSEKSClusterAdvancedConfigDefaultsStack
       Properties:
         Tags:
           - Key: Name
@@ -932,10 +946,10 @@ Resources:
           #EKSClusterLoggingTypes: !Ref EKSClusterLoggingTypes
           PerAccountSharedResources: !Ref PerAccountSharedResources
           PerRegionSharedResources: !Ref PerRegionSharedResources
-          #ConfigSetName: !Ref ConfigSetName
           ConfigSetName: !Sub "${AWS::StackName}"
           ProvisionBastionHost: !Ref ProvisionBastionHost
           ALBIngressController: !Ref ALBIngressController
+          ClusterAutoScaler: !Ref ClusterAutoScaler
           PrometheusIntegration: !Ref PrometheusIntegration
 
     EKSNodeGroupStack:
