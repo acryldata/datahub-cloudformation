@@ -543,7 +543,7 @@ Parameters:
     KotsAdmNLBScheme:
       Description: Kots Admin Load Balancer Scheme
       Type: String
-      Default: "internal"
+      Default: "internet-facing"
       AllowedValues:
       - "internal"
       - "internet-facing"
