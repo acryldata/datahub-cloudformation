@@ -883,7 +883,7 @@ Resources:
             Value: !Sub "${AWS::StackName}-AWSQSEKSClusterProvisionIAM"
           - Key: KubernetesCluster
             Value: !Sub "${AWS::StackName}"
-        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/2-subnets/awsqseks-cluster-provision-iam.yaml"
+        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/amazon-eks/templates/awsqseks-cluster-provision-iam.yaml"
         Parameters:
           TemplateBucketName: !Ref TemplateBucketName
           Environment: !Ref Environment
@@ -894,8 +894,7 @@ Resources:
       Condition: isCreateAWSQSEKS
       Type: AWS::CloudFormation::Stack
       Properties:
-        #TemplateURL: !Sub 'https://${S3Bucket}.s3.${S3Region}.${AWS::URLSuffix}/${QSS3KeyPrefix}templates/amazon-eks-advanced-configuration.template.yaml'
-        TemplateURL: "https://cf-amazon-eks-templates-blrxgroup-us-west-2.s3.us-west-2.amazonaws.com/quickstart-amazon-eks/templates/amazon-eks-advanced-configuration.template.yaml"
+        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/amazon-eks/templates/amazon-eks-advanced-configuration.template.yaml"
         Parameters:
           ConfigSetName: !Ref AWS::StackName
           ConsulUIAccessCIDR: !Ref RemoteAccessCIDR
@@ -917,15 +916,11 @@ Resources:
             Value: !Sub "${AWS::StackName}-AWSQSEKSCluster"
           - Key: KubernetesCluster
             Value: !Sub "${AWS::StackName}"
-#        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/quickstart-amazon-eks/templates/amazon-eks-entrypoint-existing-vpc.template.yaml"
-        TemplateURL: "https://cf-amazon-eks-templates-blrxgroup-us-west-2.s3.us-west-2.amazonaws.com/quickstart-amazon-eks/templates/amazon-eks-entrypoint-existing-vpc.template.yaml"
+        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/amazon-eks/templates/amazon-eks-entrypoint-existing-vpc.template.yaml"
         Parameters:
-          #EksClusterName: !Sub "${AWS::StackName}"
-          #Environment: !Ref Environment
-          #QSS3BucketName: !Ref TemplateBucketName
-          #QSS3KeyPrefix: !Sub "${Environment}/"
+          QSS3BucketName: !Ref TemplateBucketName
+          QSS3KeyPrefix: !Sub "${Environment}/templates/nested/amazon-eks/"
           EKSClusterName: !Sub "${AWS::StackName}"
-          QSS3BucketName: "cf-amazon-eks-templates-blrxgroup-us-west-2"
           VPCID: !Ref VPCID
           PrivateSubnet1ID: !Ref PrivateSubnet1ID
           PrivateSubnet2ID: !Ref PrivateSubnet2ID
@@ -934,15 +929,10 @@ Resources:
           PublicSubnet2ID: !Ref PublicSubnet2ID
           PublicSubnet3ID: !Ref PublicSubnet3ID
           RemoteAccessCIDR: !Ref RemoteAccessCIDR
-          #SecurityGroupIds: !GetAtt EKSPreRequsiteStack.Outputs.ControlPanelSecurityGroup
-          #RoleArn: !GetAtt EKSPreRequsiteStack.Outputs.EksServiceRoleArn
-          #AdditionalEKSAdminRoleArn: !Join [",", [!Ref AdditionalEKSAdminRoleArn, !GetAtt NodeInstanceRole.Arn]]
           AdditionalEKSAdminNodeRoleArn: !GetAtt AWSQSEKSClusterProvisionIAMStack.Outputs.ProvisionInstanceRoleArn
           AdditionalEKSAdminRoleArn: !Ref AdditionalEKSAdminRoleArn
           AdditionalEKSAdminUserArn: !Ref AdditionalEKSAdminUserArn
-          #KubernetesVersion: !Ref KubernetesVersion
           EKSPublicAccessEndpoint: !Ref EKSPublicAccessEndpoint
-          #EKSPrivateAccessEndpoint: !Ref EKSPrivateAccessEndpoint
           #EKSClusterLoggingTypes: !Ref EKSClusterLoggingTypes
           PerAccountSharedResources: !Ref PerAccountSharedResources
           PerRegionSharedResources: !Ref PerRegionSharedResources

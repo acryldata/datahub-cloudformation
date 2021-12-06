@@ -1,0 +1,211 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: AWSQSEKSCluster provision iam stack that create EKS cluster provision instance role
+
+Metadata:
+    AWS::CloudFormation::Interface:
+      ParameterGroups:
+        - Label:
+            default: Cluster Configuration
+          Parameters:
+            - EksClusterName
+            - Environment
+            - TemplateBucketName
+            - EC2LogGroup
+
+      ParameterLabels:
+        TemplateBucketName:
+          default: The name of the S3 bucket that holds the templates
+        EC2LogGroup:
+          default: The provision log group name
+        EksClusterName:
+          default: The EKS cluster name
+        Environment:
+          default: The Environment
+
+Parameters:
+    TemplateBucketName:
+      AllowedPattern: "^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$"
+      ConstraintDescription: "Bucket name can include numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen (-)."
+      Description: "S3 bucket name that contains the CFN templates (VPC, Provision etc). This string can include numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen (-)."
+      Type: "String"
+    EC2LogGroup:
+      Description: The provision log group name
+      Type: "String"
+    EksClusterName:
+      Type: String
+      Description: The name of the eks cluster
+    Environment:
+      Type: String
+      Description: The Environment
+
+Resources:
+  ProvisionInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${EksClusterName}-provision-role"
+      Policies:
+        - PolicyName: !Sub "${TemplateBucketName}-${Environment}-s3-policy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - s3:GetObject
+                Resource: !Sub "arn:aws:s3:::${TemplateBucketName}/${Environment}/scripts/*"
+                Effect: Allow
+        - PolicyName: cloudwatch-logs-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - logs:CreateLogStream
+                  - logs:GetLogEvents
+                  - logs:PutLogEvents
+                  - logs:DescribeLogGroups
+                  - logs:DescribeLogStreams
+                  - logs:PutRetentionPolicy
+                  #- logs:CreateLogGroup
+                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:${EC2LogGroup}:*"
+                Effect: Allow
+        - PolicyName: provision-ssm-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - ssm:PutParameter
+                  - ssm:GetParameters
+                  - ssm:GetParameter
+                  - ssm:AddTagsToResource
+                #Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${Environment}/${EksClusterName}/*"
+                Resource: "*"
+                Effect: Allow
+        - PolicyName: provision-kms-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - kms:GenerateRandom
+                Resource: "*"
+                Effect: Allow
+        - PolicyName: provision-OpenID-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - iam:GetOpenIDConnectProvider
+                  - iam:CreateOpenIDConnectProvider
+                  - iam:TagOpenIDConnectProvider
+                Resource: "*"
+                Effect: Allow
+        - PolicyName: provision-secretsmanager-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - secretsmanager:CreateSecret
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:DescribeSecret
+                #Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${Environment}/${EksClusterName}/*",
+                Resource: "*"
+                Effect: Allow
+        - PolicyName: provision-iam-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - iam:PassRole
+                  - iam:GetRole
+                Resource: "*"
+                Effect: Allow
+        - PolicyName: provision-kafka-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - kafka:Describe*
+                  - kafka:Get*
+                  - kafka:List*
+                #Resource: !Sub "arn:aws:kafka:${AWS::Region}:${AWS::AccountId}:cluster/${EksClusterName}/*",
+                Resource: "*"
+                Effect: Allow
+        - PolicyName: provision-autoscaling-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - autoscaling:DescribeAutoScalingInstances
+                  - autoscaling:UpdateAutoScalingGroup
+                #Resource: !Sub "arn:aws:autoscaling:${AWS::Region}:${AWS::AccountId}:autoScalingGroup/*",
+                Resource: "*"
+                Effect: Allow
+        - PolicyName: eks-cluster-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - eks:*
+                #Resource: !Sub "arn:aws:eks:${AWS::Region}:${AWS::AccountId}:cluster/${EksClusterName}",
+                Resource: "*"
+                Effect: Allow
+        - PolicyName: provision-others-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - elasticloadbalancing:DescribeLoadBalancers
+                  - elasticloadbalancing:DescribeTags
+                  - elasticloadbalancing:DeleteLoadBalancers
+                  - elasticloadbalancing:DeleteLoadBalancer
+                  - elasticloadbalancing:DescribeTargetGroups
+                  - sts:*
+                  - ec2:DescribeTags 
+                  - ec2:RevokeSecurityGroupIngress
+                  - ec2:DescribeSecurityGroups
+                  - ec2:DeleteSecurityGroups
+                  - ec2:DeleteSecurityGroup
+                  - ec2:RevokeSecurityGroupIngress
+                  - ec2:AuthorizeSecurityGroupIngress
+                  - autoscaling:DeleteLaunchConfiguration
+                  - autoscaling:DescribeAutoScalingGroups
+                  - autoscaling:DescribeScalingActivities
+                  - autoscaling:DeleteAutoScalingGroup
+                  - secretsmanager:DeleteSecret
+                  - ssm:DeleteParameters
+                  - ssm:DeleteParameter
+                Resource: "*"
+                Effect: Allow
+      Path: /
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Effect: Allow
+        Version: "2012-10-17"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM
+
+  ProvisionInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref ProvisionInstanceRole
+      Path: /
+
+Outputs:
+  SubstackName:
+    Description: The awsqsekscluster-provision-iam stack name
+    Value: !Sub "${AWS::StackName}"
+  EksClusterName:
+    Description: EKS Cluster name
+    Value: !Ref EksClusterName
+  ProvisionInstanceProfile:
+    Description: IAM Instance profile of Provision host
+    Value: !Ref ProvisionInstanceProfile
+  ProvisionInstanceRole:
+    Description: IAM Role of Provision host
+    Value: !Ref ProvisionInstanceRole
+  ProvisionInstanceRoleArn:
+    Description: IAM Role Arn of Provision host
+    Value: !GetAtt ProvisionInstanceRole.Arn
