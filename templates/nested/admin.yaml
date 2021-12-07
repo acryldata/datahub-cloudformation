@@ -103,8 +103,6 @@ Parameters:
       Type: String
       Description: The namespace in EKS to deploy kots and datahub app
       Default: "datahub"
-    EKSProvisionAutoScalingGroup:
-      Type: String
     DomainName:
       Type: String
     KotsDomainName:

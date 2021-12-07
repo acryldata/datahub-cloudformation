@@ -12,7 +12,6 @@ Metadata:
           - DBSubnet2
           - MSKClusterName
           - Environment
-          - EksClusterName
           - KafkaVersion
           - MSKInstanceType
           - MSKVolumeSize
@@ -31,8 +30,6 @@ Metadata:
         default: MSK Cluster Name
       Environment:
         default: The Environment
-      EksClusterName:
-        default: The EksClusterName
       KafkaVersion:
         default: Kafka Version
       MSKInstanceType:
@@ -77,9 +74,6 @@ Parameters:
   Environment:
     Type: String
     Description: The Environment
-  EksClusterName:
-    Type: String
-    Description: The EksClusterName
   MSKVolumeSize:
     Default: 10
     Description: MSK Volume Size in GB
@@ -102,7 +96,6 @@ Resources:
         Type: "AWS::EC2::SecurityGroupIngress"
         Properties:
             GroupId: !Ref MSKSecurityGroup
-            #SourceSecurityGroupId: !Sub "{{resolve:ssm:/${Environment}/${EksClusterName}/eks/clusterSecurityGroupId}}"
             SourceSecurityGroupId: !Ref NodeSecurityGroup
             SourceSecurityGroupOwnerId: !Ref AWS::AccountId
             FromPort: 9094
@@ -113,7 +106,6 @@ Resources:
         Type: "AWS::EC2::SecurityGroupIngress"
         Properties:
             GroupId: !Ref MSKSecurityGroup
-            #SourceSecurityGroupId: !Sub "{{resolve:ssm:/${Environment}/${EksClusterName}/eks/clusterSecurityGroupId}}"
             SourceSecurityGroupId: !Ref NodeSecurityGroup
             SourceSecurityGroupOwnerId: !Ref AWS::AccountId
             FromPort: 2181
@@ -124,7 +116,6 @@ Resources:
         Type: "AWS::EC2::SecurityGroupIngress"
         Properties:
             GroupId: !Ref MSKSecurityGroup
-            #SourceSecurityGroupId: !Sub "{{resolve:ssm:/${Environment}/${EksClusterName}/eks/clusterSecurityGroupId}}"
             SourceSecurityGroupId: !Ref NodeSecurityGroup
             SourceSecurityGroupOwnerId: !Ref AWS::AccountId
             FromPort: 9092

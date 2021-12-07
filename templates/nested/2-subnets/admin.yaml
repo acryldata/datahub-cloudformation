@@ -333,9 +333,9 @@ Resources:
                 APIKEY=$(cat apikey)
                 cd ..
                 if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
-                  aws secretsmanager create-secret --tags $EXTRA_TAGS --region ${AWS::Region} --name "/${Environment}/${EksClusterName}/admin/apikey" --secret-string "$APIKEY" --description "${Environment}//${EksClusterName}: DataHub Admin Apikey"
+                  aws secretsmanager update-secret --region ${AWS::Region} --secret-id "/${Environment}/${EksClusterName}/admin/apikey" --secret-string "$APIKEY" 
                 else
-                  aws secretsmanager create-secret --region ${AWS::Region} --name "/${Environment}/${EksClusterName}/admin/apikey" --secret-string "$APIKEY" --description "${Environment}/${EksClusterName}: DataHub Admin Apikey"
+                  aws secretsmanager update-secret --region ${AWS::Region} --secret-id "/${Environment}/${EksClusterName}/admin/apikey" --secret-string "$APIKEY" 
                 fi
                 cd ..
                 echo "prepare secrets..."
@@ -379,29 +379,37 @@ Resources:
                 NLBARN=$(aws elbv2 describe-load-balancers --region ${AWS::Region} --names ${EksClusterName}-kotsadm --query LoadBalancers[0].LoadBalancerArn --output text --no-paginate)
                 parameter='/${Environment}/${EksClusterName}/kotsadm/nlbarn'
                 if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
-                  aws ssm put-parameter --tags $EXTRA_TAGS --region ${AWS::Region} --name "$parameter" --type "String" --value "$NLBARN" --no-paginate
+                  #aws ssm put-parameter --tags $EXTRA_TAGS --region ${AWS::Region} --name "$parameter" --type "String" --value "$NLBARN" --no-paginate
+                  aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$NLBARN" --overwrite --no-paginate
                 else
+                  #aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$NLBARN" --overwrite --no-paginate
                   aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$NLBARN" --overwrite --no-paginate
                 fi
                 NLBDNS=$(aws elbv2 describe-load-balancers --region ${AWS::Region} --names ${EksClusterName}-kotsadm --query LoadBalancers[0].DNSName --output text --no-paginate)
                 parameter='/${Environment}/${EksClusterName}/kotsadm/nlbdns'
                 if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
-                  aws ssm put-parameter --tags $EXTRA_TAGS --region ${AWS::Region} --name "$parameter" --type "String" --value "$NLBDNS"  --no-paginate
+                  #aws ssm put-parameter --tags $EXTRA_TAGS --region ${AWS::Region} --name "$parameter" --type "String" --value "$NLBDNS"  --no-paginate
+                  aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$NLBARN" --overwrite --no-paginate
                 else
+                  #aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$NLBARN" --overwrite --no-paginate
                   aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$NLBARN" --overwrite --no-paginate
                 fi
                 ALBARN=$(aws elbv2 describe-load-balancers --region ${AWS::Region} --names ${EksClusterName}-datahub --query LoadBalancers[0].LoadBalancerArn --output text --no-paginate)
                 parameter='/${Environment}/${EksClusterName}/admin/albarn'
                 if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
-                  aws ssm put-parameter --tags $EXTRA_TAGS --region ${AWS::Region} --name "$parameter" --type "String" --value "$ALBARN" --no-paginate
+                  #aws ssm put-parameter --tags $EXTRA_TAGS --region ${AWS::Region} --name "$parameter" --type "String" --value "$ALBARN" --no-paginate
+                  aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$ALBARN" --overwrite --no-paginate
                 else
+                  #aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$ALBARN" --overwrite --no-paginate
                   aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$ALBARN" --overwrite --no-paginate
                 fi
                 ALBDNS=$(aws elbv2 describe-load-balancers --region ${AWS::Region} --names ${EksClusterName}-datahub --query LoadBalancers[0].DNSName --output text --no-paginate)
                 parameter='/${Environment}/${EksClusterName}/admin/albdns'
                 if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
-                  aws ssm put-parameter --tags $EXTRA_TAGS --region ${AWS::Region} --name "$parameter" --type "String" --value "$ALBDNS"  --no-paginate
+                  #aws ssm put-parameter --tags $EXTRA_TAGS --region ${AWS::Region} --name "$parameter" --type "String" --value "$ALBDNS"  --no-paginate
+                  aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$ALBDNS" --overwrite --no-paginate
                 else
+                  #aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$ALBDNS" --overwrite --no-paginate
                   aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$ALBDNS" --overwrite --no-paginate
                 fi
               mode: "000750"

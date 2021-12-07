@@ -59,6 +59,9 @@ Metadata:
           - LaunchTemplateId
           - LaunchTemplateVersion
           - NodeSecurityGroupId
+          - NodeInstanceType
+          - NumberOfNodes
+          - MaxNumberOfNodes
           - NodeInstanceType2
           - NodeInstanceType3
           - NodeInstanceType4
@@ -153,6 +156,12 @@ Metadata:
         default: Launch template version
       NodeSecurityGroupId:
         default: Security group ID
+      NodeInstanceType:
+        default: Instance type
+      NumberOfNodes:
+        default: Number of Nodes
+      MaxNumberOfNodes:
+        default: Max Number of Nodes
       NodeInstanceType2:
         default: Instance type 2
       NodeInstanceType3:
@@ -299,6 +308,16 @@ Parameters:
     MaxValue: 100
     Default: 100
     Description: Only applies if the NodeGroupType parameter is set to "Unmanaged." Set the percentage of on-demand instances and spot instances. With a default of 100, the percentages are 100% for on-demand instances and 0% for spot instances.
+  NodeInstanceType:
+    Default: "t3.medium"
+    Description: "The type of EC2 instance to be launched for EKS Worker Node"
+    Type: String
+  NumberOfNodes:
+    Default: 3
+    Type: Number
+  MaxNumberOfNodes:
+    Default: 3
+    Type: Number
   NodeInstanceType2:
     Default: ""
     Description: (Optional) Only applies if the NodeGroupType parameter is set to "Unmanaged." This is the second type of EC2 instance for the nodes.
@@ -514,6 +533,24 @@ Resources:
       Type: String
       Value: !Sub '{ "Value": "${LaunchTemplateId}" }'
       Name: !Sub ["${ParameterPrefix}/${ConfigSetName}/default-nodegroup/LaunchTemplateId", {ParameterPrefix: !FindInMap [Config, ParameterPrefix, Value]}]
+  NodeInstanceTypeParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Type: String
+      Value: !Sub '{ "Value": "${NodeInstanceType}" }'
+      Name: !Sub ["${ParameterPrefix}/${ConfigSetName}/default-nodegroup/NodeInstanceType", {ParameterPrefix: !FindInMap [Config, ParameterPrefix, Value]}]
+  NumberOfNodesParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Type: String
+      Value: !Sub '{ "Value": "${NumberOfNodes}" }'
+      Name: !Sub ["${ParameterPrefix}/${ConfigSetName}/default-nodegroup/NumberOfNodes", {ParameterPrefix: !FindInMap [Config, ParameterPrefix, Value]}]
+  MaxNumberOfNodesParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Type: String
+      Value: !Sub '{ "Value": "${MaxNumberOfNodes}" }'
+      Name: !Sub ["${ParameterPrefix}/${ConfigSetName}/default-nodegroup/MaxNumberOfNodes", {ParameterPrefix: !FindInMap [Config, ParameterPrefix, Value]}]
   NodeInstanceType2Parameter:
     Type: AWS::SSM::Parameter
     Properties:

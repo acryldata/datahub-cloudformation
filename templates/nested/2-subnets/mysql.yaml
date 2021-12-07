@@ -13,8 +13,6 @@ Metadata:
           - DBSubnet2
           - DBClusterIdentifier
           - Environment
-          - EksClusterName
-          - EksClusterName
           - DBInstanceClass
           - EngineVersion
           - MasterUser
@@ -35,8 +33,6 @@ Metadata:
         default: Aurora Cluster Identifier
       Environment:
         default: The Environment
-      EksClusterName:
-        default: The EksClusterName
       DBInstanceClass:
         default: Aurora Instance Type
       EngineVersion:
@@ -69,9 +65,6 @@ Parameters:
   Environment:
     Type: String
     Description: The Environment
-  EksClusterName:
-    Type: String
-    Description: The EksClusterName
   DBInstanceClass:
     AllowedValues:
       - db.t3.small
@@ -110,7 +103,6 @@ Resources:
         Type: "AWS::EC2::SecurityGroupIngress"
         Properties:
             GroupId: !Ref RDSSecurityGroup
-            #SourceSecurityGroupId: !Sub "{{resolve:ssm:/${Environment}/${EksClusterName}/eks/clusterSecurityGroupId}}"
             SourceSecurityGroupId: !Ref NodeSecurityGroup
             SourceSecurityGroupOwnerId: !Ref AWS::AccountId
             FromPort: 3306

@@ -323,9 +323,12 @@ Resources:
         Subnet1ID: !Ref PrivateSubnet1ID
         Subnet2ID: !If [2AZDeployment, !Ref PrivateSubnet2ID, !Ref "AWS::NoValue" ]
         Subnet3ID: !If [3AZDeployment, !Ref PrivateSubnet3ID, !Ref "AWS::NoValue" ]
-        NodeInstanceType: !Ref NodeInstanceType
-        NumberOfNodes: !Ref NumberOfNodes
-        MaxNumberOfNodes: !Ref MaxNumberOfNodes
+        #NodeInstanceType: !Ref NodeInstanceType
+        NodeInstanceType: ~~/<ConfigSetName>/default-nodegroup/NodeInstanceType~~
+        #NumberOfNodes: !Ref NumberOfNodes
+        NumberOfNodes: ~~/<ConfigSetName>/default-nodegroup/NumberOfNodes~~
+        #MaxNumberOfNodes: !Ref MaxNumberOfNodes
+        MaxNumberOfNodes: ~~/<ConfigSetName>/default-nodegroup/MaxNumberOfNodes~~
         NodeGroupName: ~~/<ConfigSetName>/default-nodegroup/NodeGroupName~~
         NodeVolumeSize: ~~/<ConfigSetName>/default-nodegroup/NodeVolumeSize~~
         CustomAmiId: ~~/<ConfigSetName>/default-nodegroup/CustomAmiId~~
