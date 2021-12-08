@@ -518,7 +518,8 @@ Resources:
                   - 'ssm:GetParameters'
                   - 'ssm:GetParameterHistory'
                   - 'ssm:GetParameter'
-                Resource: !Sub ['arn:${AWS::Partition}:ssm:*:${AWS::AccountId}:parameter${ParameterPrefix}/*', {ParameterPrefix: !FindInMap [Config, ParameterPrefix, Value]}]
+                Resource: "*"
+#                Resource: !Sub ['arn:${AWS::Partition}:ssm:*:${AWS::AccountId}:parameter${ParameterPrefix}/*', {ParameterPrefix: !FindInMap [Config, ParameterPrefix, Value]}]
   UnmanagedNodeInstanceProfile:
     Type: AWS::IAM::InstanceProfile
     Properties:

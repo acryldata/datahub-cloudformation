@@ -575,31 +575,31 @@ Resources:
 
 Outputs:
   DatahubAppUrl:
-    Description: Datahub Application Url
+    Description: DataHub Application Url
     Value: !Sub "https://${DomainName}"
   DatahubAppCredential:
-    Description: Datahub Application Credential
+    Description: DataHub Application Credential
     Value: !Sub "Secret Name: /${Environment}/${EksClusterName}/admin/password"
   DatahubAppAlbArn:
-    Description: Datahub Application ALB Arn
+    Description: DataHub Application ALB Arn
     Value: !Sub "SSM Parameter Store: /${Environment}/${EksClusterName}/admin/albarn"
   DatahubAppAlbDns:
-    Description: Datahub Application ALB Dns
+    Description: DataHub Application ALB Dns
     Value: !Sub "SSM Parameter Store: /${Environment}/${EksClusterName}/admin/albdns"
   DatahubAppApiKey:
-    Description: Datahub Application APIKEY
+    Description: DataHub Application APIKEY
     Value: !Sub "Secret Name: /${Environment}/${EksClusterName}/admin/apikey"
   KotsAdminDomainName:
-    Description: Datahub Release Admin Url
+    Description: DataHub Release Admin Url
     Value: !Sub "https://${KotsDomainName}"
   KotsAdminNlbArn:
-    Description: Datahub Release Admin NLB Arn
+    Description: DataHub Release Admin NLB Arn
     Value: !Sub "SSM Parameter Store: /${Environment}/${EksClusterName}/kotsadm/nlbarn"
   KotsAdminNlbDns:
-    Description: Datahub release Admin NLB Dns
+    Description: DataHub release Admin NLB Dns
     Value: !Sub "SSM Parameter Store: /${Environment}/${EksClusterName}/kotsadm/nlbdns"
   KotsAdminCredential:
-    Description: Datahub Release Admin Credential
+    Description: DataHub Release Admin Credential
     Value: !Sub "Secret Name: /${Environment}/${EksClusterName}/kotsadm/password"
   AuroraRDSEndpoint:
     Description: Aurora RDS Endpoint

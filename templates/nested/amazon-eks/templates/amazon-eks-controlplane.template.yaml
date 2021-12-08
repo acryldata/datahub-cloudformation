@@ -49,7 +49,8 @@ Parameters:
   EKSEncryptSecrets:
     Type: String
     AllowedValues: [Enabled, Disabled]
-    Default: Enabled
+    #Default: Enabled
+    Default: Disabled
   EKSEncryptSecretsKmsKeyArn:
     Type: String
     Default: ""
@@ -127,14 +128,14 @@ Resources:
       Version: !Ref KubernetesVersion
       KubernetesApiAccess:
         Roles:
-          - Arn: !Sub
-              - 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${NodeRole}'
-              - NodeRole: !If
-                  - CustomeNodeRoleProvided
-                  - !Ref CustomNodeRole
-                  - !Sub [ '${Prefix}-UnmanagedNodeInstance', { Prefix: !FindInMap [ Config, Prefix, Value ] } ]
-            Username: 'system:node:{{EC2PrivateDNSName}}'
-            Groups: [ 'system:bootstrappers', 'system:nodes', 'eks:kube-proxy-windows' ]
+          #- Arn: !Sub
+          #    - 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${NodeRole}'
+          #    - NodeRole: !If
+          #        - CustomeNodeRoleProvided
+          #        - !Ref CustomNodeRole
+          #        - !Sub [ '${Prefix}-UnmanagedNodeInstance', { Prefix: !FindInMap [ Config, Prefix, Value ] } ]
+          #  Username: 'system:node:{{EC2PrivateDNSName}}'
+          #  Groups: [ 'system:bootstrappers', 'system:nodes', 'eks:kube-proxy-windows' ]
           - Arn: !Ref FunctionRoleArn
             Username: !Ref FunctionRoleArn
             Groups: [ 'system:masters' ]

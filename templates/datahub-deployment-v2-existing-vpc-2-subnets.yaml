@@ -569,7 +569,7 @@ Resources:
       Type: AWS::SecretsManager::Secret
       Properties:
         Name: !Sub "/${Environment}/${AWS::StackName}/admin/password"
-        Description: !Sub "/${Environment}/${AWS::StackName}: Secrets for Admin Password"
+        Description: !Sub "/${Environment}/${AWS::StackName}: Secrets for DataHub Admin Password"
         GenerateSecretString:
           SecretStringTemplate: '{"username": "admin"}'
           GenerateStringKey: password
@@ -620,7 +620,7 @@ Resources:
     AdminAlbArnSSM: ### placeholder
         Type: AWS::SSM::Parameter
         Properties:
-          Description: Datahub Admin ALB Arn
+          Description: DataHub Admin ALB Arn
           Name: !Sub '/${Environment}/${AWS::StackName}/admin/albarn'
           Type: String
           Value: !Sub '${AWS::StackName}-admin-albarn'
@@ -628,7 +628,7 @@ Resources:
     AdminAlbDnsSSM: ### placeholder
         Type: AWS::SSM::Parameter
         Properties:
-          Description: Datahub Admin ALB Dns
+          Description: DataHub Admin ALB Dns
           Name: !Sub '/${Environment}/${AWS::StackName}/admin/albdns'
           Type: String
           Value: !Sub '${AWS::StackName}-admin-albdns'
@@ -831,7 +831,7 @@ Resources:
       Properties:
         TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/amazon-eks/templates/amazon-eks-advanced-configuration.template.yaml"
         Parameters:
-          ConfigSetName: !Ref AWS::StackName
+          ConfigSetName: !Sub "${Environment}/${AWS::StackName}"
           NodeGroupName: !Ref AWS::StackName
           NodeInstanceType: !Ref NodeInstanceType
           NumberOfNodes: !Ref NumberOfNodes
@@ -874,7 +874,8 @@ Resources:
           EKSPublicAccessEndpoint: !Ref EKSPublicAccessEndpoint
           PerAccountSharedResources: !Ref PerAccountSharedResources
           PerRegionSharedResources: !Ref PerRegionSharedResources
-          ConfigSetName: !Sub "${AWS::StackName}"
+          #ConfigSetName: !Sub "${AWS::StackName}"
+          ConfigSetName: !Sub "${Environment}/${AWS::StackName}"
           ProvisionBastionHost: !Ref ProvisionBastionHost
           ALBIngressController: !Ref ALBIngressController
           ClusterAutoScaler: !Ref ClusterAutoScaler
@@ -908,7 +909,7 @@ Resources:
           TemplateBucketName: !Ref TemplateBucketName
           Environment: !Ref Environment
           EC2LogGroup: !Ref EC2LogGroup
-          EKSClusterName: !Sub "${AWS::StackName}"
+          EksClusterName: !Sub "${AWS::StackName}"
           K8sNamespace: !Sub "${AWS::StackName}"
           DomainName: !Ref DomainName
           KotsDomainName: !Ref KotsDomainName
@@ -923,7 +924,7 @@ Resources:
             Fn::Sub: "{{resolve:secretsmanager:${RDSSecret}::password}}"
           ESMasterUserPassword:
             Fn::Sub: "{{resolve:secretsmanager:${ESSecret}::password}}"
-          KotsUserPassword:
+          KOTSUserPassword:
             Fn::Sub: "{{resolve:secretsmanager:${KotsSecret}::password}}"
           RemoveTempResources: !Ref RemoveTempResources
 

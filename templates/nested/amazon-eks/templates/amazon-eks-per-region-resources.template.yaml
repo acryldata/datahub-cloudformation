@@ -4,35 +4,35 @@ Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
       - Label:
-          default: Quick Start configuration
+          default: Configuration
         Parameters:
           - RandomStr
           - QSS3BucketName
           - QSS3KeyPrefix
     ParameterLabels:
       QSS3BucketName:
-        default: Quick Start S3 bucket name
+        default: S3 bucket name
       QSS3KeyPrefix:
-        default: Quick Start S3 key prefix
+        default: S3 key prefix
       RandomStr:
         default: Random string
 Parameters:
   QSS3BucketName:
     AllowedPattern: ^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$
-    ConstraintDescription: Quick Start bucket name can include numbers, lowercase
+    ConstraintDescription: Bucket name can include numbers, lowercase
       letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen
       (-).
     Default: cf-amazon-eks-templates-blrxgroup-us-west-2
-    Description: S3 bucket name for the Quick Start assets. This string can include
+    Description: S3 bucket name for the assets. This string can include
       numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start
       or end with a hyphen (-).
     Type: String
   QSS3KeyPrefix:
     AllowedPattern: ^[0-9a-zA-Z-/.]*$
-    ConstraintDescription: Quick Start key prefix can include numbers, lowercase letters,
+    ConstraintDescription: key prefix can include numbers, lowercase letters,
       uppercase letters, hyphens (-), dots(.) and forward slash (/).
     Default: dev/
-    Description: S3 key prefix for the Quick Start assets. Quick Start key prefix
+    Description: S3 key prefix for the assets. key prefix
       can include numbers, lowercase letters, uppercase letters, hyphens (-), dots(.) and
       forward slash (/).
     Type: String
@@ -587,7 +587,7 @@ Resources:
   ParameterResolverFunction:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: 'QuickStart-ParameterResolver'
+      FunctionName: !Sub ['${Prefix}-ParameterResolver', {Prefix: !FindInMap [Config, Prefix, Value]}]
       Code:
         ZipFile: |
           import traceback
