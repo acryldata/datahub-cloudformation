@@ -969,7 +969,7 @@ Outputs:
     Value: !Sub "${AWS::StackName}"
     Condition: isCreateEKS
   EKSServiceRoleArn:
-    Value: !GetAtt EKSPreRequsiteStack.Outputs.EKSServiceRoleArn
+    Value: !GetAtt EKSPreRequsiteStack.Outputs.EksServiceRoleArn
     Condition: isCreateEKS
   NodeInstanceRoleArn:
     Value: !GetAtt NodeInstanceRole.Arn
