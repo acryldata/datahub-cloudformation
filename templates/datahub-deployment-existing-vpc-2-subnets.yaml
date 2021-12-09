@@ -826,7 +826,7 @@ Resources:
           MinNumberOfNodes: !Ref MinNumberOfNodes
           DesiredNumberOfNodes: !Ref DesiredNumberOfNodes
           EKSNodeVolumeSize: !Ref EKSNodeVolumeSize
-          EKSClusterName: !Sub "${AWS::StackName}"
+          EksClusterName: !Sub "${AWS::StackName}"
           KubernetesVersion: !Ref KubernetesVersion
 
     IngressControllerPreRequsiteStack:
@@ -909,7 +909,7 @@ Resources:
         TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/privatelink.yaml"
         Parameters:
           Environment: !Sub "${Environment}"
-          EKSClusterName: !Sub "${AWS::StackName}"
+          EksClusterName: !Sub "${AWS::StackName}"
 
 Outputs:
   SubstackName:
