@@ -425,7 +425,7 @@ Parameters:
     KotsVersion:
       Description: Kots Admin Version
       Type: String
-      Default: "v1.58.1"
+      Default: "v1.55.0"
       AllowedValues:
       - "v1.55.0"
       - "v1.58.1"

@@ -312,7 +312,7 @@ Resources:
                 if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
                   EXTRA_TAGS_V1=$(/tmp/check_extra_tags.sh ${Environment} ${EksClusterName})
                   sed -i "s|Project=DataHub|$EXTRA_TAGS_V1|g" /home/ec2-user/configvalues.yaml
-                  aws ssm put-parameter --tags $EXTRA_TAGS --region ${AWS::Region} --name "$parameter" --type "String" --value "$BOOTSTRAP_BROKERS"  --no-paginate
+                  aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$BOOTSTRAP_BROKERS"  --no-paginate
                 else
                   aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$BOOTSTRAP_BROKERS" --overwrite --no-paginate
                 fi
@@ -386,39 +386,42 @@ Resources:
                 NLBARN=$(aws elbv2 describe-load-balancers --region ${AWS::Region} --names ${EksClusterName}-kotsadm --query LoadBalancers[0].LoadBalancerArn --output text --no-paginate)
                 parameter='/${Environment}/${EksClusterName}/kotsadm/nlbarn'
                 if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
-                  #aws ssm put-parameter --tags $EXTRA_TAGS --region ${AWS::Region} --name "$parameter" --type "String" --value "$NLBARN" --no-paginate
                   aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$NLBARN" --overwrite --no-paginate
                 else
-                  #aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$NLBARN" --overwrite --no-paginate
                   aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$NLBARN" --overwrite --no-paginate
                 fi
                 NLBDNS=$(aws elbv2 describe-load-balancers --region ${AWS::Region} --names ${EksClusterName}-kotsadm --query LoadBalancers[0].DNSName --output text --no-paginate)
                 parameter='/${Environment}/${EksClusterName}/kotsadm/nlbdns'
                 if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
-                  #aws ssm put-parameter --tags $EXTRA_TAGS --region ${AWS::Region} --name "$parameter" --type "String" --value "$NLBDNS"  --no-paginate
                   aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$NLBARN" --overwrite --no-paginate
                 else
-                  #aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$NLBARN" --overwrite --no-paginate
                   aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$NLBARN" --overwrite --no-paginate
                 fi
                 ALBARN=$(aws elbv2 describe-load-balancers --region ${AWS::Region} --names ${EksClusterName}-datahub --query LoadBalancers[0].LoadBalancerArn --output text --no-paginate)
                 parameter='/${Environment}/${EksClusterName}/admin/albarn'
                 if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
-                  #aws ssm put-parameter --tags $EXTRA_TAGS --region ${AWS::Region} --name "$parameter" --type "String" --value "$ALBARN" --no-paginate
                   aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$ALBARN" --overwrite --no-paginate
                 else
-                  #aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$ALBARN" --overwrite --no-paginate
                   aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$ALBARN" --overwrite --no-paginate
                 fi
                 ALBDNS=$(aws elbv2 describe-load-balancers --region ${AWS::Region} --names ${EksClusterName}-datahub --query LoadBalancers[0].DNSName --output text --no-paginate)
                 parameter='/${Environment}/${EksClusterName}/admin/albdns'
                 if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
-                  #aws ssm put-parameter --tags $EXTRA_TAGS --region ${AWS::Region} --name "$parameter" --type "String" --value "$ALBDNS"  --no-paginate
                   aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$ALBDNS" --overwrite --no-paginate
                 else
-                  #aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$ALBDNS" --overwrite --no-paginate
                   aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$ALBDNS" --overwrite --no-paginate
                 fi
+                if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
+                  EXTRA_TAGS_V1=$(/tmp/check_extra_tags.sh ${Environment} ${EksClusterName})
+                  echo "Appending extra tags to EKS Cluster:${EksClusterName}..."
+                  CLUSTER_ARN=$(aws eks describe-cluster --region ${AWS::Region} --name ${EksClusterName} --query cluster.arn --output text)
+                  aws eks tag-resource --region ${AWS::Region} --resource-arn $CLUSTER_ARN --tags "$EXTRA_TAGS_V1"
+
+                  echo "Appending extra tags to EKS node group:${EksClusterName}..."
+                  NODEGROUP_ARN=$(aws eks describe-nodegroup --region ${AWS::Region} --cluster-name ${EksClusterName} --nodegroup ${EksClusterName} --query nodegroup.nodegroupArn --output text)
+                  aws eks tag-resource --region ${AWS::Region} --resource-arn $NODEGROUP_ARN --tags "$EXTRA_TAGS_V1"
+                fi
+
               mode: "000750"
               owner: root
               group: root
