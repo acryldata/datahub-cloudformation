@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: Deploys Aurora RDS
+Description: Deploys Amazon Aurora RDS
 
 Metadata:
   AWS::CloudFormation::Interface:

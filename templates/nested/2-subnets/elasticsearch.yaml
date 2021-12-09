@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: Deploys Amazon ElasticSearch
+Description: Deploys Amazon Managed ElasticSearch
 
 Metadata:
   AWS::CloudFormation::Interface:
