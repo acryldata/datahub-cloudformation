@@ -12,7 +12,6 @@ Metadata:
           - PrivateSubnet2
           - ESDomainName
           - Environment
-          - EksClusterName
           - ElasticsearchVersion
 
     ParameterLabels:
@@ -28,8 +27,6 @@ Metadata:
         default: Elasticsearch Domain
       Environment:
         default: The Environment
-      EksClusterName:
-        default: The EksClusterName
       ElasticsearchVersion:
         default: Elasticsearch Version
 
@@ -82,9 +79,6 @@ Parameters:
   Environment:
     Type: String
     Description: The Environment
-  EksClusterName:
-    Type: String
-    Description: The EksClusterName
   ESMasterUser:
     Default: "admin"
     Type: String
@@ -109,7 +103,7 @@ Resources:
         Type: "AWS::EC2::SecurityGroupIngress"
         Properties:
             GroupId: !Ref ESSecurityGroup
-            SourceSecurityGroupId: !Sub "{{resolve:ssm:/${Environment}/${EksClusterName}/eks/clusterSecurityGroupId}}"
+            SourceSecurityGroupId: !Ref NodeSecurityGroup
             SourceSecurityGroupOwnerId: !Ref AWS::AccountId
             FromPort: 443
             IpProtocol: "tcp"

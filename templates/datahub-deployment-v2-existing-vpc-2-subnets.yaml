@@ -653,6 +653,22 @@ Resources:
           Type: String
           Value: !Sub '${AWS::StackName}-kotsadm-nlbdns'
 
+    EKSOidcSSM: ### placeholder
+        Type: AWS::SSM::Parameter
+        Properties:
+          Description: EKS OIDC
+          Name: !Sub '/${Environment}/${AWS::StackName}/eks/oidc'
+          Type: String
+          Value: !Sub '${AWS::StackName}-eks-oidc'
+
+    EKSClusterSecurityGroupIdSSM: ### placeholder
+        Type: AWS::SSM::Parameter
+        Properties:
+          Description: EKS OIDC
+          Name: !Sub '/${Environment}/${AWS::StackName}/eks/clusterSecurityGroupId'
+          Type: String
+          Value: !Sub '${AWS::StackName}-eks-clusterSecurityGroupId'
+
     EC2LogGroup:
       Condition: isCreateEKS
       Type: AWS::Logs::LogGroup
@@ -724,7 +740,7 @@ Resources:
             Value: !Sub "${AWS::StackName}"
           - Key: Component
             Value: !Sub "${AWS::StackName}-ElasticSearch"
-        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/2-subnets/elasticsearch.yaml"
+        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/2-subnets/elasticsearch-v2.yaml"
         Parameters:
           VPCID: !Ref VPCID
           PrivateSubnet1: !Ref PrivateSubnet1ID
@@ -752,7 +768,7 @@ Resources:
             Value: !Sub "${AWS::StackName}"
           - Key: Component
             Value: !Sub "${AWS::StackName}-MySQL"
-        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/2-subnets/mysql.yaml"
+        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/2-subnets/mysql-v2.yaml"
         Parameters:
           AvailabilityZones: !Join [",", !Ref AvailabilityZones]
           VPCID: !Ref VPCID
@@ -779,7 +795,7 @@ Resources:
             Value: !Sub "${AWS::StackName}"
           - Key: Component
             Value: !Sub "${AWS::StackName}-MSK"
-        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/2-subnets/msk.yaml"
+        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/2-subnets/msk-v2.yaml"
         Parameters:
           VPCID: !Ref VPCID
           DBSubnet1: !Ref PrivateSubnet1ID
