@@ -421,7 +421,6 @@ Resources:
         AdditionalEKSAdminNodeRoleArn: !Ref AdditionalEKSAdminNodeRoleArn
         VPCID: !Ref VPCID
         ProvisionClusterAutoScaler: !Ref ClusterAutoScaler
-        ProvisionMetricsServer: !Ref MetricsServer
         EKSPublicAccessEndpoint: !Ref EKSPublicAccessEndpoint
         ProvisionALBIngressController: !Ref ALBIngressController
         EKSClusterName: !Ref EKSClusterName

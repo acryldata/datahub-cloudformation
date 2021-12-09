@@ -791,10 +791,10 @@ Resources:
           ControlPanelSecurityGroup: !GetAtt EKSPreRequsiteStack.Outputs.ControlPanelSecurityGroup
           EKSServiceRoleArn: !GetAtt EKSPreRequsiteStack.Outputs.EksServiceRoleArn
           NodeInstanceRoleArn: !GetAtt NodeInstanceRole.Arn
-          EksMgmtIamRoleArn: !Ref EksMgmtIamRoleArn
-          EksMgmtIamUserArnList: !Ref EksMgmtIamUserArnList
+          AdditionalEKSAdminRoleArn: !Ref EksMgmtIamRoleArn
+          AdditionalEKSAdminUserArn: !Ref EksMgmtIamUserArnList
           KubernetesVersion: !Ref KubernetesVersion
-          EKSClusterName: !Sub "${AWS::StackName}"
+          EksClusterName: !Sub "${AWS::StackName}"
           RemoveTempResources: !Ref RemoveTempResources
 
     EKSNodeGroupStack:
