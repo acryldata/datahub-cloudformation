@@ -14,13 +14,11 @@ Resources:
       AcceptanceRequired: True
       NetworkLoadBalancerArns:
         - !Sub '{{resolve:ssm:/${Environment}/${EksClusterName}/kotsadm/nlbarn}}'
-      Tags:
-        - Key: Name
-          Value: ${EksClusterName}
-        - Key: ManangedBy
-          Value: cloudformation
-        - Key: TSM
-          Value: xxx@example.com
+#      Tags:
+#        - Key: Name
+#          Value: ${EksClusterName}
+#        - Key: ManangedBy
+#          Value: cloudformation
 
   EndpointServicePermissions:
     Type: AWS::EC2::VPCEndpointServicePermissions

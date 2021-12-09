@@ -1,7 +1,5 @@
-# Datahub Deployment AWS
-
 AWSTemplateFormatVersion: "2010-09-09"
-Description: Master template that set up DataHub Platform in AWS
+Description: Master Template that Deploys DataHub Platform in AWS
 Metadata:
     AWS::CloudFormation::Interface:
       ParameterGroups:
@@ -71,6 +69,7 @@ Metadata:
             - DomainName
             - ElbInboundCIDRs
             - ElbCertArn 
+            - KotsVersion
             - KotsDomainName
             - KotsElbCertArn 
             - KotsAdmNLBScheme
@@ -168,6 +167,8 @@ Metadata:
           default: Deploy EKS load balancer controller
         ElbCertArn:
           default: DataHub ALB cert arn
+        KotsVersion:
+          default: Kots Admin Version
         KotsElbCertArn:
           default: KotsAdmin NLB cert arn
         ElbInboundCIDRs:
@@ -421,6 +422,13 @@ Parameters:
       Default: "datahub.a.b.c"
       Description: DataHub Domain Name
       Type: String
+    KotsVersion:
+      Description: Kots Admin Version
+      Type: String
+      Default: "v1.58.1"
+      AllowedValues:
+      - "v1.55.0"
+      - "v1.58.1"
     KotsDomainName:
       Default: "kotsadm.e.f.g"
       Description: Kots Admin Domain Name
@@ -431,7 +439,7 @@ Parameters:
       Default: "internal"
       AllowedValues:
       - "internal"
-      #- "internet-facing"
+      - "internet-facing"
     Application:
       Description: Application Name
       Type: String
@@ -462,9 +470,7 @@ Conditions:
   isCreateAdmin:                    !Equals [!Ref CreateAdmin, "true"]
   isCreatePrivateLink:              !Equals [!Ref CreatePrivateLink, "true"]
 
-
 Resources:
-
     ESServiceRole:
         Condition: isCreateESServiceRole
         Type: 'AWS::IAM::ServiceLinkedRole'
@@ -477,83 +483,124 @@ Resources:
       Type: AWS::SecretsManager::Secret
       Properties:
         Name: !Sub "/${Environment}/${AWS::StackName}/mysql/password"
-        Description: !Sub "${Environment}/${AWS::StackName}: Secrets for Aurora MySQL"
+        Description: !Sub "/${Environment}/${AWS::StackName}: Secrets for Aurora MySQL"
         GenerateSecretString:
           SecretStringTemplate: '{"username": "admin"}'
           GenerateStringKey: password
           PasswordLength: 16
           ExcludeCharacters: '#"@/\<>()$?+-`'
           ExcludePunctuation: true
-        Tags:
-          -
-            Key: CloudFormation
-            Value: "true"
 
     ESSecret:
       Condition: isCreateElasticSearch
       Type: AWS::SecretsManager::Secret
       Properties:
         Name: !Sub "/${Environment}/${AWS::StackName}/elasticsearch/password"
-        Description: !Sub "${Environment}/${AWS::StackName}: Secrets for ElasticSearch"
+        Description: !Sub "/${Environment}/${AWS::StackName}: Secrets for ElasticSearch"
         GenerateSecretString:
           SecretStringTemplate: '{"username": "admin"}'
           GenerateStringKey: password
           PasswordLength: 16
           ExcludeCharacters: '#"@/\<>()$?+-`'
-        Tags:
-          -
-            Key: CloudFormation
-            Value: "true"
 
-    KOTSSecret:
+    KotsSecret:
       Type: AWS::SecretsManager::Secret
       Properties:
         Name: !Sub "/${Environment}/${AWS::StackName}/kotsadm/password"
-        Description: !Sub "${Environment}/${AWS::StackName}: Secrets for KOTS Admin"
+        Description: !Sub "/${Environment}/${AWS::StackName}: Secrets for Kots Admin"
         GenerateSecretString:
           SecretStringTemplate: '{"username": "admin"}'
           GenerateStringKey: password
           PasswordLength: 16
           ExcludeCharacters: '#"@/\<>()$?+-`'
           ExcludePunctuation: true
-        Tags:
-          -
-            Key: CloudFormation
-            Value: "true"
 
     PasswordSecret:
       Type: AWS::SecretsManager::Secret
       Properties:
         Name: !Sub "/${Environment}/${AWS::StackName}/admin/password"
-        Description: !Sub "${Environment}/${AWS::StackName}: Secrets for Admin Password"
+        Description: !Sub "/${Environment}/${AWS::StackName}: Secrets for DataHub Admin Password"
         GenerateSecretString:
           SecretStringTemplate: '{"username": "admin"}'
           GenerateStringKey: password
           PasswordLength: 16
           ExcludeCharacters: '#"@/\<>()$?+-`'
           #ExcludePunctuation: true
-        Tags:
-          -
-            Key: CloudFormation
-            Value: "true"
 
     UUIDSecret:
       Type: AWS::SecretsManager::Secret
       Properties:
         Name: !Sub "/${Environment}/${AWS::StackName}/admin/uuid"
-        Description: !Sub "${Environment}/${AWS::StackName}: Secrets for Admin UUID"
+        Description: !Sub "/${Environment}/${AWS::StackName}: Secrets for Admin UUID"
         GenerateSecretString:
           SecretStringTemplate: '{"username": "admin"}'
-          GenerateStringKey: uuid 
+          GenerateStringKey: uuid
           PasswordLength: 32
           ExcludeCharacters: '"@/\<>()$?+-`'
           ExcludePunctuation: true
-        Tags:
-          -
-            Key: CloudFormation
-            Value: "true"
+
+    ApiKeySecret: ### placeholder
+      Type: AWS::SecretsManager::Secret
+      Properties:
+        Name: !Sub "/${Environment}/${AWS::StackName}/admin/apikey"
+        Description: !Sub "/${Environment}/${AWS::StackName}: Secrets for DataHub Admin Apikey"
+        GenerateSecretString:
+          SecretStringTemplate: '{"username": "admin"}'
+          GenerateStringKey: apikey
+          PasswordLength: 32
+          ExcludeCharacters: '"@/\<>()$?+-`'
+          ExcludePunctuation: true
+
+    MSKBootstrapBrokersSSM: ### placeholder
+        Type: AWS::SSM::Parameter
+        Properties:
+          Description: MSK Bootstrap Brokers
+          Name: !Sub '/${Environment}/${AWS::StackName}/msk/bootstrap_brokers'
+          Type: String
+          Value: !Sub '${AWS::StackName}-msk-bootstrap_brokers'
+
+    MSKZookeeperConnectSSM: ### placeholder
+        Type: AWS::SSM::Parameter
+        Properties:
+          Description: MSK Zookeeper Connect
+          Name: !Sub '/${Environment}/${AWS::StackName}/msk/zookeeper_connect'
+          Type: String
+          Value: !Sub '${AWS::StackName}-msk-zookeeper_connect'
+
+    AdminAlbArnSSM: ### placeholder
+        Type: AWS::SSM::Parameter
+        Properties:
+          Description: DataHub Admin ALB Arn
+          Name: !Sub '/${Environment}/${AWS::StackName}/admin/albarn'
+          Type: String
+          Value: !Sub '${AWS::StackName}-admin-albarn'
+
+    AdminAlbDnsSSM: ### placeholder
+        Type: AWS::SSM::Parameter
+        Properties:
+          Description: DataHub Admin ALB Dns
+          Name: !Sub '/${Environment}/${AWS::StackName}/admin/albdns'
+          Type: String
+          Value: !Sub '${AWS::StackName}-admin-albdns'
+
+    KotsNlbArnSSM: ### placeholder
+        Type: AWS::SSM::Parameter
+        Properties:
+          Description: Kots Admin NLB Arn
+          Name: !Sub '/${Environment}/${AWS::StackName}/kotsadm/nlbarn'
+          Type: String
+          Value: !Sub '${AWS::StackName}-kotsadm-nlbarn'
+
+    KotsNlbDnsSSM: ### placeholder
+        Type: AWS::SSM::Parameter
+        Properties:
+          Description: Kots Admin NLB Dns
+          Name: !Sub '/${Environment}/${AWS::StackName}/kotsadm/nlbdns'
+          Type: String
+          Value: !Sub '${AWS::StackName}-kotsadm-nlbdns'
 
     EC2LogGroup:
+      Condition: isCreateEKS
       Type: AWS::Logs::LogGroup
       #DeletionPolicy: Retain
       Properties: 
@@ -586,7 +633,6 @@ Resources:
                     - logs:DescribeLogStreams
                     - logs:PutRetentionPolicy
                     - logs:PutMetricFilter
-                    #- logs:CreateLogGroup
                   Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:${EC2LogGroup}:*"
                   Effect: Allow
           - PolicyName: ebs-volume-policy
@@ -624,7 +670,7 @@ Resources:
           - Key: Name
             Value: !Sub "${AWS::StackName}"
           - Key: Component
-            Value: Datahub-ElasticSearch
+            Value: !Sub "${AWS::StackName}-ElasticSearch"
         TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/2-subnets/elasticsearch.yaml"
         Parameters:
           # ES stack params
@@ -653,7 +699,7 @@ Resources:
           - Key: Name
             Value: !Sub "${AWS::StackName}"
           - Key: Component
-            Value: Datahub-MySQL
+            Value: !Sub "${AWS::StackName}-MySQL"
         TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/2-subnets/mysql.yaml"
         Parameters:
           # MySQL stack params
@@ -681,7 +727,7 @@ Resources:
           - Key: Name
             Value: !Sub "${AWS::StackName}"
           - Key: Component
-            Value: Datahub-MSK
+            Value: !Sub "${AWS::StackName}-MSK"
         TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/2-subnets/msk.yaml"
         Parameters:
           # MSK stack params
@@ -816,7 +862,6 @@ Resources:
             Value: !Sub "${AWS::StackName}-Admin"
         TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/2-subnets/admin.yaml"
         Parameters:
-          # Provision stack params
           Application: !Ref Application
           ApplicationReleaseChannel: !Ref ApplicationReleaseChannel
           VPCID: !Ref VPCID
@@ -827,15 +872,13 @@ Resources:
           ProvisionInstanceType: !Ref ProvisionInstanceType
           ProvisionSecurityGroup: !Ref ProvisionSecurityGroup
           NodeInstanceRoleArn: !GetAtt EKSClusterStack.Outputs.NodeInstanceRoleArn
-          # EKS Worker Node stack params
           TemplateBucketName: !Ref TemplateBucketName
           Environment: !Ref Environment
           EC2LogGroup: !Ref EC2LogGroup
-          EKSClusterName: !Sub "${AWS::StackName}"
+          EksClusterName: !Sub "${AWS::StackName}"
           K8sNamespace: !Sub "${AWS::StackName}"
-          # pass other stack info
-          EKSProvisionAutoScalingGroup: !GetAtt EKSClusterStack.Outputs.EKSProvisionAutoScalingGroup
           DomainName: !Ref DomainName
+          KotsVersion: !Ref KotsVersion
           KotsDomainName: !Ref KotsDomainName
           KotsAdmNLBScheme: !Ref KotsAdmNLBScheme
           MySQLEndpoint: !GetAtt MySQLStack.Outputs.ClusterEndpoint
@@ -849,7 +892,7 @@ Resources:
           ESMasterUserPassword:
             Fn::Sub: "{{resolve:secretsmanager:${ESSecret}::password}}"
           KOTSUserPassword:
-            Fn::Sub: "{{resolve:secretsmanager:${KOTSSecret}::password}}"
+            Fn::Sub: "{{resolve:secretsmanager:${KotsSecret}::password}}"
           RemoveTempResources: !Ref RemoveTempResources
 
     PrivateLinkStack:
@@ -869,18 +912,11 @@ Resources:
           EKSClusterName: !Sub "${AWS::StackName}"
 
 Outputs:
-  # Provision stack
-  ProvisionSubstackName:
-    Value: !GetAtt EKSClusterStack.Outputs.SubstackName
-    Condition: isCreateEKS
+  SubstackName:
+    Description: The master stack name
+    Value: !Sub "${AWS::StackName}"
   ProvisionSecurityGroup:
     Value: !Ref ProvisionSecurityGroup
-    Condition: isCreateEKS
-  EKSProvisionLaunchConfiguration:
-    Value: !GetAtt EKSClusterStack.Outputs.EKSProvisionLaunchConfiguration
-    Condition: isCreateEKS
-  EKSProvisionAutoScalingGroup:
-    Value: !GetAtt EKSClusterStack.Outputs.EKSProvisionAutoScalingGroup
     Condition: isCreateEKS
   ProvisionInstanceRole:
     Value: !GetAtt EKSClusterStack.Outputs.ProvisionInstanceRole
@@ -891,24 +927,17 @@ Outputs:
   ProvisionInstanceRole:
     Value: !GetAtt EKSClusterStack.Outputs.ProvisionInstanceRole
     Condition: isCreateEKS
-  EC2LogGroup:
-    Value: !Ref EC2LogGroup
-    Condition: isCreateEKS
 
-  # ElasticSearch
-  DomainEndpoint:
-   Value: !GetAtt ElasticSearchStack.Outputs.DomainEndpoint
-   Condition: isCreateElasticSearch
-  
+  ElasticSearchDomainEndpoint:
+    Value: !GetAtt ElasticSearchStack.Outputs.DomainEndpoint
+    Condition: isCreateElasticSearch
 
-  # EKS Cluster
   ControlPanelSecurityGroup:
     Value: !GetAtt EKSPreRequsiteStack.Outputs.ControlPanelSecurityGroup
     Condition: isCreateEKS
-  EksClusterName:
-    Value: !GetAtt EKSClusterStack.Outputs.EksClusterName
-    Condition: isCreateEKS
-  EksServiceRoleArn:
+  EKSClusterName:
+    Value: !Sub "${AWS::StackName}"
+  EKSServiceRoleArn:
     Value: !GetAtt EKSPreRequsiteStack.Outputs.EksServiceRoleArn
     Condition: isCreateEKS
   NodeInstanceRoleArn:

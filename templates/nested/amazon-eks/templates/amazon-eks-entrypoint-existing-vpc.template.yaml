@@ -102,6 +102,7 @@ Metadata:
         Parameters:
           - ALBIngressController
           - ClusterAutoScaler
+          - MetricsServer
           - PrometheusIntegration
       - Label:
           default: Configuration
@@ -146,6 +147,8 @@ Metadata:
         default: Custom Admin Node Role ARN (IAM Role)
       ClusterAutoScaler:
         default: Cluster autoscaler
+      MetricsServer:
+        default: MetricsServer
       ProvisionBastionHost:
         default: Provision bastion host
       ALBIngressController:
@@ -268,6 +271,10 @@ Parameters:
     AllowedValues: [ Enabled, Disabled ]
     Default: Disabled
     Description: Choose "Enabled" to enable Kubernetes cluster autoscaler.
+  MetricsServer:
+    Type: String
+    AllowedValues: [ "Enabled", "Disabled" ]
+    Default: "Disabled"
   HttpProxy:
     Type: String
     Default: ""
@@ -414,6 +421,7 @@ Resources:
         AdditionalEKSAdminNodeRoleArn: !Ref AdditionalEKSAdminNodeRoleArn
         VPCID: !Ref VPCID
         ProvisionClusterAutoScaler: !Ref ClusterAutoScaler
+        ProvisionMetricsServer: !Ref MetricsServer
         EKSPublicAccessEndpoint: !Ref EKSPublicAccessEndpoint
         ProvisionALBIngressController: !Ref ALBIngressController
         EKSClusterName: !Ref EKSClusterName

@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: Master template that set up DataHub Platform in AWS
+Description: Master Template that Deploys DataHub Platform in AWS
 Metadata:
     AWS::CloudFormation::Interface:
       ParameterGroups:
@@ -75,6 +75,7 @@ Metadata:
             - DomainName
             - ElbInboundCIDRs
             - ElbCertArn 
+            - KotsVersion
             - KotsDomainName
             - KotsElbCertArn 
             - KotsAdmNLBScheme
@@ -188,6 +189,8 @@ Metadata:
           default: The Number of MSK Brokers
         ElbCertArn:
           default: DataHub ALB cert arn
+        KotsVersion:
+          default: Kots Admin Version
         KotsElbCertArn:
           default: KotsAdmin NLB cert arn
         ElbInboundCIDRs:
@@ -476,6 +479,13 @@ Parameters:
       Default: "datahub.a.b.c"
       Description: DataHub Domain Name
       Type: String
+    KotsVersion:
+      Description: Kots Admin Version
+      Type: String
+      Default: "v1.58.1"
+      AllowedValues:
+      - "v1.55.0"
+      - "v1.58.1"
     KotsDomainName:
       Default: "kotsadm.e.f.g"
       Description: Kots Admin Domain Name
@@ -490,7 +500,7 @@ Parameters:
     Application:
       Description: Application Name
       Type: String
-      Default: "datahub-poc"
+      Default: "datahub"
       AllowedValues:
       - "datahub-poc"
       - "datahub"
@@ -516,11 +526,8 @@ Conditions:
   isCreateEKS:                      !Equals [!Ref CreateEKS, "true"]
   isCreateAdmin:                    !Equals [!Ref CreateAdmin, "true"]
   isCreatePrivateLink:              !Equals [!Ref CreatePrivateLink, "true"]
-   
-
 
 Resources:
-
     ESServiceRole:
         Condition: isCreateESServiceRole
         Type: 'AWS::IAM::ServiceLinkedRole'
@@ -818,7 +825,7 @@ Resources:
             Value: !Sub "${AWS::StackName}-EKSClusterProvisionIAM"
           - Key: KubernetesCluster
             Value: !Sub "${AWS::StackName}"
-        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/amazon-eks/templates/awsqseks-cluster-provision-iam.yaml"
+        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/amazon-eks/templates/amazon-eks-provisioning-node-iam.yaml"
         Parameters:
           TemplateBucketName: !Ref TemplateBucketName
           Environment: !Ref Environment
@@ -894,7 +901,7 @@ Resources:
             Value: !Sub "${AWS::StackName}"
           - Key: Component
             Value: !Sub "${AWS::StackName}-Admin"
-        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/2-subnets/admin.yaml"
+        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/2-subnets/admin-v2.yaml"
         Parameters:
           Application: !Ref Application
           ApplicationReleaseChannel: !Ref ApplicationReleaseChannel
@@ -912,6 +919,7 @@ Resources:
           EksClusterName: !Sub "${AWS::StackName}"
           K8sNamespace: !Sub "${AWS::StackName}"
           DomainName: !Ref DomainName
+          KotsVersion: !Ref KotsVersion
           KotsDomainName: !Ref KotsDomainName
           KotsAdmNLBScheme: !Ref KotsAdmNLBScheme
           MySQLEndpoint: !GetAtt MySQLStack.Outputs.ClusterEndpoint

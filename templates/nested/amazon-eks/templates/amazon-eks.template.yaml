@@ -2,6 +2,8 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: Deploys an EKS cluster into an existing VPC
 Transform: [QuickStartParameterResolver]
 Metadata:
+  QSLint:
+    Exclusions: [W9002, W9003, W9004, W9006]
   ConfigSetName: !Ref ConfigSetName
 Parameters:
   KeyPairName:
@@ -65,10 +67,6 @@ Parameters:
     Type: String
     Default: ""
   ProvisionClusterAutoScaler:
-    Type: String
-    AllowedValues: [ "Enabled", "Disabled" ]
-    Default: "Disabled"
-  ProvisionMetricsServer:
     Type: String
     AllowedValues: [ "Enabled", "Disabled" ]
     Default: "Disabled"
@@ -222,7 +220,6 @@ Resources:
         NodeAutoScalingGroup: !GetAtt NodeGroupStack.Outputs.NodeAutoScalingGroup
         EksClusterName: !GetAtt EKSControlPlane.Outputs.EKSName
         KubernetesVersion: ~~/<ConfigSetName>/controlplane/KubernetesVersion~~
-
   CleanupLambdas:
     Type: Custom::LambdaCleanup
     DependsOn: CleanupControlPlaneSecurityGroupDependencies

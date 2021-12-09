@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: AWSQSEKSCluster provision iam stack that create EKS cluster provision instance role
+Description: Deploys EKS cluster provision instance role
 
 Metadata:
     AWS::CloudFormation::Interface:

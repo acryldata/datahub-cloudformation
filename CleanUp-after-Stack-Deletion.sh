@@ -35,7 +35,6 @@ aws ssm delete-parameters --names "/${Environment}/${StackName}/admin/albarn" --
 aws ssm delete-parameters --names "/${Environment}/${StackName}/admin/albdns" --region ${Region} --no-cli-pager;
 
 #===Log Group===
-#aws logs delete-log-group --log-group-name "/${Environment}/${StackName}/ProvisionHost" --region ${Region} --no-cli-pager;
 aws logs delete-log-group --log-group-name "/aws/eks/${StackName}/cluster" --region ${Region} --no-cli-pager;
 aws logs delete-log-group --log-group-name "/aws/rds/cluster/${StackName}/error" --region ${Region} --no-cli-pager;
 break;;

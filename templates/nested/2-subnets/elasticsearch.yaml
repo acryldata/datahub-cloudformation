@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: ElasticSearch stack that creates Amazon ElasticSearch
+Description: Deploys Amazon ElasticSearch
 
 Metadata:
   AWS::CloudFormation::Interface:

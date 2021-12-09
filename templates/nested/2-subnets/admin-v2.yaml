@@ -300,17 +300,8 @@ Resources:
                 fi
                 echo "Creating namespace..."
                 kubectl create ns ${K8sNamespace}
-                echo "Install Ingress Controller..."
+
                 set -x
-                curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
-                mv /tmp/eksctl /usr/local/bin
-                eksctl utils associate-iam-oidc-provider --cluster ${EksClusterName} --approve --region ${AWS::Region}
-                helm repo add eks https://aws.github.io/eks-charts
-                helm repo update
-                echo "        serviceAccount:" > values.yaml
-                echo "          annotations:" >> values.yaml
-                echo "            eks.amazonaws.com/role-arn: arn:aws:iam::${AWS::AccountId}:role/${EksClusterName}-aws-load-balancer-controller" >> values.yaml
-                helm install aws-load-balancer-controller eks/aws-load-balancer-controller --set region=${AWS::Region} -n kube-system --set clusterName=${EksClusterName} --set serviceAccount.name=${EksClusterName}-aws-load-balancer-controller --set image.tag=v2.2.0 --version 1.2.7 -f values.yaml
                 echo "prepare configvalues.yaml..."
                 ZOOKEEPER_CONNECT=$(aws kafka --region ${AWS::Region} list-clusters --cluster-name-filter ${MSKClusterName} --no-paginate --query 'ClusterInfoList[0].ZookeeperConnectString' --output text)
                 CLUSTER_ARN=$(aws kafka --region ${AWS::Region} list-clusters --cluster-name-filter ${MSKClusterName} --no-paginate --query 'ClusterInfoList[0].ClusterArn' --output text)
