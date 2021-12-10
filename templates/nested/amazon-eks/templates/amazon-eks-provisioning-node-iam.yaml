@@ -75,6 +75,7 @@ Resources:
                   - ssm:GetParameters
                   - ssm:GetParameter
                   - ssm:AddTagsToResource
+                  - ssm:ListTagsForResource
                 #Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${Environment}/${EksClusterName}/*"
                 Resource: "*"
                 Effect: Allow
@@ -172,6 +173,7 @@ Resources:
                   - secretsmanager:DeleteSecret
                   - ssm:DeleteParameters
                   - ssm:DeleteParameter
+                  - lambda:TagResource
                 Resource: "*"
                 Effect: Allow
       Path: /
