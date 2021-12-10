@@ -436,10 +436,10 @@ Resources:
                     aws ssm add-tags-to-resource --region ${AWS::Region} --resource-type "Parameter" --resource-id "/cfn-registry/awsqs-kubernetes-resource/version" --tags "$EXTRA_TAGS_V3"
                   fi
                   #ACCOUNT_ID=$(aws sts get-caller-identity --region ${AWS::Region} --query Account --output text)
-                  #LAMBDA_TAG_STATUS=$(aws lambda list-tags --region ${AWS::Region} --resource arn:aws:lambda:${AWS::Region}:$ACCOUNT_ID:function:awsqs-kubernetes-resource-proxy-prod-datahub --query "Tags" --output text|wc -l)
+                  #LAMBDA_TAG_STATUS=$(aws lambda list-tags --region ${AWS::Region} --resource arn:aws:lambda:${AWS::Region}:$ACCOUNT_ID:function:xxx --query "Tags" --output text|wc -l)
                   #if [ $LAMBDA_TAG_STATUS -eq 0 ]; then
                   #  EXTRA_TAGS_V1=$(/tmp/check_extra_tags.sh ${Environment} ${EksClusterName})
-                  #  FUNCTIONS="awsqs-kubernetes-resource-proxy-prod-datahub"
+                  #  FUNCTIONS="xxx,yyy"
                   #  for i in $(echo $FUNCTIONS | sed "s/,/ /g")
                   #  do
                   #    aws lambda tag-resource --region ${AWS::Region} --resource arn:aws:lambda:${AWS::Region}:$ACCOUNT_ID:function:$i --tags "$EXTRA_TAGS_V1"
