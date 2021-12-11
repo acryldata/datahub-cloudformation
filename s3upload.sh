@@ -23,7 +23,7 @@ else
     exit 1
   fi
 
-  #aws s3 sync ./templates s3://$S3_BUCKET/$S3_KEY_PREFIX/templates --exclude 'nested/XXX/*' --exclude 'nested/YYY/*'
-  aws s3 sync ./templates s3://$S3_BUCKET/$S3_KEY_PREFIX/templates
+  #aws s3 sync ./templates s3://$S3_BUCKET/$S3_KEY_PREFIX/templates
+  aws s3 sync ./templates s3://$S3_BUCKET/$S3_KEY_PREFIX/templates --exclude 'nested/amazon-eks/functions/source*'
   aws s3 sync ./scripts s3://$S3_BUCKET/$S3_KEY_PREFIX/scripts
 fi

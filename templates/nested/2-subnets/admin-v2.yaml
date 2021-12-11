@@ -253,6 +253,11 @@ Resources:
               mode: "000750"
               owner: root
               group: root
+            /tmp/remove_namespace_finalizer.sh:
+              source: !Sub "https://s3.${AWS::Region}.amazonaws.com/${TemplateBucketName}/${Environment}/scripts/remove_namespace_finalizer.sh"
+              mode: "000750"
+              owner: root
+              group: root
             /tmp/admin_bootstrap.sh:
               content: !Sub |
                 #!/bin/bash
@@ -271,7 +276,15 @@ Resources:
                 do
                   aws ec2 authorize-security-group-ingress --region ${AWS::Region} --group-id ${ProvisionSecurityGroup} --ip-permissions IpProtocol=tcp,FromPort=22,ToPort=22,IpRanges="[{CidrIp=$cidr,Description='grant ssh access to provision'}]"
                 done
+
+                echo "add api ingress rule to cluster security group..."
+                EKSSecurityGroupId=$(aws eks describe-cluster --region ${AWS::Region} --name ${EksClusterName} --query cluster.resourcesVpcConfig.securityGroupIds --output text)
+                for cidr in $(echo ${ElbInboundCIDRs} | sed "s/,/ /g")
+                do
+                  aws ec2 authorize-security-group-ingress --region ${AWS::Region} --group-id $EKSSecurityGroupId --ip-permissions IpProtocol=tcp,FromPort=443,ToPort=443,IpRanges="[{CidrIp=$cidr,Description='grant api access to given CIDRs'}]"
+                done
                 sleep 5
+
 
                 echo "Checking extra tags..."
                 EXTRA_TAGS=$(/tmp/check_extra_tags-v2.sh ${Environment} ${EksClusterName})
@@ -287,7 +300,7 @@ Resources:
                   EKSSecurityGroupId=$(aws eks describe-cluster --region ${AWS::Region} --name ${EksClusterName} --query cluster.resourcesVpcConfig.securityGroupIds --output text)
                   echo "add ingress rule to EKS control panel security group..."
                   LOCAL_IP=$(curl http://169.254.169.254/latest/meta-data/local-ipv4)
-                  aws ec2 authorize-security-group-ingress --region ${AWS::Region} --group-id $EKSSecurityGroupId --ip-permissions IpProtocol=tcp,FromPort=443,ToPort=443,IpRanges="[{CidrIp=$LOCAL_IP/32,Description='grant access to EKS'}]"
+                  aws ec2 authorize-security-group-ingress --region ${AWS::Region} --group-id $EKSSecurityGroupId --ip-permissions IpProtocol=tcp,FromPort=443,ToPort=443,IpRanges="[{CidrIp=$LOCAL_IP/32,Description='grant api access to Admin host'}]"
                   sleep 5
 
                   echo "Updating kubeconfig file..."
@@ -298,15 +311,16 @@ Resources:
                   export KUBECONFIG=/home/ec2-user/.kube/config
                   chmod 600 /home/ec2-user/.kube/config
                 fi
-                kubectl get ns ${K8sNamespace} &> /dev/null
-                if [ $? -eq 0 ]; then
-                  echo "namespace ${K8sNamespace} already exists, stopping..."
-                  exit 0
-                fi
-                echo "Creating namespace..."
-                kubectl create ns ${K8sNamespace}
-
                 set -x
+                kubectl get pod -n ${K8sNamespace} |grep kots &> /dev/null
+                if [ $? -eq 0 ]; then
+                  echo "namespace ${K8sNamespace} already has resources, stopping..."
+                  exit 0
+                else
+                  echo "Creating namespace..."
+                  kubectl create ns ${K8sNamespace}
+                fi
+
                 echo "prepare configvalues.yaml..."
                 ZOOKEEPER_CONNECT=$(aws kafka --region ${AWS::Region} list-clusters --cluster-name-filter ${MSKClusterName} --no-paginate --query 'ClusterInfoList[0].ZookeeperConnectString' --output text)
                 CLUSTER_ARN=$(aws kafka --region ${AWS::Region} list-clusters --cluster-name-filter ${MSKClusterName} --no-paginate --query 'ClusterInfoList[0].ClusterArn' --output text)
@@ -446,6 +460,10 @@ Resources:
                   #  done
                   #fi
                 fi
+                echo "removing finalizer from namespace: ${EksClusterName}"
+                /tmp/remove_namespace_finalizer.sh ${EksClusterName}
+                echo "removing finalizer from namespace: prometheus"
+                /tmp/remove_namespace_finalizer.sh prometheusprometheus
               mode: "000750"
               owner: root
               group: root

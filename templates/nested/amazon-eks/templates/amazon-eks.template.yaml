@@ -285,19 +285,34 @@ Resources:
         #EKSEncryptSecretsKmsKeyArn: ~~/<ConfigSetName>/controlplane/EKSEncryptSecretsKmsKeyArn~~
         IamOidcProvider: !If [EnableOIDC, 'Enabled', 'Disabled']
         EKSClusterName: !If [GenerateClusterName, !Ref GenerateName, !Ref EKSClusterName]
-  PrometheusStack:
-    Metadata:
-      cfn-lint: { config: { ignore_checks: [ W9901 ] } }
-      DependsOn:
-        - !Ref ControlPlaneSecurityGroupIngress
-        - !Ref NodeGroupStack
-        - !If [EnableFargate, !Ref FargateNamespaces, !Ref 'AWS::NoValue']
-    Condition: EnablePrometheus
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub 'https://${QSS3BucketName}.s3.amazonaws.com/${QSS3KeyPrefix}submodules/eks-prometheus/templates/eks-prometheus.template.yaml'
-      Parameters:
-        KubeClusterName: !GetAtt EKSControlPlane.Outputs.EKSName
+#  PrometheusStack:
+#    Metadata:
+#      cfn-lint: { config: { ignore_checks: [ W9901 ] } }
+#      DependsOn:
+#        - !Ref ControlPlaneSecurityGroupIngress
+#        - !Ref NodeGroupStack
+#        - !Ref LoadBalancerStack
+#        - !If [EnableFargate, !Ref FargateNamespaces, !Ref 'AWS::NoValue']
+#    Condition: EnablePrometheus
+#    Type: AWS::CloudFormation::Stack
+#    Properties:
+#      TemplateURL: !Sub 'https://${QSS3BucketName}.s3.amazonaws.com/${QSS3KeyPrefix}submodules/eks-prometheus/templates/eks-prometheus.template.yaml'
+#      Parameters:
+#        KubeClusterName: !GetAtt EKSControlPlane.Outputs.EKSName
+
+#  AppNamespaceStack:
+#    Metadata:
+#      cfn-lint: { config: { ignore_checks: [ W9901 ] } }
+#      DependsOn:
+#        - !Ref ControlPlaneSecurityGroupIngress
+#        - !Ref NodeGroupStack
+#        - !If [EnableFargate, !Ref FargateNamespaces, !Ref 'AWS::NoValue']
+#    Type: AWS::CloudFormation::Stack
+#    Properties:
+#      TemplateURL: !Sub 'https://${QSS3BucketName}.s3.amazonaws.com/${QSS3KeyPrefix}templates/amazon-eks-app-namespace.yaml'
+#      Parameters:
+#        EksClusterName: !GetAtt EKSControlPlane.Outputs.EKSName
+
   LoadBalancerStack:
     Metadata:
       DependsOn:
