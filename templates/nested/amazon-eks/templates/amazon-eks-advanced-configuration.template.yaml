@@ -283,12 +283,12 @@ Resources:
       Type: String
       Value: !Sub '{ "Value": "${CustomAmiId}" }'
       Name: !Sub ["${ParameterPrefix}/${ConfigSetName}/default-nodegroup/CustomAmiId", {ParameterPrefix: !FindInMap [Config, ParameterPrefix, Value]}]
-#  NodeSecurityGroupIdParameter:
-#    Type: AWS::SSM::Parameter
-#    Properties:
-#      Type: String
-#      Value: !Sub '{ "Value": "${NodeSecurityGroupId}" }'
-#      Name: !Sub ["${ParameterPrefix}/${ConfigSetName}/default-nodegroup/NodeSecurityGroupId", {ParameterPrefix: !FindInMap [Config, ParameterPrefix, Value]}]
+  NodeSecurityGroupIdParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Type: String
+      Value: !Sub '{ "Value": "${NodeSecurityGroupId}" }'
+      Name: !Sub ["${ParameterPrefix}/${ConfigSetName}/default-nodegroup/NodeSecurityGroupId", {ParameterPrefix: !FindInMap [Config, ParameterPrefix, Value]}]
 #  TaintsParameter:
 #    Type: AWS::SSM::Parameter
 #    Properties:

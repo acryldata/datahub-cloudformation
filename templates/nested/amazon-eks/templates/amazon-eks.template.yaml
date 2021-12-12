@@ -163,13 +163,13 @@ Resources:
         EKSClusterName: !If [GenerateClusterName, !Ref GenerateName, !Ref EKSClusterName]
         NodeInstanceFamily: !Ref NodeInstanceFamily
         NodeGroupType: !Ref NodeGroupType
+        NodeSecurityGroupId: ~~/<ConfigSetName>/default-nodegroup/NodeSecurityGroupId~~
         #OndemandPercentage: ~~/<ConfigSetName>/default-nodegroup/OnDemandPercentage~~
         #NodeInstanceType2: ~~/<ConfigSetName>/default-nodegroup/NodeInstanceType2~~
         #NodeInstanceType3: ~~/<ConfigSetName>/default-nodegroup/NodeInstanceType3~~
         #NodeInstanceType4: ~~/<ConfigSetName>/default-nodegroup/NodeInstanceType4~~
         #Labels: ~~/<ConfigSetName>/default-nodegroup/Labels~~
         #Taints: ~~/<ConfigSetName>/default-nodegroup/Taints~~
-        #NodeSecurityGroupId: ~~/<ConfigSetName>/default-nodegroup/NodeSecurityGroupId~~
         #LaunchTemplateId: ~~/<ConfigSetName>/default-nodegroup/LaunchTemplateId~~
         #LaunchTemplateVersion: ~~/<ConfigSetName>/default-nodegroup/LaunchTemplateVersion~~
         EC2MetadataPutResponseHopLimit: ~~/<ConfigSetName>/default-nodegroup/EC2MetadataPutResponseHopLimit~~
@@ -285,20 +285,20 @@ Resources:
         #EKSEncryptSecretsKmsKeyArn: ~~/<ConfigSetName>/controlplane/EKSEncryptSecretsKmsKeyArn~~
         IamOidcProvider: !If [EnableOIDC, 'Enabled', 'Disabled']
         EKSClusterName: !If [GenerateClusterName, !Ref GenerateName, !Ref EKSClusterName]
-#  PrometheusStack:
-#    Metadata:
-#      cfn-lint: { config: { ignore_checks: [ W9901 ] } }
-#      DependsOn:
-#        - !Ref ControlPlaneSecurityGroupIngress
-#        - !Ref NodeGroupStack
-#        - !Ref LoadBalancerStack
-#        - !If [EnableFargate, !Ref FargateNamespaces, !Ref 'AWS::NoValue']
-#    Condition: EnablePrometheus
-#    Type: AWS::CloudFormation::Stack
-#    Properties:
-#      TemplateURL: !Sub 'https://${QSS3BucketName}.s3.amazonaws.com/${QSS3KeyPrefix}submodules/eks-prometheus/templates/eks-prometheus.template.yaml'
-#      Parameters:
-#        KubeClusterName: !GetAtt EKSControlPlane.Outputs.EKSName
+  PrometheusStack:
+    Metadata:
+      cfn-lint: { config: { ignore_checks: [ W9901 ] } }
+      DependsOn:
+        - !Ref ControlPlaneSecurityGroupIngress
+        - !Ref NodeGroupStack
+        - !Ref LoadBalancerStack
+        - !If [EnableFargate, !Ref FargateNamespaces, !Ref 'AWS::NoValue']
+    Condition: EnablePrometheus
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub 'https://${QSS3BucketName}.s3.amazonaws.com/${QSS3KeyPrefix}submodules/eks-prometheus/templates/eks-prometheus.template.yaml'
+      Parameters:
+        KubeClusterName: !GetAtt EKSControlPlane.Outputs.EKSName
 
 #  AppNamespaceStack:
 #    Metadata:

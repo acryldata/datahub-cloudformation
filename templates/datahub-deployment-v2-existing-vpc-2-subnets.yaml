@@ -680,6 +680,12 @@ Resources:
       Properties: 
         LogGroupName: !Sub "/${Environment}/${AWS::StackName}/ProvisionHost"
 
+    EKSNodeSecurityGroup:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupDescription: Cluster Node SG
+        VpcId: !Ref VPCID
+
     ProvisionSecurityGroup:
       Condition: isCreateEKS
       Type: AWS::EC2::SecurityGroup
@@ -738,7 +744,9 @@ Resources:
       Condition: isCreateElasticSearch
       Type: AWS::CloudFormation::Stack
       DependsOn:
-        - EKSClusterStack
+        #- EKSClusterStack
+        - EKSClusterProvisionIAMStack
+        - EKSClusterAdvancedConfigDefaultsStack
       Properties:
         Tags:
           - Key: Name
@@ -750,7 +758,8 @@ Resources:
           VPCID: !Ref VPCID
           PrivateSubnet1: !Ref PrivateSubnet1ID
           PrivateSubnet2: !Ref PrivateSubnet2ID
-          NodeSecurityGroup: !GetAtt EKSClusterStack.Outputs.NodeGroupSecurityGroup
+          #NodeSecurityGroup: !GetAtt EKSClusterStack.Outputs.NodeGroupSecurityGroup
+          NodeSecurityGroup: !GetAtt EKSNodeSecurityGroup.GroupId
           ESDataNodeCount: !Ref ESDataNodeCount
           ESInstanceType: !Ref ESInstanceType
           ESVolumeSize: !Ref ESVolumeSize
@@ -766,7 +775,9 @@ Resources:
       Condition: isCreateMySQL
       Type: AWS::CloudFormation::Stack
       DependsOn:
-        - EKSClusterStack
+        #- EKSClusterStack
+        - EKSClusterProvisionIAMStack
+        - EKSClusterAdvancedConfigDefaultsStack
       Properties:
         Tags:
           - Key: Name
@@ -779,7 +790,8 @@ Resources:
           VPCID: !Ref VPCID
           DBSubnet1: !Ref PrivateSubnet1ID
           DBSubnet2: !Ref PrivateSubnet2ID
-          NodeSecurityGroup: !GetAtt EKSClusterStack.Outputs.NodeGroupSecurityGroup
+          #NodeSecurityGroup: !GetAtt EKSClusterStack.Outputs.NodeGroupSecurityGroup
+          NodeSecurityGroup: !GetAtt EKSNodeSecurityGroup.GroupId
           MasterUser:
             Fn::Sub: "{{resolve:secretsmanager:${RDSSecret}::username}}"
           MasterUserPassword:
@@ -793,7 +805,9 @@ Resources:
       Condition: isCreateMSK
       Type: AWS::CloudFormation::Stack
       DependsOn:
-        - EKSClusterStack
+        #- EKSClusterStack
+        - EKSClusterProvisionIAMStack
+        - EKSClusterAdvancedConfigDefaultsStack
       Properties:
         Tags:
           - Key: Name
@@ -805,7 +819,8 @@ Resources:
           VPCID: !Ref VPCID
           DBSubnet1: !Ref PrivateSubnet1ID
           DBSubnet2: !Ref PrivateSubnet2ID
-          NodeSecurityGroup: !GetAtt EKSClusterStack.Outputs.NodeGroupSecurityGroup
+          #NodeSecurityGroup: !GetAtt EKSClusterStack.Outputs.NodeGroupSecurityGroup
+          NodeSecurityGroup: !GetAtt EKSNodeSecurityGroup.GroupId
           MSKClusterName: !Sub "${AWS::StackName}"
           Environment: !Ref Environment
           MSKInstanceType: !Ref MSKInstanceType
@@ -864,12 +879,12 @@ Resources:
           NodeVolumeSize: !Ref EKSNodeVolumeSize
           KubernetesVersion: !Ref KubernetesVersion
           EKSClusterLoggingTypes: !Ref EKSClusterLoggingTypes
+          NodeSecurityGroupId: !GetAtt EKSNodeSecurityGroup.GroupId
 
     EKSClusterStack:
       Condition: isCreateEKS
       Type: AWS::CloudFormation::Stack
       DependsOn:
-        #- EKSPreRequsiteStack
         - EKSClusterProvisionIAMStack
         - EKSClusterAdvancedConfigDefaultsStack
       Properties:
@@ -910,6 +925,7 @@ Resources:
       Condition: isCreateAdmin
       Type: AWS::CloudFormation::Stack
       DependsOn: 
+          - EKSClusterStack
           - MSKStack
           - ElasticSearchStack
           - MySQLStack
@@ -954,17 +970,17 @@ Resources:
             Fn::Sub: "{{resolve:secretsmanager:${KotsSecret}::password}}"
           RemoveTempResources: !Ref RemoveTempResources
 
-    PrometheusStack:
-      Metadata:
-        cfn-lint: { config: { ignore_checks: [ W9901 ] } }
-        DependsOn:
-          - EKSClusterStack
-      Condition: EnablePrometheus
-      Type: AWS::CloudFormation::Stack
-      Properties:
-        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/amazon-eks/submodules/eks-prometheus/templates/eks-prometheus.template.yaml"
-        Parameters:
-          KubeClusterName: !Sub "${AWS::StackName}"
+#    PrometheusStack:
+#      Metadata:
+#        cfn-lint: { config: { ignore_checks: [ W9901 ] } }
+#        DependsOn:
+#          - EKSClusterStack
+#      Condition: EnablePrometheus
+#      Type: AWS::CloudFormation::Stack
+#      Properties:
+#        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/amazon-eks/submodules/eks-prometheus/templates/eks-prometheus.template.yaml"
+#        Parameters:
+#          KubeClusterName: !Sub "${AWS::StackName}"
 
     PrivateLinkStack:
       Condition: isCreatePrivateLink
