@@ -85,6 +85,8 @@ Parameters:
       Description: The Environment
     ProvisionSecurityGroup:
       Type: String
+    NodeSecurityGroup:
+      Type: String
     ProvisionInstanceRole:
       Type: String
     ProvisionInstanceProfile:
@@ -275,6 +277,7 @@ Resources:
                 for cidr in $(echo ${ElbInboundCIDRs} | sed "s/,/ /g")
                 do
                   aws ec2 authorize-security-group-ingress --region ${AWS::Region} --group-id ${ProvisionSecurityGroup} --ip-permissions IpProtocol=tcp,FromPort=22,ToPort=22,IpRanges="[{CidrIp=$cidr,Description='grant ssh access to provision'}]"
+                  #aws ec2 authorize-security-group-ingress --region ${AWS::Region} --group-id ${NodeSecurityGroup} --ip-permissions IpProtocol=tcp,FromPort=22,ToPort=22,IpRanges="[{CidrIp=$cidr,Description='grant ssh access to provision'}]"
                 done
 
                 echo "add api ingress rule to cluster security group..."
@@ -378,6 +381,7 @@ Resources:
                 kubectl create secret generic elasticsearch-secrets --from-file=elasticsearch-password=elasticsearch-password --namespace ${K8sNamespace}
                 echo "Install kots..."
                 kubectl kots install ${Application}/${ApplicationReleaseChannel} -n ${K8sNamespace} --shared-password "${KOTSUserPassword}" --license-file /tmp/license.yaml --config-values /home/ec2-user/configvalues.yaml --wait-duration 120s --port-forward=false
+                set -x
                 echo "Install kotsadm svc..."
                 if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
                   EXTRA_TAGS_V1=$(/tmp/check_extra_tags.sh ${Environment} ${EksClusterName})
@@ -463,7 +467,7 @@ Resources:
                 echo "removing finalizer from namespace: ${EksClusterName}"
                 /tmp/remove_namespace_finalizer.sh ${EksClusterName}
                 echo "removing finalizer from namespace: prometheus"
-                /tmp/remove_namespace_finalizer.sh prometheusprometheus
+                /tmp/remove_namespace_finalizer.sh prometheus
               mode: "000750"
               owner: root
               group: root

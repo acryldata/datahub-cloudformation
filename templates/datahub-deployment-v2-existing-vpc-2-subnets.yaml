@@ -208,31 +208,26 @@ Metadata:
 
 Parameters:
     VPCID: 
-      #Default: "vpc-1234" 
-      Default: "vpc-03042805f5912d718" 
+      Default: "vpc-0000" 
       Type: String
     AvailabilityZones:
       Description: "List of Availability Zones to use for the subnets in the VPC. Please choose three zones."
       Type: "List<AWS::EC2::AvailabilityZone::Name>"
-      Default: "us-west-2a,us-west-2b"
     PrivateSubnet1ID: 
       Type: "AWS::EC2::Subnet::Id"
-      Default: "subnet-0127a3f6a25ae5b7e"
+      Default: "subnet-1111"
     PrivateSubnet2ID: 
       Type: String
-      #Default: "" 
-      Default: "subnet-06ca286c2d8ef5d80" 
+      Default: "subnet-2222"
     PrivateSubnet3ID:
       Type: String
       Default: ""
     PublicSubnet1ID: 
       Type: String
       Default: "" 
-      #Default: "subnet-0000136c2838ce061"
     PublicSubnet2ID: 
       Type: String
       Default: "" 
-      #Default: "subnet-096f4342d04e00657" 
     PublicSubnet3ID:
       Default: ""
       Type: String
@@ -259,33 +254,33 @@ Parameters:
       Type: String
       MinLength: 1
       Description: "The maximum number of EKS Worker Nodes to run for each group"
-      Default: "3"
+      Default: "6"
     NumberOfNodes:
       Type: String
       MinLength: 1
       Description: "The number of EKS Worker Nodes to run for each group"
-      Default: "3"
+      Default: "4"
     TemplateBucketName:
       AllowedPattern: "^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$"
       ConstraintDescription: "Bucket name can include numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen (-)."
       Description: "S3 bucket name that contains the CFN templates (VPC, Provision etc). This string can include numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen (-)."
       Type: "String"
-      Default: "cf-templates-blrxgroup-us-west-2"
+      Default: "cf-templates-bucket"
     Environment:
       AllowedPattern: "^[0-9a-zA-Z]+([0-9a-zA-Z]*[0-9a-zA-Z])*$"
       Description: "The Environment Prefix"
       Type: "String"
       Default: "dev"
     AdditionalEKSAdminRoleArn:
-      AllowedPattern: '^arn:(aws|aws-cn|aws-us-gov):iam::[0-9]{12}:.*|^$'
+      #AllowedPattern: '^arn:(aws|aws-cn|aws-us-gov):iam::[0-9]{12}:.*|^$'
       Type: String
       Description: The AWS IAM role arn that will have manage access to EKS
-      Default: "arn:aws:iam::577660233792:role/blrxgroup-privaceracloud-role"
+      Default: "arn:aws:iam::xxxxxxxxxxxx:role/xxx"
     AdditionalEKSAdminUserArn:
-      AllowedPattern: '^arn:(aws|aws-cn|aws-us-gov):iam::[0-9]{12}:.*|^$'
+      #AllowedPattern: '^arn:(aws|aws-cn|aws-us-gov):iam::[0-9]{12}:.*|^$'
       Type: String
       Description: "The AWS IAM user arn who will be authorised to connect the cluster. Note format is arn:aws:iam::123456789:user/user1"
-      Default: "arn:aws:iam::577660233792:user/blrxgroup-dev-admin"
+      Default: "arn:aws:iam::xxxxxxxxxxxx:user/xxx"
     KubernetesVersion:
       Description: "The Kubernetes Version"
       Type: String
@@ -370,8 +365,7 @@ Parameters:
     PrometheusIntegration:
       Type: String
       AllowedValues: [ Enabled, Disabled ]
-      Default: Enabled
-      Description: 'For more information see https://prometheus.io/ .'
+      Default: Disabled
     CreateAdmin:
       Description: "Set to true if you want to create Admin"
       Type: String
@@ -429,6 +423,7 @@ Parameters:
       AllowedValues:
         - db.t3.small
         - db.t3.large
+        - db.r5.large
       ConstraintDescription: Must contain valid RDS instance type
       Default: db.t3.large
       Description: instance type for the Amazon Aurora
@@ -449,7 +444,7 @@ Parameters:
       Description: EC2 instance type for the Amazon MSK instances
       Type: String
     MSKVolumeSize:
-      Default: 10
+      Default: 30
       Description: MSK Volume Size in GB
       Type: String
     NumberOfBrokerNodes:
@@ -466,18 +461,18 @@ Parameters:
       AllowedPattern: '^arn:(aws|aws-cn|aws-us-gov):acm:.*:[0-9]{12}:certificate.*|^$'
       ConstraintDescription: The Elastic Load Balancer Cert Arn can not be empty
       Type: String
-      Default: "arn:aws:acm:us-west-2:577660233792:certificate/66b92cc0-c78f-4a11-99f3-a6f8586d744f"
+      Default: ""
     KotsElbCertArn:
       AllowedPattern: '^arn:(aws|aws-cn|aws-us-gov):acm:.*:[0-9]{12}:certificate.*|^$'
       ConstraintDescription: The Elastic Load Balancer Cert Arn can not be empty
       Type: String
-      Default: "arn:aws:acm:us-west-2:577660233792:certificate/66b92cc0-c78f-4a11-99f3-a6f8586d744f"
+      Default: ""
     ElbInboundCIDRs:
       ConstraintDescription: The Elastic Load Balancer Inbound CIDRs
       Type: String
       Default: "10.0.0.0/8,192.0.0.0/8,172.0.0.0/8"
     DomainName:
-      Default: "datahub.a.b.c"
+      Default: ""
       Description: DataHub Domain Name
       Type: String
     KotsVersion:
@@ -488,7 +483,7 @@ Parameters:
       - "v1.55.0"
       - "v1.58.1"
     KotsDomainName:
-      Default: "kotsadm.e.f.g"
+      Default: ""
       Description: Kots Admin Domain Name
       Type: String
     KotsAdmNLBScheme:
@@ -508,7 +503,7 @@ Parameters:
     ApplicationReleaseChannel:
       Description: Application Release Channel
       Type: String
-      Default: "unstable"
+      Default: "stable"
       AllowedValues:
       - "unstable"
       - "beta"
@@ -744,7 +739,6 @@ Resources:
       Condition: isCreateElasticSearch
       Type: AWS::CloudFormation::Stack
       DependsOn:
-        #- EKSClusterStack
         - EKSClusterProvisionIAMStack
         - EKSClusterAdvancedConfigDefaultsStack
       Properties:
@@ -758,7 +752,6 @@ Resources:
           VPCID: !Ref VPCID
           PrivateSubnet1: !Ref PrivateSubnet1ID
           PrivateSubnet2: !Ref PrivateSubnet2ID
-          #NodeSecurityGroup: !GetAtt EKSClusterStack.Outputs.NodeGroupSecurityGroup
           NodeSecurityGroup: !GetAtt EKSNodeSecurityGroup.GroupId
           ESDataNodeCount: !Ref ESDataNodeCount
           ESInstanceType: !Ref ESInstanceType
@@ -775,7 +768,6 @@ Resources:
       Condition: isCreateMySQL
       Type: AWS::CloudFormation::Stack
       DependsOn:
-        #- EKSClusterStack
         - EKSClusterProvisionIAMStack
         - EKSClusterAdvancedConfigDefaultsStack
       Properties:
@@ -790,7 +782,6 @@ Resources:
           VPCID: !Ref VPCID
           DBSubnet1: !Ref PrivateSubnet1ID
           DBSubnet2: !Ref PrivateSubnet2ID
-          #NodeSecurityGroup: !GetAtt EKSClusterStack.Outputs.NodeGroupSecurityGroup
           NodeSecurityGroup: !GetAtt EKSNodeSecurityGroup.GroupId
           MasterUser:
             Fn::Sub: "{{resolve:secretsmanager:${RDSSecret}::username}}"
@@ -805,7 +796,6 @@ Resources:
       Condition: isCreateMSK
       Type: AWS::CloudFormation::Stack
       DependsOn:
-        #- EKSClusterStack
         - EKSClusterProvisionIAMStack
         - EKSClusterAdvancedConfigDefaultsStack
       Properties:
@@ -827,25 +817,6 @@ Resources:
           KafkaVersion: !Ref KafkaVersion
           MSKVolumeSize: !Ref MSKVolumeSize
           NumberOfBrokerNodes: !Ref NumberOfBrokerNodes
-
-#    EKSPreRequsiteStack:
-#      Condition: isCreateEKS
-#      Type: AWS::CloudFormation::Stack
-#      Properties:
-#        Tags:
-#          - Key: Name
-#            Value: !Sub "${AWS::StackName}"
-#          - Key: Component
-#            Value: !Sub "${AWS::StackName}-EKSPreRequsite"
-#          - Key: KubernetesCluster
-#            Value: !Sub "${AWS::StackName}"
-#        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/eks-prerequsite.yaml"
-#        Parameters:
-#          VPCID: !Ref VPCID
-#          TemplateBucketName: !Ref TemplateBucketName
-#          Environment: !Ref Environment
-#          ProvisionSecurityGroup: !Ref ProvisionSecurityGroup
-#          EksClusterName: !Sub "${AWS::StackName}"
 
     EKSClusterProvisionIAMStack:
       Condition: isCreateEKS
@@ -914,7 +885,6 @@ Resources:
           EKSPublicAccessEndpoint: !Ref EKSPublicAccessEndpoint
           PerAccountSharedResources: !Ref PerAccountSharedResources
           PerRegionSharedResources: !Ref PerRegionSharedResources
-          #ConfigSetName: !Sub "${AWS::StackName}"
           ConfigSetName: !Sub "${Environment}/${AWS::StackName}"
           ProvisionBastionHost: !Ref ProvisionBastionHost
           ALBIngressController: !Ref ALBIngressController
@@ -947,6 +917,7 @@ Resources:
           ProvisionInstanceType: !Ref ProvisionInstanceType
           ProvisionSecurityGroup: !Ref ProvisionSecurityGroup
           NodeInstanceRoleArn: !GetAtt NodeInstanceRole.Arn
+          NodeSecurityGroup: !GetAtt EKSNodeSecurityGroup.GroupId
           TemplateBucketName: !Ref TemplateBucketName
           Environment: !Ref Environment
           EC2LogGroup: !Ref EC2LogGroup
@@ -970,17 +941,6 @@ Resources:
             Fn::Sub: "{{resolve:secretsmanager:${KotsSecret}::password}}"
           RemoveTempResources: !Ref RemoveTempResources
 
-#    PrometheusStack:
-#      Metadata:
-#        cfn-lint: { config: { ignore_checks: [ W9901 ] } }
-#        DependsOn:
-#          - EKSClusterStack
-#      Condition: EnablePrometheus
-#      Type: AWS::CloudFormation::Stack
-#      Properties:
-#        TemplateURL: !Sub "https://${TemplateBucketName}.s3.amazonaws.com/${Environment}/templates/nested/amazon-eks/submodules/eks-prometheus/templates/eks-prometheus.template.yaml"
-#        Parameters:
-#          KubeClusterName: !Sub "${AWS::StackName}"
 
     PrivateLinkStack:
       Condition: isCreatePrivateLink
@@ -1011,20 +971,12 @@ Outputs:
   ProvisionInstanceProfile:
     Value: !GetAtt EKSClusterProvisionIAMStack.Outputs.ProvisionInstanceProfile
     Condition: isCreateEKS
-
   ElasticSearchDomainEndpoint:
     Value: !GetAtt ElasticSearchStack.Outputs.DomainEndpoint
     Condition: isCreateElasticSearch
-
-#  ControlPanelSecurityGroup:
-#    Value: !GetAtt EKSPreRequsiteStack.Outputs.ControlPanelSecurityGroup
-#    Condition: isCreateEKS
   EKSClusterName:
     Value: !Sub "${AWS::StackName}"
     Condition: isCreateEKS
-#  EKSServiceRoleArn:
-#    Value: !GetAtt EKSPreRequsiteStack.Outputs.EksServiceRoleArn
-#    Condition: isCreateEKS
   NodeInstanceRoleArn:
     Value: !GetAtt NodeInstanceRole.Arn
     Condition: isCreateEKS

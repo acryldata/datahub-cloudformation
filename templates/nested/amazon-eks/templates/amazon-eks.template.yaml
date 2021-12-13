@@ -247,6 +247,15 @@ Resources:
       IpProtocol: tcp
       FromPort: 443
       ToPort: 443
+  ControlPlaneNodeSecurityGroupIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Allow Node SG members to access k8s api
+      GroupId: !Ref ControlPlaneSecurityGroup
+      SourceSecurityGroupId: ~~/<ConfigSetName>/default-nodegroup/NodeSecurityGroupId~~
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
   EKSControlPlane:
     Type: AWS::CloudFormation::Stack
     DependsOn: [CleanupControlPlaneSecurityGroupDependencies, ControlPlaneSecurityGroupIngress, FunctionStack]
