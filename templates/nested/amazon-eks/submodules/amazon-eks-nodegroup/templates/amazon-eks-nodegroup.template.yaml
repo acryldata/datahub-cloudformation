@@ -408,13 +408,23 @@ Resources:
           - [ !Ref Subnet1ID, !Ref Subnet2ID ]
           - [ !Ref Subnet1ID ]
 
-  EKSNodeSecurityGroupIngress:
+  EKSNodeSecurityGroupIngress01:
     DependsOn: EksClusterSecurityGroupId
     Type: AWS::EC2::SecurityGroupIngress
     Properties:
       Description: Allow control plane SG members to access worker node
       GroupId: !Ref NodeSecurityGroupId
       SourceSecurityGroupId: !Ref EksClusterSecurityGroupId
+      IpProtocol: -1
+      FromPort: -1
+      ToPort: -1
+  EKSNodeSecurityGroupIngress02:
+    DependsOn: EksClusterSecurityGroupId
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Allow worker node access each other
+      GroupId: !Ref NodeSecurityGroupId
+      SourceSecurityGroupId: !Ref NodeSecurityGroupId
       IpProtocol: -1
       FromPort: -1
       ToPort: -1
