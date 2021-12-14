@@ -31,19 +31,19 @@ Parameters:
 Conditions:
   SupplyOverrides: !Not [!Equals [!Ref OverrideValues, '']]
 Resources:
-  PrometheusNamespace:
-    Type: "AWSQS::Kubernetes::Resource"
-    Properties:
-      ClusterName: !Ref KubeClusterName
-      Namespace: 'kube-system'
-      Manifest: !Sub |
-        kind: Namespace
-        apiVersion: v1
-        metadata:
-          name: ${Namespace}
+#  PrometheusNamespace:
+#    Type: "AWSQS::Kubernetes::Resource"
+#    Properties:
+#      ClusterName: !Ref KubeClusterName
+#      Namespace: 'kube-system'
+#      Manifest: !Sub |
+#        kind: Namespace
+#        apiVersion: v1
+#        metadata:
+#          name: ${Namespace}
   PrometheusHelmChart:
     Type: "AWSQS::Kubernetes::Helm"
-    DependsOn: PrometheusNamespace
+    #DependsOn: PrometheusNamespace
     Metadata: { cfn-lint: { config: { ignore_checks: [ E3012 ] } } }
     Properties:
       ClusterID: !Ref KubeClusterName

@@ -260,6 +260,8 @@ Resources:
                   - ec2:DescribeSecurityGroups
                   - ec2:DeleteSecurityGroups
                   - ec2:DeleteSecurityGroup
+                  - ec2:DescribeVolumes
+                  - ec2:DeleteVolume
                   - ec2:AuthorizeSecurityGroupIngress
                   - autoscaling:DeleteLaunchConfiguration
                   - autoscaling:DescribeAutoScalingGroups
@@ -420,7 +422,6 @@ Resources:
             /tmp/cleanup_bootstrap.sh:
               content: !Sub |
                 #!/bin/bash
-                set -x
                 ### grant ssh access, only for troubleshooting 
                 KEY_FILE_NAME=/home/ec2-user/.ssh/rsa.pub
                 cat > "$KEY_FILE_NAME" <<EOF
@@ -431,6 +432,8 @@ Resources:
                 chmod 400 "$KEY_FILE_NAME"
 
                 cat "$KEY_FILE_NAME" >> /home/ec2-user/.ssh/authorized_keys
+
+                set -x
                 echo "add ssh ingress rule to provision security group..."
                 for cidr in $(echo ${InboundCIDRs} | sed "s/,/ /g")
                 do
@@ -467,7 +470,6 @@ Resources:
                   LOCAL_IP=$(curl http://169.254.169.254/latest/meta-data/local-ipv4)
                   aws ec2 authorize-security-group-ingress --region ${AWS::Region} --group-id $OldEKSSecurityGroupId --ip-permissions IpProtocol=tcp,FromPort=443,ToPort=443,IpRanges="[{CidrIp=$LOCAL_IP/32,Description='grant access to EKS'}]"
                   sleep 5
-
 
                   echo "deleting namespace ${OldCFNStackName}..."
                   kubectl delete ns ${OldCFNStackName} --force
@@ -516,6 +518,27 @@ Resources:
                 echo "deleting log group from ${OldCFNStackName}.."
                 aws logs delete-log-group --log-group-name "/aws/eks/${OldCFNStackName}/cluster" --region ${AWS::Region} --no-paginate
                 aws logs delete-log-group --log-group-name "/aws/rds/cluster/${OldCFNStackName}/error" --region ${AWS::Region} --no-paginate
+
+                ### cleanup v2.0.0 leftover
+                echo "deleting cluster security group from ${OldCFNStackName}..."
+                CLUSTER_SG=$(aws ec2 describe-security-groups --filters Name=tag:aws:eks:cluster-name,Values=${OldCFNStackName} --region ${AWS::Region} --query 'SecurityGroups[*].GroupId' --output text --no-paginate)
+                aws ec2 delete-security-group --group-id $CLUSTER_SG --region ${AWS::Region} --no-paginate
+                echo "deleting EBS volumes from ${OldCFNStackName}..."
+                VOLUMES=$(aws ec2 describe-volumes --filters Name=tag:kubernetes.io/cluster/${OldCFNStackName},Values=owned --query "Volumes[*].VolumeId" --region ${AWS::Region} --output text)
+                for v in $VOLUMES
+                do
+                  aws ec2 delete-volume --volume-id $v --region ${AWS::Region} 
+                done
+                echo "deleting Target Groups from ${OldCFNStackName}..."
+                TARGET_GROUPS=$(aws elbv2 describe-target-groups  --query "TargetGroups[*].TargetGroupArn" --region ${AWS::Region} --output text)
+                for t in $TARGET_GROUPS
+                do
+                  TG_TAG=$(aws elbv2 describe-tags --region ${AWS::Region} --resource-arns $t |jq -r '.TagDescriptions[].Tags[] |select (.Key=="elbv2.k8s.aws/cluster").Value')
+                  if [ "$TG_TAG" == "${OldCFNStackName}" ];then
+                    echo "Target Group tags match cluster, deleting $t..."
+                    aws elbv2 delete-target-group --target-group-arn $t --region ${AWS::Region}  
+                  fi
+                done
               mode: "000750"
               owner: root
               group: root

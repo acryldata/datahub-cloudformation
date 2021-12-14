@@ -51,6 +51,10 @@ Parameters:
       AllowedValues:
         - "true"
         - "false"
+    PrometheusIntegration:
+      Type: String
+      AllowedValues: [ Enabled, Disabled ]
+      Default: Disabled
     TemplateBucketName:
       AllowedPattern: "^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$"
       ConstraintDescription: "Bucket name can include numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen (-)."
@@ -320,8 +324,12 @@ Resources:
                   echo "namespace ${K8sNamespace} already has resources, stopping..."
                   exit 0
                 else
-                  echo "Creating namespace..."
+                  echo "Creating namespace ${K8sNamespace}..."
                   kubectl create ns ${K8sNamespace}
+                  if [ "${PrometheusIntegration}" == "Enabled" ]; then
+                    echo "Creating namespace prometheus..."
+                    kubectl create ns prometheus
+                  fi
                 fi
 
                 echo "prepare configvalues.yaml..."
