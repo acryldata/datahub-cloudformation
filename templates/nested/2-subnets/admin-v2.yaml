@@ -464,10 +464,10 @@ Resources:
                   #  done
                   #fi
                 fi
-                echo "removing finalizer from namespace: ${EksClusterName}"
-                /tmp/remove_namespace_finalizer.sh ${EksClusterName}
-                echo "removing finalizer from namespace: prometheus"
-                /tmp/remove_namespace_finalizer.sh prometheus
+                #echo "removing finalizer from namespace: ${EksClusterName}"
+                #/tmp/remove_namespace_finalizer.sh ${EksClusterName}
+                #echo "removing finalizer from namespace: prometheus"
+                #/tmp/remove_namespace_finalizer.sh prometheus
               mode: "000750"
               owner: root
               group: root
