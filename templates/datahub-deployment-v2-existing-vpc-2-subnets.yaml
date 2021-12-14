@@ -809,7 +809,6 @@ Resources:
           VPCID: !Ref VPCID
           DBSubnet1: !Ref PrivateSubnet1ID
           DBSubnet2: !Ref PrivateSubnet2ID
-          #NodeSecurityGroup: !GetAtt EKSClusterStack.Outputs.NodeGroupSecurityGroup
           NodeSecurityGroup: !GetAtt EKSNodeSecurityGroup.GroupId
           MSKClusterName: !Sub "${AWS::StackName}"
           Environment: !Ref Environment
