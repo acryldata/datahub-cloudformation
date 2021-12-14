@@ -218,7 +218,6 @@ Parameters:
       Default: "subnet-1111"
     PrivateSubnet2ID: 
       Type: "AWS::EC2::Subnet::Id"
-      Type: String
       Default: "subnet-2222"
     PrivateSubnet3ID:
       Type: String
