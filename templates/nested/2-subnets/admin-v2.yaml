@@ -321,11 +321,11 @@ Resources:
                 set -x
                 kubectl get pod -n prometheus |grep prometheus &> /dev/null
                 if [ $? -eq 0 ]; then
+                  echo "skip creating namespace prometheus..."
+                else
                   if [ "${PrometheusIntegration}" == "Enabled" ]; then
                     echo "Creating namespace prometheus..."
                     kubectl create ns prometheus
-                  else
-                    echo "skip creating namespace prometheus..."
                   fi
                 fi
                 kubectl get pod -n ${K8sNamespace} |grep kots &> /dev/null
