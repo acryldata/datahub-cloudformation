@@ -319,6 +319,15 @@ Resources:
                   chmod 600 /home/ec2-user/.kube/config
                 fi
                 set -x
+                kubectl get pod -n prometheus |grep prometheus &> /dev/null
+                if [ $? -eq 0 ]; then
+                  if [ "${PrometheusIntegration}" == "Enabled" ]; then
+                    echo "Creating namespace prometheus..."
+                    kubectl create ns prometheus
+                  else
+                    echo "skip creating namespace prometheus..."
+                  fi
+                fi
                 kubectl get pod -n ${K8sNamespace} |grep kots &> /dev/null
                 if [ $? -eq 0 ]; then
                   echo "namespace ${K8sNamespace} already has resources, stopping..."
@@ -326,10 +335,6 @@ Resources:
                 else
                   echo "Creating namespace ${K8sNamespace}..."
                   kubectl create ns ${K8sNamespace}
-                  if [ "${PrometheusIntegration}" == "Enabled" ]; then
-                    echo "Creating namespace prometheus..."
-                    kubectl create ns prometheus
-                  fi
                 fi
 
                 echo "prepare configvalues.yaml..."
