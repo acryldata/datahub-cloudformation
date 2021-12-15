@@ -944,7 +944,8 @@ Resources:
     PrometheusStack:
       Metadata:
         DependsOn:
-          - !Ref AdminStack
+          #- !Ref AdminStack
+          - !Ref EKSClusterStack
       Condition: EnablePrometheus
       Type: AWS::CloudFormation::Stack
       Properties:

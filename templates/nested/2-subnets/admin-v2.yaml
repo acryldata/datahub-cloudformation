@@ -325,7 +325,7 @@ Resources:
                 else
                   if [ "${PrometheusIntegration}" == "Enabled" ]; then
                     echo "Creating namespace prometheus..."
-                    kubectl create ns prometheus
+                    #kubectl create ns prometheus
                   fi
                 fi
                 kubectl get pod -n ${K8sNamespace} |grep kots &> /dev/null
