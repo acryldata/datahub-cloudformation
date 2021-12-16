@@ -680,6 +680,11 @@ Resources:
       Properties:
         GroupDescription: Cluster Node SG
         VpcId: !Ref VPCID
+        Tags:
+          - Key: Name
+            Value: !Sub "${AWS::StackName}-Node-SG"
+          - Key: !Sub "kubernetes.io/cluster/${AWS::StackName}"
+            Value: owned
 
     ProvisionSecurityGroup:
       Condition: isCreateEKS
