@@ -683,6 +683,8 @@ Resources:
         Tags:
           - Key: Name
             Value: !Sub "${AWS::StackName}-Node-SG"
+          - Key: aws:eks:cluster-name
+            Value: !Sub "${AWS::StackName}"
           - Key: !Sub "kubernetes.io/cluster/${AWS::StackName}"
             Value: owned
 
