@@ -70,7 +70,7 @@ Parameters:
       Default: "dev"
     VPCID:
       Default: "vpc-1234"
-      Type: String
+      Type: "AWS::EC2::VPC::Id"
     CreateRoleAndSg:
       Description: "Set to true if you want to create IAM Role and Security Group"
       Type: String
@@ -97,14 +97,14 @@ Parameters:
       Default: "datahub-provision-role"
     PrivateSubnet1ID:
       Default: "subnet-01"
-      Type: String
+      Type: "AWS::EC2::Subnet::Id"
     OldProvisionSecurityGroupID:
       Type: String
       Description: The Old Provision Instance Security Group Id
       Default: "sg-xxx"
     OldCFNStackName:
       Type: String
-      Description: The Name of The Old Cloudformation Stack
+      Description: The Name of The Old Cloudformation Stack you want to cleanup
       Default: ""
     InboundCIDRs:
       ConstraintDescription: The Elastic Load Balancer Inbound CIDRs
