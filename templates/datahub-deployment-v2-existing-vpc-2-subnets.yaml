@@ -208,8 +208,8 @@ Metadata:
 
 Parameters:
     VPCID: 
-      Default: "vpc-0000" 
-      Type: String
+      Type: "AWS::EC2::VPC::Id"
+      Default: "vpc-1234" 
     AvailabilityZones:
       Description: "List of Availability Zones to use for the subnets in the VPC. Please choose three zones."
       Type: "List<AWS::EC2::AvailabilityZone::Name>"
