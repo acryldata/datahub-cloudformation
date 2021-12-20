@@ -106,6 +106,7 @@ Resources:
                   - secretsmanager:GetSecretValue
                   - secretsmanager:DescribeSecret
                   - secretsmanager:TagResource
+                  - secretsmanager:UpdateSecret
                 #Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${Environment}/${EksClusterName}/*",
                 Resource: "*"
                 Effect: Allow
