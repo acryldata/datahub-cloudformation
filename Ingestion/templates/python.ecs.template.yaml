@@ -1,0 +1,145 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Parameters:
+  SubnetID:
+    Type: "AWS::EC2::Subnet::Id"
+  VPCID:
+    Type: "AWS::EC2::VPC::Id"
+
+### ECS Cluster ###
+Resources:
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub "${AWS::StackName}"
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "${AWS::StackName}log-group"
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AWS::StackName}-task-role"
+      Policies:
+        - PolicyName: ssmmessages-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+            - Action: 
+                - ssmmessages:CreateControlChannel
+                - ssmmessages:CreateDataChannel
+                - ssmmessages:OpenControlChannel
+                - ssmmessages:OpenDataChannel
+              Resource: "*"
+              Effect: Allow
+        - PolicyName: logs-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+            - Action: 
+                - logs:DescribeLogGroups
+              Resource: "*"
+              Effect: Allow
+        - PolicyName: logs-streams-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+            - Action: 
+                - logs:CreateLogStream
+                - logs:DescribeLogStreams
+                - logs:PutLogEvents
+              Effect: Allow
+              Resource: "*"
+        - PolicyName: sqs-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+            - Action:
+                - sqs:*
+              Effect: Allow
+              Resource: "arn:aws:sqs:us-west-2:577660233792:listener-main"
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: 'sts:AssumeRole'
+
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AWS::StackName}-execution-role"
+      Policies:
+        - PolicyName: logs-streams-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+            - Action:
+                - logs:CreateLogStream
+                - logs:DescribeLogStreams
+                - logs:PutLogEvents
+              Effect: Allow
+              Resource: "*"
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+
+  ContainerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: ContainerSecurityGroup
+      GroupDescription: Security group for container
+      VpcId: !Ref VPCID
+      #SecurityGroupIngress:
+      #  - IpProtocol: tcp
+      #    FromPort: 80
+      #    ToPort: 80
+      #    CidrIp: 0.0.0.0/0
+
+### Task Definition and ECS Service ###
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${AWS::StackName}-task"
+      Cpu: 256
+      Memory: 512
+      TaskRoleArn: !Ref TaskRole
+      NetworkMode: awsvpc
+      ExecutionRoleArn: !Ref ExecutionRole
+      ContainerDefinitions:
+        - Name: !Sub "${AWS::StackName}-container"
+          Image: zyb2n/sqs_consumer:latest
+          PortMappings:
+            - ContainerPort: 80
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-region: !Ref AWS::Region
+              awslogs-group: !Ref LogGroup
+              awslogs-stream-prefix: ecs
+      RequiresCompatibilities:
+        - EC2
+        - FARGATE
+  ECSService:
+    DependsOn: Cluster
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Sub "${AWS::StackName}-service"
+      Cluster: !Ref Cluster
+      TaskDefinition: !Ref TaskDefinition
+      DesiredCount: 1
+      LaunchType: FARGATE
+      EnableExecuteCommand: true
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets:
+            - !Ref SubnetID
+          SecurityGroups:
+            - !GetAtt ContainerSecurityGroup.GroupId
