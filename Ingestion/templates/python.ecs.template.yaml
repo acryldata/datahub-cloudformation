@@ -4,6 +4,18 @@ Parameters:
     Type: "AWS::EC2::Subnet::Id"
   VPCID:
     Type: "AWS::EC2::VPC::Id"
+  DataHubBaseUrl:
+    Type: "String"
+  DataHubAccessToken:
+    Type: "String"
+  AwsAccessKeyId:
+    Type: "String"
+  AwsSecretAccessKey:
+    Type: "String"
+  AwsRegion:
+    Type: "String"
+  AwsCommandQueueUrl:
+    Type: "String"
 
 ### ECS Cluster ###
 Resources:
@@ -114,7 +126,7 @@ Resources:
       ExecutionRoleArn: !Ref ExecutionRole
       ContainerDefinitions:
         - Name: !Sub "${AWS::StackName}-container"
-          Image: zyb2n/sqs_consumer:latest
+          Image: 795586375822.dkr.ecr.us-west-2.amazonaws.com/acryl-sqs-remote-executor
           PortMappings:
             - ContainerPort: 80
           LogConfiguration:
@@ -123,6 +135,21 @@ Resources:
               awslogs-region: !Ref AWS::Region
               awslogs-group: !Ref LogGroup
               awslogs-stream-prefix: ecs
+          Environment: 
+            - Name: DATAHUB_BASE_URL
+              Value: !Ref DataHubBaseUrl
+            - Name: DATAHUB_ACCESS_TOKEN
+              Value: !Ref DataHubAccessToken
+            - Name: AWS_ACCESS_KEY_ID
+              Value: !Ref AwsAccessKeyId
+            - Name: AWS_SECRET_ACCESS_KEY
+              Value: !Ref AwsSecretAccessKey
+            - Name: AWS_SESSION_TOKEN
+              Value: ""
+            - Name: AWS_REGION 
+              Value: !Ref AwsRegion
+            - Name: AWS_COMMAND_QUEUE_URL
+              Value: !Ref AwsCommandQueueUrl
       RequiresCompatibilities:
         - EC2
         - FARGATE

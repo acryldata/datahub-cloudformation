@@ -7,7 +7,7 @@ if [ $# -ne 1 ]; then
 else
   STACK_NAME=$1
 fi
-export AWS_PROFILE=blrxgroup-dev-admin
+export AWS_PROFILE=default
 ### use private subnet
 #aws cloudformation create-stack --stack-name ${STACK_NAME} --template-body file://./templates/nginx.ecs.template.yaml --capabilities CAPABILITY_NAMED_IAM --parameters ParameterKey=SubnetID,ParameterValue=subnet-0127a3f6a25ae5b7e ParameterKey=VPCID,ParameterValue=vpc-03042805f5912d718 --no-cli-pager
 

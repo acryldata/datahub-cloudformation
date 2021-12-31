@@ -7,7 +7,7 @@ if [ $# -ne 1 ]; then
 else
   STACK_NAME=$1
 fi
-export AWS_PROFILE=blrxgroup-dev-admin
+export AWS_PROFILE=default
 ### to login to fargate container
 TASK_ARN=$(aws ecs list-tasks --cluster "${STACK_NAME}" --query "taskArns[*]" --output text)
 echo "ECS Cluster: ${STACK_NAME} --- TASK_ARN: $TASK_ARN"
