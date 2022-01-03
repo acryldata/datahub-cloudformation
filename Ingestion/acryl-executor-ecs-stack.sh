@@ -1,7 +1,7 @@
 #!/bin/bash
 set -x
 if [ $# -ne 8 ]; then
-  echo "Usage: acryl-executor-ecs-stack.sh <Stack_Name> <DataHubBaseUrl> <DataHubAccessToken> <AwsAccessKeyId> <AwsSecretAccessKey> <AwsSessionToken> <AwsRegion> <AwsCommandQueueUrl>"
+  echo "Usage: acryl-executor-ecs-stack.sh <Stack_Name> <DataHubBaseUrl> <DataHubAccessToken> <AwsAccessKeyId> <AwsSecretAccessKey> <AwsRegion> <AwsCommandQueueUrl>"
   echo "For Example: ./acryl-python-ingestion-stack.sh datahub-ingestion https://staging.acryl.io ..."
   exit 1
 else
