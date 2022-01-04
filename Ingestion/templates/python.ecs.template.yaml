@@ -6,6 +6,7 @@ Parameters:
     Type: "AWS::EC2::VPC::Id"
   DataHubBaseUrl:
     Type: "String"
+    Default: "https://staging.acryl.io/gms"
   DataHubAccessToken:
     Type: "String"
   AwsAccessKeyId:
@@ -16,6 +17,52 @@ Parameters:
     Type: "String"
   AwsCommandQueueUrl:
     Type: "String"
+    Default: "https://sqs.us-west-2.amazonaws.com/795586375822/datahub-executor-command-test"
+  TaskCpu:
+    Type: "String"
+    Default: "1024"
+    Description: "The ECS Task CPU value, check https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-cpu-memory-error.html"
+    AllowedValues:
+      - 256
+      - 512
+      - 1024
+      - 2048
+      - 4096
+  TaskMemory:
+    Type: "String"
+    Default: "2048"
+    Description: "The ECS Task Memory value (MiB), check https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-cpu-memory-error.html"
+    AllowedValues:
+      - 512
+      - 1024
+      - 2048
+      - 4096
+      - 5120
+      - 6144
+      - 7168
+      - 8192
+      - 9216
+      - 10240
+      - 11264
+      - 12288
+      - 13312
+      - 14336
+      - 15360
+      - 16384
+      - 17408
+      - 18432
+      - 19456
+      - 20480
+      - 21504
+      - 22528
+      - 23552
+      - 24576
+      - 25600
+      - 26624
+      - 27648
+      - 28672
+      - 29696
+      - 30720
 
 ### ECS Cluster ###
 Resources:
@@ -119,8 +166,8 @@ Resources:
     Type: AWS::ECS::TaskDefinition
     Properties:
       Family: !Sub "${AWS::StackName}-task"
-      Cpu: 256
-      Memory: 512
+      Cpu: !Ref TaskCpu
+      Memory: !Ref TaskMemory
       TaskRoleArn: !Ref TaskRole
       NetworkMode: awsvpc
       ExecutionRoleArn: !Ref ExecutionRole
