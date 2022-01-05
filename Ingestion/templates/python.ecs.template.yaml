@@ -9,10 +9,13 @@ Parameters:
     Default: "https://staging.acryl.io/gms"
   DataHubAccessToken:
     Type: "String"
+    NoEcho: Yes
   AwsAccessKeyId:
     Type: "String"
+    NoEcho: Yes
   AwsSecretAccessKey:
     Type: "String"
+    NoEcho: Yes
   AwsRegion:
     Type: "String"
   AwsCommandQueueUrl:
@@ -66,6 +69,12 @@ Parameters:
 
 ### ECS Cluster ###
 Resources:
+  DataHubAccessTokenSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "/${AWS::StackName}/DataHubAccessToken"
+      Description: !Sub "${AWS::StackName}: Secrets for DataHubAccessToken"
+      SecretString: !Ref DataHubAccessToken
   Cluster:
     Type: AWS::ECS::Cluster
     Properties:
@@ -73,11 +82,12 @@ Resources:
   LogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Sub "${AWS::StackName}log-group"
+      LogGroupName: !Sub "${AWS::StackName}-log-group"
   TaskRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub "${AWS::StackName}-task-role"
+      #RoleName: !Sub "${AWS::StackName}-task-role"
+      RoleName: !Sub "datahub-ingestion-task-role"
       Policies:
         - PolicyName: ssmmessages-policy
           PolicyDocument:
@@ -88,13 +98,43 @@ Resources:
                 - ssmmessages:CreateDataChannel
                 - ssmmessages:OpenControlChannel
                 - ssmmessages:OpenDataChannel
-              Resource: "*"
               Effect: Allow
+              Resource: "*"
         - PolicyName: logs-policy
           PolicyDocument:
             Version: 2012-10-17
             Statement:
             - Action: 
+                - logs:DescribeLogGroups
+              Effect: Allow
+              Resource: "*"
+        - PolicyName: logs-streams-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+            - Action:
+                - logs:CreateLogStream
+                - logs:DescribeLogStreams
+                - logs:PutLogEvents
+              Effect: Allow
+              Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/ecs/${AWS::StackName}-log-group:*"
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "datahub-ingestion-execution-role"
+      Policies:
+        - PolicyName: logs-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+            - Action:
                 - logs:DescribeLogGroups
               Resource: "*"
               Effect: Allow
@@ -102,40 +142,20 @@ Resources:
           PolicyDocument:
             Version: 2012-10-17
             Statement:
-            - Action: 
-                - logs:CreateLogStream
-                - logs:DescribeLogStreams
-                - logs:PutLogEvents
-              Effect: Allow
-              Resource: "*"
-        - PolicyName: sqs-policy
-          PolicyDocument:
-            Version: 2012-10-17
-            Statement:
-            - Action:
-                - sqs:*
-              Effect: Allow
-              Resource: "arn:aws:sqs:us-west-2:577660233792:listener-main"
-      AssumeRolePolicyDocument:
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: ecs-tasks.amazonaws.com
-            Action: 'sts:AssumeRole'
-
-  ExecutionRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Sub "${AWS::StackName}-execution-role"
-      Policies:
-        - PolicyName: logs-streams-policy
-          PolicyDocument:
-            Version: 2012-10-17
-            Statement:
             - Action:
                 - logs:CreateLogStream
                 - logs:DescribeLogStreams
                 - logs:PutLogEvents
+              Effect: Allow
+              Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/ecs/${AWS::StackName}-log-group:*"
+        - PolicyName: secretsmanager-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+            - Action:
+                - secretsmanager:GetSecretValue
+                #- ssm:GetParameters
+                #- kms:Decrypt
               Effect: Allow
               Resource: "*"
       AssumeRolePolicyDocument:
@@ -143,8 +163,7 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Service:
-                - ecs-tasks.amazonaws.com
+              Service: ecs-tasks.amazonaws.com
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
@@ -163,6 +182,7 @@ Resources:
 
 ### Task Definition and ECS Service ###
   TaskDefinition:
+    DependsOn: DataHubAccessTokenSecret
     Type: AWS::ECS::TaskDefinition
     Properties:
       Family: !Sub "${AWS::StackName}-task"
@@ -182,11 +202,12 @@ Resources:
               awslogs-region: !Ref AWS::Region
               awslogs-group: !Ref LogGroup
               awslogs-stream-prefix: ecs
+          Secrets:
+            - Name: DATAHUB_ACCESS_TOKEN
+              ValueFrom: !Sub "${DataHubAccessTokenSecret}"
           Environment: 
             - Name: DATAHUB_BASE_URL
               Value: !Ref DataHubBaseUrl
-            - Name: DATAHUB_ACCESS_TOKEN
-              Value: !Ref DataHubAccessToken
             - Name: AWS_ACCESS_KEY_ID
               Value: !Ref AwsAccessKeyId
             - Name: AWS_SECRET_ACCESS_KEY
