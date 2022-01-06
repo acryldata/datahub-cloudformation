@@ -86,8 +86,8 @@ Resources:
   TaskRole:
     Type: AWS::IAM::Role
     Properties:
-      #RoleName: !Sub "${AWS::StackName}-task-role"
-      RoleName: !Sub "datahub-ingestion-task-role"
+      RoleName: !Sub "${AWS::StackName}-task-role"
+      #RoleName: !Sub "datahub-ingestion-task-role"
       Policies:
         - PolicyName: ssmmessages-policy
           PolicyDocument:
@@ -128,7 +128,8 @@ Resources:
   ExecutionRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub "datahub-ingestion-execution-role"
+      RoleName: !Sub "${AWS::StackName}-execution-role"
+      #RoleName: !Sub "datahub-ingestion-execution-role"
       Policies:
         - PolicyName: logs-policy
           PolicyDocument:
