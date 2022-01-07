@@ -21,6 +21,9 @@ Parameters:
   AwsCommandQueueUrl:
     Type: "String"
     Default: "https://sqs.us-west-2.amazonaws.com/795586375822/datahub-executor-command-test"
+  AwsCommandQueueArn:
+    Type: "String"
+    Default: "arn:aws:sqs:us-west-2:795586375822:datahub-executor-command-test"
   TaskCpu:
     Type: "String"
     Default: "1024"
@@ -118,6 +121,17 @@ Resources:
                 - logs:PutLogEvents
               Effect: Allow
               Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/ecs/${AWS::StackName}-log-group:*"
+        - PolicyName: sqs-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+            - Action:
+                - sqs:ChangeMessageVisibility
+                - sqs:DeleteMessage
+                - sqs:ReceiveMessage
+                - sqs:GetQueueUrl
+              Effect: Allow
+              Resource: !Ref AwsCommandQueueArn
       AssumeRolePolicyDocument:
         Statement:
           - Effect: Allow
@@ -158,7 +172,7 @@ Resources:
                 #- ssm:GetParameters
                 #- kms:Decrypt
               Effect: Allow
-              Resource: "*"
+              Resource: !Sub "${DataHubAccessTokenSecret}"
       AssumeRolePolicyDocument:
         Version: 2012-10-17
         Statement:
