@@ -1,0 +1,178 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Deploys Amazon Managed Kafka
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: MSK Stack Configuration
+        Parameters:
+          - VPCID
+          - DBSubnet1
+          - DBSubnet2
+          - DBSubnet3
+          - MSKClusterName
+          - Environment
+          - KafkaVersion
+          - MSKInstanceType
+          - MSKVolumeSize
+          - NumberOfBrokerNodes
+
+    ParameterLabels:
+      NodeSecurityGroup:
+        default: The Node Security Group ID to use for MSK
+      DBSubnet1:
+        default: The ID of Private Subnet 1
+      DBSubnet2:
+        default: The ID of Private Subnet 2
+      DBSubnet3:
+        default: The ID of Private Subnet 3
+      VPCID:
+        default: VPC ID
+      MSKClusterName:
+        default: MSK Cluster Name
+      Environment:
+        default: The Environment
+      KafkaVersion:
+        default: Kafka Version
+      MSKInstanceType:
+        default: MSK Instance Type
+      MSKVolumeSize:
+        default: The MSK Volume Size
+      NumberOfBrokerNodes:
+        default: The Number of MSK Brokers
+
+Parameters:
+  NodeSecurityGroup:
+    Description: ID for the VPC, This will be used to get the node security group
+    Type: AWS::EC2::SecurityGroup::Id
+  DBSubnet1:
+    Description: ID of Private Subnet 1
+    Type: AWS::EC2::Subnet::Id
+  DBSubnet2:
+    Description: ID of Private Subnet 2
+    Type: AWS::EC2::Subnet::Id
+  DBSubnet3:
+    Description: ID of Private Subnet 3
+    Type: AWS::EC2::Subnet::Id
+  VPCID:
+    Description: ID for the VPC
+    Type: AWS::EC2::VPC::Id
+  MSKInstanceType:
+    AllowedValues:
+      - kafka.t3.small
+      - kafka.t3.large
+      - kafka.m5.large
+    ConstraintDescription: Must contain valid MSK instance type
+    Default: kafka.t3.small
+    Description: EC2 instance type for the Amazon MSK instances
+    Type: String
+  KafkaVersion:
+    AllowedValues:
+      - 2.4.1.1
+    Default: 2.4.1.1
+    Description: Kafka version
+    Type: String
+  MSKClusterName:
+    Default: "datahub"
+    Description: MSK Cluster Name
+    Type: String
+  Environment:
+    Type: String
+    Description: The Environment
+  MSKVolumeSize:
+    Default: 10
+    Description: MSK Volume Size in GB
+    Type: String
+  NumberOfBrokerNodes:
+    Default: 3
+    Description: The number of MSK Brokers
+    Type: String
+
+
+Resources:
+    MSKSecurityGroup:
+        Type: "AWS::EC2::SecurityGroup"
+        Properties:
+            GroupDescription: "Managed by CloudFormation"
+            GroupName: !Sub "${MSKClusterName}-msk-sg"
+            VpcId: !Ref VPCID
+
+    MSKSecurityGroupIngress01:
+        Type: "AWS::EC2::SecurityGroupIngress"
+        Properties:
+            GroupId: !Ref MSKSecurityGroup
+            SourceSecurityGroupId: !Ref NodeSecurityGroup
+            SourceSecurityGroupOwnerId: !Ref AWS::AccountId
+            FromPort: 9094
+            IpProtocol: "tcp"
+            ToPort: 9094
+
+    MSKSecurityGroupIngress02:
+        Type: "AWS::EC2::SecurityGroupIngress"
+        Properties:
+            GroupId: !Ref MSKSecurityGroup
+            SourceSecurityGroupId: !Ref NodeSecurityGroup
+            SourceSecurityGroupOwnerId: !Ref AWS::AccountId
+            FromPort: 2181
+            IpProtocol: "tcp"
+            ToPort: 2181
+
+    MSKSecurityGroupIngress03:
+        Type: "AWS::EC2::SecurityGroupIngress"
+        Properties:
+            GroupId: !Ref MSKSecurityGroup
+            SourceSecurityGroupId: !Ref NodeSecurityGroup
+            SourceSecurityGroupOwnerId: !Ref AWS::AccountId
+            FromPort: 9092
+            IpProtocol: "tcp"
+            ToPort: 9092
+
+    MSKCluster:
+        Type: "AWS::MSK::Cluster"
+        DependsOn: MSKLogGroup
+        Properties:
+            ClusterName: !Sub "${MSKClusterName}"
+            NumberOfBrokerNodes: !Ref NumberOfBrokerNodes
+            Tags:
+                CloudFormation: "true"
+                Environment: !Sub "${MSKClusterName}"
+            EnhancedMonitoring: "DEFAULT"
+            EncryptionInfo:
+                EncryptionInTransit:
+                    ClientBroker: "TLS_PLAINTEXT"
+                    InCluster: true
+            KafkaVersion: "2.4.1.1"
+            BrokerNodeGroupInfo:
+                BrokerAZDistribution: "DEFAULT"
+                ClientSubnets:
+                  - !Ref DBSubnet1
+                  - !Ref DBSubnet2
+                  - !Ref DBSubnet3
+                InstanceType: !Ref MSKInstanceType
+                SecurityGroups:
+                  - !Ref MSKSecurityGroup
+                StorageInfo:
+                    EBSStorageInfo:
+                        VolumeSize: !Ref MSKVolumeSize
+            OpenMonitoring:
+                Prometheus:
+                    JmxExporter:
+                        EnabledInBroker: false
+                    NodeExporter:
+                        EnabledInBroker: false
+            LoggingInfo:
+                BrokerLogs:
+                    CloudWatchLogs:
+                        Enabled: true
+                        LogGroup: !Sub "${Environment}-${MSKClusterName}-msk-broker-logs"
+
+    MSKLogGroup:
+        Type: "AWS::Logs::LogGroup"
+        Properties:
+            LogGroupName: !Sub "${Environment}-${MSKClusterName}-msk-broker-logs"
+
+Outputs:
+  SubstackName:
+    Description: The msk stack name
+    Value: !Sub "${AWS::StackName}"
