@@ -19,7 +19,7 @@ export AWS_PROFILE=***
       
 2. create stack to deploy datahub platform in AWS
 
-     - choose Oregon region -> Cloudformation -> Create stack
+     - choose region -> Cloudformation -> Create stack
 
      - choose template based on your use case
          - Template Amazon S3 URL: https://cf-templates-xxx-us-west-2.s3.us-west-2.amazonaws.com/dev/templates/datahub-deployment-v2.yaml (will create new VPC with 3 Subnets first, then deploy datahub to the new VPC)
@@ -30,11 +30,10 @@ export AWS_PROFILE=***
              - TemplateBucketName: cf-templates-xxx-us-west-2
              - Environment: dev
              - VPCID: vpc-0xxxxxxxxxxxxxxxx
-             - The AZ's to deploy to: choose 'us-west-2a, us-west-2b, us-west-2c'
-             - choose 3 AZs
+             - The AZ's to deploy to: choose 3 or 2 AZs per your use case
              - The Existing Private Subnet 1 ID: subnet-1xxxxxxxxxxxxxxxx
              - The Existing Private Subnet 2 ID: subnet-2xxxxxxxxxxxxxxxx
-             - The Existing Private Subnet 3 ID: subnet-3xxxxxxxxxxxxxxxx
+             - The Existing Private Subnet 3 ID: subnet-3xxxxxxxxxxxxxxxx, or leave empty for 2-subnet setup
 
              - Enable Creation of ElasticSearch Service Role: set to true if ServiceLinked Role for ES doesn't exists
 
@@ -55,7 +54,8 @@ export AWS_PROFILE=***
 
      - Tags, can have customized tags here, no space allowed in either Key or Value
 
-     - Stack failure options: choose 'Preserve successfully provisioned resources' (useful when working on development of cloudformation)
+     - Stack failure options: choose 'rollback on failure'
+         - for troubleshooting, choose 'Preserve successfully provisioned resources' (useful when working on development of cloudformation)
 
      - check:
           - "I acknowledge that AWS CloudFormation might create IAM resources with custom names."
@@ -81,18 +81,8 @@ export AWS_PROFILE=***
 
 ## step 5 runs on Acryl AWS account
 5. manually create VPC endpoint
-     - under Acryl AWS account, us-west-2 region, find service by service name, for example com.amazonaws.vpce.us-west-2.vpce-svc-*** (get service name from step 4.), select shared vpc, choose 3 private subnets, attach default security group
+     - under Acryl AWS account, go to same region as customer, find service by service name, for example com.amazonaws.vpce.us-west-2.vpce-svc-*** (get service name from step 4.), select shared vpc, choose 3 private subnets, attach default security group
 
      - access https://{vpc_endpoint_dns} to use manage datahub release
 
-
-## To cleanup, see CleanUp-after-Stack-Deletion.sh
-```console
-cd cloudformation
-./CleanUp-after-Stack-Deletion.sh dev dev-datahub
-```
-     - follow step 0 to step 3
-
-     - after step 0 through step 3 are completed, type 1 to continue, Type 2 to cancel
-     
 
