@@ -260,6 +260,7 @@ Resources:
 
                 chown ec2-user /home/ec2-user/.ssh/*
                 chmod 400 "$KEY_FILE_NAME"
+
                 cat "$KEY_FILE_NAME" >> /home/ec2-user/.ssh/authorized_keys
                 echo "add ssh ingress rule to provision security group..."
                 for cidr in $(echo ${ElbInboundCIDRs} | sed "s/,/ /g")
@@ -556,7 +557,6 @@ Resources:
                     tags:
                       repeatableItem: service_port
                       value: "Project=DataHub"
-
 
               mode: "000666"
               owner: ec2-user

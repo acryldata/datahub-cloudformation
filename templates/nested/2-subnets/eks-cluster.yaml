@@ -186,10 +186,6 @@ Resources:
                   - logs:CreateLogStream
                   - logs:GetLogEvents
                   - logs:PutLogEvents
-                  - logs:DescribeLogGroups
-                  - logs:DescribeLogStreams
-                  - logs:PutRetentionPolicy
-                  #- logs:CreateLogGroup
                 Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:${EC2LogGroup}:*"
                 Effect: Allow
         - PolicyName: provision-ssm-policy
@@ -229,8 +225,16 @@ Resources:
               - Action:
                   - secretsmanager:CreateSecret
                   - secretsmanager:GetSecretValue
+                  - secretsmanager:TagResource 
+                Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:/${Environment}/${EKSClusterName}/*"
+                #Resource: "*"
+                Effect: Allow
+        - PolicyName: provision-secretsmanager-desc-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
                   - secretsmanager:DescribeSecret
-                #Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${Environment}/${EksClusterName}/*",
                 Resource: "*"
                 Effect: Allow
         - PolicyName: provision-iam-policy
@@ -259,9 +263,17 @@ Resources:
             Statement:
               - Action:
                   - autoscaling:DescribeAutoScalingInstances
-                  - autoscaling:UpdateAutoScalingGroup
-                #Resource: !Sub "arn:aws:autoscaling:${AWS::Region}:${AWS::AccountId}:autoScalingGroup/*",
+                  - autoscaling:DescribeAutoScalingGroups
+                  - autoscaling:DescribeScalingActivities
                 Resource: "*"
+                Effect: Allow
+        - PolicyName: provision-autoscaling-update-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - autoscaling:UpdateAutoScalingGroup
+                Resource: !Sub "arn:aws:autoscaling:${AWS::Region}:${AWS::AccountId}:autoScalingGroup:*:autoScalingGroupName/${AWS::StackName}*"
                 Effect: Allow
         - PolicyName: eks-cluster-policy
           PolicyDocument:
@@ -277,26 +289,13 @@ Resources:
             Version: "2012-10-17"
             Statement:
               - Action:
+                  - ec2:DescribeTags 
+                  - ec2:DescribeSecurityGroups
+                  - ec2:AuthorizeSecurityGroupIngress
                   - elasticloadbalancing:DescribeLoadBalancers
                   - elasticloadbalancing:DescribeTags
-                  - elasticloadbalancing:DeleteLoadBalancers
-                  - elasticloadbalancing:DeleteLoadBalancer
                   - elasticloadbalancing:DescribeTargetGroups
-                  - sts:*
-                  - ec2:DescribeTags 
-                  - ec2:RevokeSecurityGroupIngress
-                  - ec2:DescribeSecurityGroups
-                  - ec2:DeleteSecurityGroups
-                  - ec2:DeleteSecurityGroup
-                  - ec2:RevokeSecurityGroupIngress
-                  - ec2:AuthorizeSecurityGroupIngress
-                  - autoscaling:DeleteLaunchConfiguration
-                  - autoscaling:DescribeAutoScalingGroups
-                  - autoscaling:DescribeScalingActivities
-                  - autoscaling:DeleteAutoScalingGroup
-                  - secretsmanager:DeleteSecret
-                  - ssm:DeleteParameters
-                  - ssm:DeleteParameter
+                  #- sts:*
                 Resource: "*"
                 Effect: Allow
       Path: /
