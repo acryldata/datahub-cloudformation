@@ -21,50 +21,37 @@ export AWS_PROFILE=***
 
      - choose Oregon region -> Cloudformation -> Create stack
 
-     - Template Amazon S3 URL: https://cf-templates-xxx-us-west-2.s3.us-west-2.amazonaws.com/dev/templates/datahub-deployment.yaml (will create new VPC/Subnets)
+     - choose template based on your use case
+         - Template Amazon S3 URL: https://cf-templates-xxx-us-west-2.s3.us-west-2.amazonaws.com/dev/templates/datahub-deployment-v2.yaml (will create new VPC with 3 Subnets first, then deploy datahub to the new VPC)
+         - Template Amazon S3 URL: https://cf-templates-xxx-us-west-2.s3.us-west-2.amazonaws.com/dev/templates/datahub-deployment-v2-existing-vpc-3-subnets.yaml (will use existing VPC with 3 Subnets to deploy datahub)
+         - Template Amazon S3 URL: https://cf-templates-xxx-us-west-2.s3.us-west-2.amazonaws.com/dev/templates/datahub-deployment-v2-existing-vpc-2-subnets.yaml (will use existing VPC with 2 Subnets deploy datahub)
 
-
-     - Template Amazon S3 URL: https://cf-templates-xxx-us-west-2.s3.us-west-2.amazonaws.com/dev/templates/datahub-deployment-existing-vpc.yaml (use existing VPC/Subnets)
-         - to use existing VPC, fill in below parameters:
              - StackName: dev-datahub
              - TemplateBucketName: cf-templates-xxx-us-west-2
              - Environment: dev
              - VPCID: vpc-0xxxxxxxxxxxxxxxx
+             - The AZ's to deploy to: choose 'us-west-2a, us-west-2b, us-west-2c'
              - choose 3 AZs
              - The Existing Private Subnet 1 ID: subnet-1xxxxxxxxxxxxxxxx
              - The Existing Private Subnet 2 ID: subnet-2xxxxxxxxxxxxxxxx
              - The Existing Private Subnet 3 ID: subnet-3xxxxxxxxxxxxxxxx
-             - The Existing Public Subnet 1 ID: subnet-4xxxxxxxxxxxxxxxx
-             - The Existing Public Subnet 2 ID: subnet-5xxxxxxxxxxxxxxxx
-             - The Existing Public Subnet 2 ID: subnet-6xxxxxxxxxxxxxxxx
 
              - Enable Creation of ElasticSearch Service Role: set to true if ServiceLinked Role for ES doesn't exists
 
-             - The AWS IAM Role arn that will be allowed to manage EKS: aws:iam::AccountID:role/admin-role
+             - The AWS IAM Role arn that will be allowed to manage EKS, for example: aws:iam::AccountID:role/admin-role
              - DataHub Domain Name: datahub.a.b.c
              - ELB cert arn: arn: arn:aws:acm:REGION:AccountID:certificate/xx-xx-xx-xx-xx (ssl cert for datahub.a.b.c)
              - The Elastic Load Balancer Inbound CIDRs: comma seperated CIDR list that can access DataHub ALB
 
              - Kots Admin Domain Name: kotsadm.e.f.g
              - Kots ELB cert arn: arn:aws:acm:REGION:AccountID:certificate/xx-xx-xx-xx-xx (ssl cert for kotsadm.e.f.g)
-             
-             
+             - Applicaiton: Kots application name
+             - ApplicationReleaseChannel: choose Kots Application Release Channel
+            
 
-     - Stack name: dev-datahub
- 
-     - TemplateBucketName: cf-templates-xxx-us-west-2     
-
-     - Environment: dev
-
-     - The AZ's to deploy to: choose 'us-west-2a, us-west-2b, us-west-2c'
-
-     - The AWS IAM Role arn: existing IAM role arn to be granted EKS access
-
-     - ELB cert arn: ACM cert arn to be attached to new create ALB
-
-     - CreatePrivateLink: Choose 'true' to create private link endpoint service
-
-     - RemoveTempResources: if you want to keep admin provision host, choose 'false'
+             - CreatePrivateLink: Choose 'true' to create private link endpoint service
+             - RemoveTempResources: if you want to keep admin provision host, choose 'false'
+     
 
      - Tags, can have customized tags here, no space allowed in either Key or Value
 
