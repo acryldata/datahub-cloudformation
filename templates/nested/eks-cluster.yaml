@@ -8,11 +8,11 @@ Metadata:
             default: Cluster Configuration
           Parameters:
             - RemoveTempResources
-            - EksMgmtIamRoleArn
-            - EksMgmtIamUserArnList
+            - AdditionalEKSAdminRoleArn
+            - AdditionalEKSAdminUserArn
             - NodeInstanceRoleArn
             - EKSServiceRoleArn
-            - EKSClusterName
+            - EksClusterName
             - KubernetesVersion
             - Environment
             - TemplateBucketName
@@ -66,11 +66,11 @@ Metadata:
           default: The Security Group of Provision Host
         ControlPanelSecurityGroup:
           default: The Security Group of EKS Control Panel
-        EksMgmtIamRoleArn:
+        AdditionalEKSAdminRoleArn:
           default: The AWS IAM Role name that will be allowed to manage EKS. Note format is arn:aws:iam::123456789:role/admin-role
-        EksMgmtIamUserArnList:
-          default: The AWS IAM user arns list, who will be authorised to connect the cluster
-        EKSClusterName:
+        AdditionalEKSAdminUserArn:
+          default: The AWS IAM user arns who will be authorised to connect the cluster
+        EksClusterName:
           default: The EKS cluster name
         KubernetesVersion:
           default: The Kubernetes Version
@@ -140,13 +140,13 @@ Parameters:
     ProvisionSecurityGroup:
       Description: "ID for the VPC, This will be used to get the provision security group"
       Type: "AWS::EC2::SecurityGroup::Id"
-    EksMgmtIamRoleArn:
+    AdditionalEKSAdminRoleArn:
       Type: String
       Description: "The AWS IAM Role name that will be allowed to manage EKS. Note format is arn:aws:iam::123456789:role/admin-role"
-    EksMgmtIamUserArnList:
+    AdditionalEKSAdminUserArn:
       Type: String
-      Description: "The AWS IAM user arns list who will be authorised to connect the cluster. Note format is arn:aws:iam::123456789:user/user1,arn:aws:iam::123456789:user/user2"
-    EKSClusterName:
+      Description: "The AWS IAM user arns who will be authorised to connect the cluster. Note format is arn:aws:iam::123456789:user/user1"
+    EksClusterName:
       Type: String
       Description: The name of the eks cluster
     KubernetesVersion:
@@ -180,7 +180,7 @@ Resources:
   ProvisionInstanceRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub "${EKSClusterName}-provision-role"
+      RoleName: !Sub "${EksClusterName}-provision-role"
       Policies:
         - PolicyName: !Sub "${TemplateBucketName}-${Environment}-s3-policy"
           PolicyDocument:
@@ -209,8 +209,17 @@ Resources:
                   - ssm:GetParameters
                   - ssm:GetParameter
                   - ssm:AddTagsToResource
-                Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${Environment}/${EKSClusterName}/*"
-                #Resource: "*"
+                #Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${Environment}/${EksClusterName}/*"
+                Resource: "*"
+                Effect: Allow
+        - PolicyName: provision-kms-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - kms:GenerateRandom
+                Resource: "*"
+                #Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${Environment}/${EKSClusterName}/*"
                 Effect: Allow
         - PolicyName: provision-OpenID-policy
           PolicyDocument:
@@ -230,8 +239,8 @@ Resources:
                   - secretsmanager:CreateSecret
                   - secretsmanager:GetSecretValue
                   - secretsmanager:DescribeSecret
-                Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:/${Environment}/${EKSClusterName}/*"
-                #Resource: "*"
+                #Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${Environment}/${EksClusterName}/*",
+                Resource: "*"
                 Effect: Allow
         - PolicyName: provision-iam-policy
           PolicyDocument:
@@ -250,6 +259,7 @@ Resources:
                   - kafka:Describe*
                   - kafka:Get*
                   - kafka:List*
+                #Resource: !Sub "arn:aws:kafka:${AWS::Region}:${AWS::AccountId}:cluster/${EksClusterName}/*",
                 Resource: "*"
                 Effect: Allow
         - PolicyName: provision-autoscaling-policy
@@ -276,8 +286,8 @@ Resources:
             Statement:
               - Action:
                   - eks:*
-                Resource: !Sub "arn:aws:eks:${AWS::Region}:${AWS::AccountId}:cluster/${EKSClusterName}"
-                #Resource: "*"
+                #Resource: !Sub "arn:aws:eks:${AWS::Region}:${AWS::AccountId}:cluster/${EksClusterName}",
+                Resource: "*"
                 Effect: Allow
         - PolicyName: provision-others-policy
           PolicyDocument:
@@ -327,10 +337,10 @@ Resources:
       DesiredCapacity: 1
       Tags:
         - Key: Name
-          Value: !Sub "${EKSClusterName}-eks-provision-node"
+          Value: !Sub "${EksClusterName}-eks-provision-node"
           PropagateAtLaunch: true
         - Key: Component
-          Value: !Sub "${EKSClusterName}-eks-provision-asg"
+          Value: !Sub "${EksClusterName}-eks-provision-asg"
           PropagateAtLaunch: true
     CreationPolicy:
       ResourceSignal:
@@ -409,19 +419,19 @@ Resources:
                 #!/bin/bash
                 set -x
                 echo "Checking extra tags..."
-                EXTRA_TAGS=$(/tmp/check_extra_tags.sh ${Environment} ${EKSClusterName})
+                EXTRA_TAGS=$(/tmp/check_extra_tags.sh ${Environment} ${EksClusterName})
                 len=`expr length "$EXTRA_TAGS"`
                 if [ $len -gt 3 ]; then
                   EXTRA_TAGS_FLAG="true"
                 fi
 
                 echo "Checking whether cluster exists..."
-                aws eks describe-cluster --region ${AWS::Region} --name ${EKSClusterName} &> /dev/null
+                aws eks describe-cluster --region ${AWS::Region} --name ${EksClusterName} &> /dev/null
                 if [ $? -ne 0 ]; then
                   if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
                   echo "Cluster does not exist, creating with EXTRA_TAGS..."
                   aws eks create-cluster --region ${AWS::Region} \
-                  --name ${EKSClusterName} \
+                  --name ${EksClusterName} \
                   --tags "$EXTRA_TAGS" \
                   --kubernetes-version ${KubernetesVersion} \
                   --role-arn ${EKSServiceRoleArn} \
@@ -430,7 +440,7 @@ Resources:
                   else
                   echo "Cluster does not exist, creating..."
                   aws eks create-cluster --region ${AWS::Region} \
-                  --name ${EKSClusterName} \
+                  --name ${EksClusterName} \
                   --kubernetes-version ${KubernetesVersion} \
                   --role-arn ${EKSServiceRoleArn} \
                   --resources-vpc-config subnetIds=${PrivateSubnet1ID},${PrivateSubnet2ID},${PrivateSubnet3ID},${PublicSubnet1ID},${PublicSubnet2ID},${PublicSubnet3ID},securityGroupIds=${ControlPanelSecurityGroup},endpointPublicAccess=false,endpointPrivateAccess=true \
@@ -440,41 +450,41 @@ Resources:
                     exit 1
                   fi
                   sleep 5
-                  STATUS=$(aws eks describe-cluster --region ${AWS::Region} --name ${EKSClusterName} --query cluster.status --output text)
+                  STATUS=$(aws eks describe-cluster --region ${AWS::Region} --name ${EksClusterName} --query cluster.status --output text)
                   while [ \"$STATUS\" = \"CREATING\" ]; do
                     echo "Cluster is still creating, sleeping for 30 seconds..."
                     sleep 30
-                    STATUS=$(aws eks describe-cluster --region ${AWS::Region} --name ${EKSClusterName} --query cluster.status --output text)
+                    STATUS=$(aws eks describe-cluster --region ${AWS::Region} --name ${EksClusterName} --query cluster.status --output text)
                   done
                 fi
                 echo "Saving oidc info..."
-                OIDC=$(aws eks describe-cluster --region ${AWS::Region}  --name ${EKSClusterName} --query cluster.identity.oidc --output text --no-paginate |cut -c 9-)
-                parameter="/${Environment}/${EKSClusterName}/eks/oidc"
+                OIDC=$(aws eks describe-cluster --region ${AWS::Region}  --name ${EksClusterName} --query cluster.identity.oidc --output text --no-paginate |cut -c 9-)
+                parameter="/${Environment}/${EksClusterName}/eks/oidc"
                 if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
-                  EXTRA_TAGS=$(/tmp/check_extra_tags-v2.sh ${Environment} ${EKSClusterName})
+                  EXTRA_TAGS=$(/tmp/check_extra_tags-v2.sh ${Environment} ${EksClusterName})
                   aws ssm put-parameter --tags $EXTRA_TAGS --region ${AWS::Region} --name "$parameter" --type "String" --value "$OIDC" --no-paginate
                 else
                   aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$OIDC" --overwrite --no-paginate
                 fi
-                EKSSecurityGroupId=$(aws eks describe-cluster --region ${AWS::Region} --name ${EKSClusterName} --query cluster.resourcesVpcConfig.securityGroupIds --output text)
+                EKSSecurityGroupId=$(aws eks describe-cluster --region ${AWS::Region} --name ${EksClusterName} --query cluster.resourcesVpcConfig.securityGroupIds --output text)
                 echo "add ingress rule to EKS control panel security group..."
                 for cidr in $(echo ${ElbInboundCIDRs} | sed "s/,/ /g")
                 do
                   aws ec2 authorize-security-group-ingress --region ${AWS::Region} --group-id $EKSSecurityGroupId --ip-permissions IpProtocol=tcp,FromPort=443,ToPort=443,IpRanges="[{CidrIp=$cidr,Description='grant access to EKS'}]"
                 done
                 echo "Saving security group info..."
-                clusterSecurityGroupId=$(aws eks describe-cluster --region ${AWS::Region}  --name ${EKSClusterName} --query cluster.resourcesVpcConfig.clusterSecurityGroupId  --output text)
-                parameter="/${Environment}/${EKSClusterName}/eks/clusterSecurityGroupId"
+                clusterSecurityGroupId=$(aws eks describe-cluster --region ${AWS::Region}  --name ${EksClusterName} --query cluster.resourcesVpcConfig.clusterSecurityGroupId  --output text)
+                parameter="/${Environment}/${EksClusterName}/eks/clusterSecurityGroupId"
                 if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
-                  EXTRA_TAGS=$(/tmp/check_extra_tags-v2.sh ${Environment} ${EKSClusterName})
+                  EXTRA_TAGS=$(/tmp/check_extra_tags-v2.sh ${Environment} ${EksClusterName})
                   aws ssm put-parameter --tags $EXTRA_TAGS --region ${AWS::Region} --name "$parameter" --type "String" --value "$clusterSecurityGroupId" --no-paginate
                 else
                   aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$clusterSecurityGroupId" --overwrite --no-paginate
                 fi
                 set +x
                 echo "Updating kubeconfig file..."
-                ENDPOINT=$(aws eks describe-cluster --region ${AWS::Region}  --name ${EKSClusterName} --query cluster.endpoint --output text)
-                CERT_DATA=$(aws eks describe-cluster --region ${AWS::Region}  --name ${EKSClusterName} --query cluster.certificateAuthority.data --output text)
+                ENDPOINT=$(aws eks describe-cluster --region ${AWS::Region}  --name ${EksClusterName} --query cluster.endpoint --output text)
+                CERT_DATA=$(aws eks describe-cluster --region ${AWS::Region}  --name ${EksClusterName} --query cluster.certificateAuthority.data --output text)
                 sed -i s,ENDPOINT,$ENDPOINT,g /home/ec2-user/.kube/config
                 sed -i s,CERTIFICATE_DATA,$CERT_DATA,g /home/ec2-user/.kube/config
                 export KUBECONFIG=/home/ec2-user/.kube/config
@@ -483,7 +493,7 @@ Resources:
                 if [ $? -gt 0 ]; then
                   echo "Configmap does not exist, applying..."
                   curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
-                  for u in $(echo ${EksMgmtIamUserArnList} | sed "s/,/ /g")
+                  for u in $(echo ${AdditionalEKSAdminUserArn} | sed "s/,/ /g")
                   do
                     echo "    - userarn: $u" >> /tmp/aws-auth-cm.yaml
                     echo "      username: admin" >> /tmp/aws-auth-cm.yaml
@@ -492,7 +502,7 @@ Resources:
                   done
                   kubectl apply -f /tmp/aws-auth-cm.yaml
                   mv /tmp/eksctl /usr/local/bin
-                  eksctl create iamidentitymapping  --region ${AWS::Region} --cluster ${EKSClusterName} --arn ${EksMgmtIamRoleArn} --username admin --group system:masters
+                  eksctl create iamidentitymapping  --region ${AWS::Region} --cluster ${EksClusterName} --arn ${AdditionalEKSAdminRoleArn} --username admin --group system:masters
                   kubectl get cm -n kube-system aws-auth -o yaml
                 fi
               mode: "000750"
@@ -541,7 +551,7 @@ Resources:
                       args:
                         - token
                         - -i
-                        - ${EKSClusterName}
+                        - ${EksClusterName}
               mode: "000666"
               owner: ec2-user
               group: ec2-user
@@ -595,7 +605,7 @@ Outputs:
     Value: !Sub "${AWS::StackName}"
   EksClusterName:
     Description: EKS Cluster name
-    Value: !Ref EKSClusterName
+    Value: !Ref EksClusterName
   EKSProvisionLaunchConfiguration:
     Description: The provision host launch config
     Value: !Ref EKSProvisionLaunchConfiguration

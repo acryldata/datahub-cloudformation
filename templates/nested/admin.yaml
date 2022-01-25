@@ -7,7 +7,7 @@ Metadata:
         - Label:
             default: Cluster Configuration
           Parameters:
-            - EKSClusterName
+            - EksClusterName
             - Environment
             - K8sNamespace
             - TemplateBucketName
@@ -39,7 +39,7 @@ Metadata:
           default: The provision log group name
         ProvisionInstanceType:
           default: The instance type to deploy Provision to
-        EKSClusterName:
+        EksClusterName:
           default: The EKS cluster name
         Environment:
           default: The Environment
@@ -83,7 +83,7 @@ Parameters:
         - t2.medium
         - t2.large
       ConstraintDescription: "Must contain a valid instance type"
-    EKSClusterName:
+    EksClusterName:
       Type: String
       Description: The name of the eks cluster
     Environment:
@@ -103,8 +103,6 @@ Parameters:
       Type: String
       Description: The namespace in EKS to deploy kots and datahub app
       Default: "datahub"
-    EKSProvisionAutoScalingGroup:
-      Type: String
     DomainName:
       Type: String
     KotsDomainName:
@@ -167,10 +165,10 @@ Resources:
       DesiredCapacity: 1
       Tags:
         - Key: Name
-          Value: !Sub "${EKSClusterName}-admin-provision-node"
+          Value: !Sub "${EksClusterName}-admin-provision-node"
           PropagateAtLaunch: true
         - Key: Component
-          Value: !Sub "${EKSClusterName}-admin-provision-asg"
+          Value: !Sub "${EksClusterName}-admin-provision-asg"
           PropagateAtLaunch: true
     CreationPolicy:
       ResourceSignal:
@@ -276,11 +274,11 @@ Resources:
                 #done
                 #sleep 5    
                 echo "Checking whether cluster exists..."
-                aws eks describe-cluster --region ${AWS::Region} --name ${EKSClusterName} &> /dev/null
+                aws eks describe-cluster --region ${AWS::Region} --name ${EksClusterName} &> /dev/null
                 if [ $? -eq 0 ]; then
                   echo "Updating kubeconfig file..."
-                  ENDPOINT=$(aws eks describe-cluster --region ${AWS::Region}  --name ${EKSClusterName} --query cluster.endpoint --output text)
-                  CERT_DATA=$(aws eks describe-cluster --region ${AWS::Region}  --name ${EKSClusterName} --query cluster.certificateAuthority.data --output text)
+                  ENDPOINT=$(aws eks describe-cluster --region ${AWS::Region}  --name ${EksClusterName} --query cluster.endpoint --output text)
+                  CERT_DATA=$(aws eks describe-cluster --region ${AWS::Region}  --name ${EksClusterName} --query cluster.certificateAuthority.data --output text)
                   sed -i s,ENDPOINT,$ENDPOINT,g /home/ec2-user/.kube/config
                   sed -i s,CERTIFICATE_DATA,$CERT_DATA,g /home/ec2-user/.kube/config
                   export KUBECONFIG=/home/ec2-user/.kube/config
@@ -297,13 +295,13 @@ Resources:
                 set -x
                 curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
                 mv /tmp/eksctl /usr/local/bin
-                eksctl utils associate-iam-oidc-provider --cluster ${EKSClusterName} --approve --region ${AWS::Region}
+                eksctl utils associate-iam-oidc-provider --cluster ${EksClusterName} --approve --region ${AWS::Region}
                 helm repo add eks https://aws.github.io/eks-charts
                 helm repo update
                 echo "        serviceAccount:" > values.yaml
                 echo "          annotations:" >> values.yaml
-                echo "            eks.amazonaws.com/role-arn: arn:aws:iam::${AWS::AccountId}:role/${EKSClusterName}-aws-load-balancer-controller" >> values.yaml
-                helm install aws-load-balancer-controller eks/aws-load-balancer-controller --set region=${AWS::Region} -n kube-system --set clusterName=${EKSClusterName} --set serviceAccount.name=${EKSClusterName}-aws-load-balancer-controller --set image.tag=v2.2.0 --version 1.2.7 -f values.yaml
+                echo "            eks.amazonaws.com/role-arn: arn:aws:iam::${AWS::AccountId}:role/${EksClusterName}-aws-load-balancer-controller" >> values.yaml
+                helm install aws-load-balancer-controller eks/aws-load-balancer-controller --set region=${AWS::Region} -n kube-system --set clusterName=${EksClusterName} --set serviceAccount.name=${EksClusterName}-aws-load-balancer-controller --set image.tag=v2.2.0 --version 1.2.7 -f values.yaml
                 echo "prepare configvalues.yaml..."
                 ZOOKEEPER_CONNECT=$(aws kafka --region ${AWS::Region} list-clusters --cluster-name-filter ${MSKClusterName} --no-paginate --query 'ClusterInfoList[0].ZookeeperConnectString' --output text)
                 CLUSTER_ARN=$(aws kafka --region ${AWS::Region} list-clusters --cluster-name-filter ${MSKClusterName} --no-paginate --query 'ClusterInfoList[0].ClusterArn' --output text)
@@ -323,6 +321,18 @@ Resources:
                   aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$ZOOKEEPER_CONNECT" --overwrite --no-paginate
                 fi
                 set +x
+<<<<<<< HEAD
+                echo "Creating namespace..."
+                kubectl create ns ${K8sNamespace}
+                echo "Generate UUID..."
+                aws kms generate-random --region ${AWS::Region} --number-of-bytes 32  --output text --query Plaintext>uuid_secret
+                aws kms generate-random --region ${AWS::Region} --number-of-bytes 16  --output text --query Plaintext>datahub-password
+                DATAHUB_PASSWORD=$(cat datahub-password)
+                if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
+                  aws secretsmanager create-secret --tags $EXTRA_TAGS --region ${AWS::Region} --name "/${Environment}/${EksClusterName}/admin/password" --secret-string "$DATAHUB_PASSWORD" --description "${Environment}/${EksClusterName}: DataHub Admin password"
+                else
+                  aws secretsmanager create-secret --region ${AWS::Region} --name "/${Environment}/${EksClusterName}/admin/password" --secret-string "$DATAHUB_PASSWORD" --description "${Environment}//${EksClusterName}: DataHub Admin password"
+                fi
                 tar xzvf /tmp/python-jwt.tar.gz
                 cd python-jwt
                 pip3 install -r requirements.txt
@@ -330,9 +340,9 @@ Resources:
                 python3 create_jwt.py>apikey
                 APIKEY=$(cat apikey)
                 if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
-                  aws secretsmanager create-secret --tags $EXTRA_TAGS --region ${AWS::Region} --name "/${Environment}/${EKSClusterName}/admin/apikey" --secret-string "$APIKEY" --description "${Environment}//${EKSClusterName}: DataHub Admin Apikey" 
+                  aws secretsmanager create-secret --tags $EXTRA_TAGS --region ${AWS::Region} --name "/${Environment}/${EksClusterName}/admin/apikey" --secret-string "$APIKEY" --description "${Environment}//${EksClusterName}: DataHub Admin Apikey" 
                 else
-                  aws secretsmanager create-secret --region ${AWS::Region} --name "/${Environment}/${EKSClusterName}/admin/apikey" --secret-string "$APIKEY" --description "${Environment}/${EKSClusterName}: DataHub Admin Apikey" 
+                  aws secretsmanager create-secret --region ${AWS::Region} --name "/${Environment}/${EksClusterName}/admin/apikey" --secret-string "$APIKEY" --description "${Environment}/${EksClusterName}: DataHub Admin Apikey" 
                 fi
                 cd ..
                 echo "prepare secrets..."
@@ -356,42 +366,42 @@ Resources:
                 kubectl kots install ${Application}/${ApplicationReleaseChannel} -n ${K8sNamespace} --shared-password "${KOTSUserPassword}" --license-file /tmp/license.yaml --config-values /home/ec2-user/configvalues.yaml --wait-duration 120s --port-forward=false
                 echo "Install kotsadm svc..."
                 kubectl apply -f /home/ec2-user/kotsadm-svc.yaml
-                echo "Waiting ${EKSClusterName}-kotsadm to be Active..."
-                aws elbv2 describe-load-balancers --region ${AWS::Region} --names ${EKSClusterName}-kotsadm
+                echo "Waiting ${EksClusterName}-kotsadm to be Active..."
+                aws elbv2 describe-load-balancers --region ${AWS::Region} --names ${EksClusterName}-kotsadm
                 while [ $? -gt 0 ]; do
-                  echo "${EKSClusterName}-kotsadm is still creating, sleeping for 30 seconds..."
+                  echo "${EksClusterName}-kotsadm is still creating, sleeping for 30 seconds..."
                   sleep 30
-                  aws elbv2 describe-load-balancers --region ${AWS::Region} --names ${EKSClusterName}-kotsadm
+                  aws elbv2 describe-load-balancers --region ${AWS::Region} --names ${EksClusterName}-kotsadm
                 done
-                STATUS=$(aws elbv2 describe-load-balancers --region ${AWS::Region} --names ${EKSClusterName}-kotsadm --query LoadBalancers[0].State.Code --output text --no-paginate)
+                STATUS=$(aws elbv2 describe-load-balancers --region ${AWS::Region} --names ${EksClusterName}-kotsadm --query LoadBalancers[0].State.Code --output text --no-paginate)
                 while [ $STATUS != 'active' ]; do
-                  echo "${EKSClusterName}-kotsadm is still provisioning, sleeping for 10 seconds..."
+                  echo "${EksClusterName}-kotsadm is still provisioning, sleeping for 10 seconds..."
                   sleep 10
-                  STATUS=$(aws elbv2 describe-load-balancers --region ${AWS::Region} --names ${EKSClusterName}-kotsadm --query LoadBalancers[0].State.Code --output text --no-paginate)
+                  STATUS=$(aws elbv2 describe-load-balancers --region ${AWS::Region} --names ${EksClusterName}-kotsadm --query LoadBalancers[0].State.Code --output text --no-paginate)
                 done
-                NLBARN=$(aws elbv2 describe-load-balancers --region ${AWS::Region} --names ${EKSClusterName}-kotsadm --query LoadBalancers[0].LoadBalancerArn --output text --no-paginate)
-                parameter='/${Environment}/${EKSClusterName}/kotsadm/nlbarn'
+                NLBARN=$(aws elbv2 describe-load-balancers --region ${AWS::Region} --names ${EksClusterName}-kotsadm --query LoadBalancers[0].LoadBalancerArn --output text --no-paginate)
+                parameter='/${Environment}/${EksClusterName}/kotsadm/nlbarn'
                 if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
                   aws ssm put-parameter --tags $EXTRA_TAGS --region ${AWS::Region} --name "$parameter" --type "String" --value "$NLBARN" --no-paginate
                 else
                   aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$NLBARN" --overwrite --no-paginate
                 fi
-                NLBDNS=$(aws elbv2 describe-load-balancers --region ${AWS::Region} --names ${EKSClusterName}-kotsadm --query LoadBalancers[0].DNSName --output text --no-paginate)
-                parameter='/${Environment}/${EKSClusterName}/kotsadm/nlbdns'
+                NLBDNS=$(aws elbv2 describe-load-balancers --region ${AWS::Region} --names ${EksClusterName}-kotsadm --query LoadBalancers[0].DNSName --output text --no-paginate)
+                parameter='/${Environment}/${EksClusterName}/kotsadm/nlbdns'
                 if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
                   aws ssm put-parameter --tags $EXTRA_TAGS --region ${AWS::Region} --name "$parameter" --type "String" --value "$NLBDNS"  --no-paginate
                 else
                   aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$NLBARN" --overwrite --no-paginate
                 fi
-                ALBARN=$(aws elbv2 describe-load-balancers --region ${AWS::Region} --names ${EKSClusterName}-datahub --query LoadBalancers[0].LoadBalancerArn --output text --no-paginate)
-                parameter='/${Environment}/${EKSClusterName}/admin/albarn'
+                ALBARN=$(aws elbv2 describe-load-balancers --region ${AWS::Region} --names ${EksClusterName}-datahub --query LoadBalancers[0].LoadBalancerArn --output text --no-paginate)
+                parameter='/${Environment}/${EksClusterName}/admin/albarn'
                 if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
                   aws ssm put-parameter --tags $EXTRA_TAGS --region ${AWS::Region} --name "$parameter" --type "String" --value "$ALBARN" --no-paginate
                 else
                   aws ssm put-parameter --region ${AWS::Region} --name "$parameter" --type "String" --value "$ALBARN" --overwrite --no-paginate
                 fi
-                ALBDNS=$(aws elbv2 describe-load-balancers --region ${AWS::Region} --names ${EKSClusterName}-datahub --query LoadBalancers[0].DNSName --output text --no-paginate)
-                parameter='/${Environment}/${EKSClusterName}/admin/albdns'
+                ALBDNS=$(aws elbv2 describe-load-balancers --region ${AWS::Region} --names ${EksClusterName}-datahub --query LoadBalancers[0].DNSName --output text --no-paginate)
+                parameter='/${Environment}/${EksClusterName}/admin/albdns'
                 if [ "$EXTRA_TAGS_FLAG" == "true" ]; then
                   aws ssm put-parameter --tags $EXTRA_TAGS --region ${AWS::Region} --name "$parameter" --type "String" --value "$ALBDNS"  --no-paginate
                 else
@@ -425,7 +435,7 @@ Resources:
                       args:
                         - token
                         - -i
-                        - ${EKSClusterName}
+                        - ${EksClusterName}
               mode: "000666"
               owner: ec2-user
               group: ec2-user
@@ -436,7 +446,7 @@ Resources:
                 metadata:
                   annotations:
                     service.beta.kubernetes.io/aws-load-balancer-backend-protocol: tcp
-                    service.beta.kubernetes.io/aws-load-balancer-name: ${EKSClusterName}-kotsadm
+                    service.beta.kubernetes.io/aws-load-balancer-name: ${EksClusterName}-kotsadm
                     service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
                     service.beta.kubernetes.io/aws-load-balancer-scheme: "${KotsAdmNLBScheme}"
                     service.beta.kubernetes.io/aws-load-balancer-ssl-cert: "${KotsElbCertArn}"
@@ -495,7 +505,7 @@ Resources:
                       value: ${PrivateSubnet1ID},${PrivateSubnet2ID},${PrivateSubnet3ID}
                     load_balancer_name:
                       repeatableItem: service_port
-                      value: "${EKSClusterName}-datahub"
+                      value: "${EksClusterName}-datahub"
                     oidc_enabled:
                       repeatableItem: service_port
                       value: "false"
@@ -560,44 +570,44 @@ Outputs:
     Value: !Sub "https://${DomainName}"
   DatahubAppCredential:
     Description: Datahub Application Credential
-    Value: !Sub "Secret Name: /${Environment}/${EKSClusterName}/admin/password"
+    Value: !Sub "Secret Name: /${Environment}/${EksClusterName}/admin/password"
   DatahubAppAlbArn:
     Description: Datahub Application ALB Arn
-    Value: !Sub "SSM Parameter Store: /${Environment}/${EKSClusterName}/admin/albarn"
+    Value: !Sub "SSM Parameter Store: /${Environment}/${EksClusterName}/admin/albarn"
   DatahubAppAlbDns:
     Description: Datahub Application ALB Dns
-    Value: !Sub "SSM Parameter Store: /${Environment}/${EKSClusterName}/admin/albdns"
+    Value: !Sub "SSM Parameter Store: /${Environment}/${EksClusterName}/admin/albdns"
   DatahubAppApiKey:
     Description: Datahub Application APIKEY
-    Value: !Sub "Secret Name: /${Environment}/${EKSClusterName}/admin/apikey"
+    Value: !Sub "Secret Name: /${Environment}/${EksClusterName}/admin/apikey"
   KotsAdminDomainName:
     Description: Datahub Release Admin Url
     Value: !Sub "https://${KotsDomainName}"
   KotsAdminNlbArn:
     Description: Datahub Release Admin NLB Arn
-    Value: !Sub "SSM Parameter Store: /${Environment}/${EKSClusterName}/kotsadm/nlbarn"
+    Value: !Sub "SSM Parameter Store: /${Environment}/${EksClusterName}/kotsadm/nlbarn"
   KotsAdminNlbDns:
     Description: Datahub release Admin NLB Dns
-    Value: !Sub "SSM Parameter Store: /${Environment}/${EKSClusterName}/kotsadm/nlbdns"
+    Value: !Sub "SSM Parameter Store: /${Environment}/${EksClusterName}/kotsadm/nlbdns"
   KotsAdminCredential:
     Description: Datahub Release Admin Credential
-    Value: !Sub "Secret Name: /${Environment}/${EKSClusterName}/kotsadm/password"
+    Value: !Sub "Secret Name: /${Environment}/${EksClusterName}/kotsadm/password"
   AuroraRDSEndpoint:
     Description: Aurora RDS Endpoint
-    Value: !Sub "SSM Parameter Store: /${Environment}/${EKSClusterName}/mysql/endpoint"
+    Value: !Sub "SSM Parameter Store: /${Environment}/${EksClusterName}/mysql/endpoint"
   AuroraRDSCredential:
     Description: Aurora RDS Credential
-    Value: !Sub "Secret Name: /${Environment}/${EKSClusterName}/mysql/password"
+    Value: !Sub "Secret Name: /${Environment}/${EksClusterName}/mysql/password"
   ElasticSearchEndpoint:
     Description: ElasticSearch Endpoint
-    Value: !Sub "SSM Parameter Store: /${Environment}/${EKSClusterName}/elasticsearch/endpoint"
+    Value: !Sub "SSM Parameter Store: /${Environment}/${EksClusterName}/elasticsearch/endpoint"
   ElasticSearchCredential:
     Description: ElasticSearch Credential
-    Value: !Sub "Secret Name: /${Environment}/${EKSClusterName}/elasticsearch/password"
+    Value: !Sub "Secret Name: /${Environment}/${EksClusterName}/elasticsearch/password"
   MSKZookeepers:
     Description: MSK Zookeepers
-    Value: !Sub "SSM Parameter Store: /${Environment}/${EKSClusterName}/msk/zookeeper_connect"
+    Value: !Sub "SSM Parameter Store: /${Environment}/${EksClusterName}/msk/zookeeper_connect"
   MSKBrokers:
     Description: MSK Bootstrap Brokers
-    Value: !Sub "SSM Parameter Store: /${Environment}/${EKSClusterName}/msk/bootstrap_broker"
+    Value: !Sub "SSM Parameter Store: /${Environment}/${EksClusterName}/msk/bootstrap_broker"
  

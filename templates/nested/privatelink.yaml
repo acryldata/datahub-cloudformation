@@ -4,7 +4,7 @@ Description: PrivateLink Stack that creates VPC Endpoint service
 Parameters:
   Environment:
     Type: String
-  EKSClusterName:
+  EksClusterName:
     Type: String
 
 Resources:
@@ -13,7 +13,7 @@ Resources:
     Properties:
       AcceptanceRequired: True
       NetworkLoadBalancerArns:
-        - !Sub '{{resolve:ssm:/${Environment}/${EKSClusterName}/kotsadm/nlbarn}}'
+        - !Sub '{{resolve:ssm:/${Environment}/${EksClusterName}/kotsadm/nlbarn}}'
 
   EndpointServicePermissions:
     Type: AWS::EC2::VPCEndpointServicePermissions

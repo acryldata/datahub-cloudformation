@@ -1,0 +1,23 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Metadata:
+  QSLint:
+    Exclusions: [W9002, W9003, W9004, W9006]
+Description: "Deploys application namespace into an existing kubernetes cluster"
+Parameters:
+  EksClusterName:
+    Type: String
+Resources:
+  AppNamespace:
+    Type: "AWSQS::Kubernetes::Resource"
+    Metadata: { cfn-lint: { config: { ignore_checks: [ E3012 ] } } }
+    Properties:
+      ClusterName: !Ref EksClusterName
+      Namespace: 'kube-system'
+      Manifest: !Sub | 
+        kind: Namespace
+        apiVersion: v1
+        metadata:
+          name: ${EksClusterName}
+Outputs:
+  AppNamespace:
+    Value: !Ref AppNamespace
