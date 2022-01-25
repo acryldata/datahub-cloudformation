@@ -1,4 +1,5 @@
 # Cloudformation Demo
+![Acryl - Ingestion](https://user-images.githubusercontent.com/1105928/151049717-f70eaa9f-f296-4b13-88d0-936c18e5665a.png)
 ## step 1 to 4 runs on customer AWS account
 1. create stack to deploy ingestion app in AWS
      - choose region -> Cloudformation -> Create stack
