@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: MSK stack that creates Amazon Managed Kafka
+Description: Deploys Amazon Managed Kafka
 
 Metadata:
   AWS::CloudFormation::Interface:

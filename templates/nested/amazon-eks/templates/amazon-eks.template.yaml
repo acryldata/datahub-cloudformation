@@ -1,0 +1,392 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Deploys an EKS cluster into an existing VPC
+Transform: [QuickStartParameterResolver]
+Metadata:
+  QSLint:
+    Exclusions: [W9002, W9003, W9004, W9006]
+  ConfigSetName: !Ref ConfigSetName
+Parameters:
+  KeyPairName:
+    Type: String
+    Default: ""
+  QSS3BucketName:
+    AllowedPattern: ^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$
+    Default: cf-amazon-eks-templates-blrxgroup-us-west-2
+    Type: String
+  QSS3KeyPrefix:
+    AllowedPattern: ^[0-9a-zA-Z-/.]*$
+    Default: dev/
+    Type: String
+  QSS3BucketRegion:
+    Default: 'us-west-2'
+    Description: The Region where the S3 bucket (QSS3BucketName) is
+      hosted. When using your own bucket, you must specify this value.
+    Type: String
+  RemoteAccessCIDR:
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
+    Type: String
+  EKSPublicAccessEndpoint:
+    Type: String
+    AllowedValues: [Enabled, Disabled]
+    Default: Disabled
+  AdditionalEKSAdminUserArn:
+    Type: String
+    Default: ""
+  AdditionalEKSAdminRoleArn:
+    Type: String
+    Default: ""
+  AdditionalEKSAdminNodeRoleArn:
+    Type: String
+    Default: ""
+  NodeInstanceType:
+    Default: t3.medium
+    Type: String
+  NumberOfNodes:
+    Default: 3
+    Type: Number
+  MaxNumberOfNodes:
+    Default: 3
+    Type: Number
+  VPCID:
+    Type: "AWS::EC2::VPC::Id"
+  PublicSubnet1ID:
+    Type: String
+    Default: ""
+  PublicSubnet2ID:
+    Type: String
+    Default: ""
+  PublicSubnet3ID:
+    Type: String
+    Default: ""
+  PrivateSubnet1ID:
+    Type: "AWS::EC2::Subnet::Id"
+  PrivateSubnet2ID:
+    Type: String
+    Default: ""
+  PrivateSubnet3ID:
+    Type: String
+    Default: ""
+  ProvisionClusterAutoScaler:
+    Type: String
+    AllowedValues: [ "Enabled", "Disabled" ]
+    Default: "Disabled"
+  # This parameter name is inaccurate to preserve backward compatibility, and will be changed to ProvisionLoadBalancerController in the next release
+  ProvisionALBIngressController:
+    Type: String
+    AllowedValues: [ "Enabled", "Disabled" ]
+    Default: "Disabled"
+  PrometheusIntegration:
+    Type: String
+    AllowedValues: [ Enabled, Disabled ]
+    Default: Disabled
+  ProvisionBastionHost:
+    Type: String
+    AllowedValues: [ "Enabled", "Disabled" ]
+    Default: "Enabled"
+  HttpProxy:
+    Type: String
+    Default: ""
+  FargateNamespaces:
+    Type: String
+    Default: ""
+  FargateLabels:
+    Type: String
+    Default: ""
+  EKSClusterName:
+    Type: String
+    Default: ""
+    Description: "(Optional) Name for the EKS cluster. If left blank one will be auto-generated."
+  ConfigSetName:
+    Type: String
+  NodeInstanceFamily:
+    AllowedValues: ['Standard', 'ARM', 'GPU']
+    Type: String
+    Description: Choose "ARM" to use an ARM based AMI, choose "GPU" to use an AMI that supports GPU and Inferentia based instance types. Ignored if "Custom launch template" is provided.
+  NodeGroupOS:
+    AllowedValues:
+      - 'Amazon Linux 2'
+    Default: 'Amazon Linux 2'
+    Description: The Linux distribution for the AMI to be used for the node instances. Ignored if "Custom launch template" is provided.
+    Type: String
+  NodeGroupType:
+    Type: String
+    AllowedValues: [ Managed, Unmanaged ]
+    Default: Managed
+    Description: Choose "Unmanaged" to create an auto-scaling group without using the EKS managed node groups feature.
+Mappings:
+  Config:
+    Prefix: { Value: 'eks-datahub' }
+    #ParameterPrefix: { Value: '/datahub/amazon-eks' }
+    ParameterPrefix: { Value: '' }
+Conditions:
+  EnableProxy: !Not [!Equals [!Ref HttpProxy, ""]]
+  EnableFargate: !Not [!Equals [ !Ref FargateNamespaces, ""]]
+  3AZDeployment: !Not [!Equals [!Ref PrivateSubnet3ID, ""]]
+  2AZDeployment: !Or
+    - !Not [!Equals [!Ref PrivateSubnet2ID, ""]]
+    - !Not [!Equals [!Ref PrivateSubnet3ID, ""]]
+  EnablePublicSubnets: !Not [!Equals [!Ref PublicSubnet1ID, ""]]
+  EnableBastion: !And
+    - !Equals [!Ref 'ProvisionBastionHost', 'Enabled']
+    - !Not [!Equals [!Ref PublicSubnet1ID, ""]]
+  EnableClusterAutoScaler: !Equals [!Ref 'ProvisionClusterAutoScaler', 'Enabled']
+  EnableLoadBalancerController: !Equals [!Ref 'ProvisionALBIngressController', 'Enabled']
+  EnablePrometheus: !Equals [!Ref 'PrometheusIntegration', 'Enabled']
+  UsingDefaultBucket: !Equals [!Ref QSS3BucketName, 'aws-quickstart']
+  GenerateClusterName: !Equals [!Ref 'EKSClusterName', '']
+  EnableOIDC: !Or
+    - !Equals [!Ref 'ProvisionALBIngressController', 'Enabled']
+    - !Equals [~~/<ConfigSetName>/cluster/IamOidcProvider~~, "Enabled"]
+  UseKeyPair: !Not [ !Equals [ !Ref KeyPairName, "" ] ]
+Resources:
+  NodeGroupStack:
+    Type: "AWS::CloudFormation::Stack"
+    Metadata:
+      cfn-lint: { config: { ignore_checks: [ W9901 ] } }
+      DependsOn:
+        - !Ref EKSControlPlane
+    Properties:
+      TemplateURL: !Sub 'https://${QSS3BucketName}.s3.amazonaws.com/${QSS3KeyPrefix}submodules/amazon-eks-nodegroup/templates/amazon-eks-nodegroup.template.yaml'
+      Parameters:
+        HttpProxy: !Ref HttpProxy
+        KeyPairName: !If [UseKeyPair, !Ref KeyPairName, !Ref 'AWS::NoValue']
+        NodeGroupOS: !Ref NodeGroupOS
+        Subnet1ID: !Ref PrivateSubnet1ID
+        Subnet2ID: !If [2AZDeployment, !Ref PrivateSubnet2ID, !Ref "AWS::NoValue" ]
+        Subnet3ID: !If [3AZDeployment, !Ref PrivateSubnet3ID, !Ref "AWS::NoValue" ]
+        NodeInstanceType: ~~/<ConfigSetName>/default-nodegroup/NodeInstanceType~~
+        NumberOfNodes: ~~/<ConfigSetName>/default-nodegroup/NumberOfNodes~~
+        MaxNumberOfNodes: ~~/<ConfigSetName>/default-nodegroup/MaxNumberOfNodes~~
+        NodeGroupName: ~~/<ConfigSetName>/default-nodegroup/NodeGroupName~~
+        NodeVolumeSize: ~~/<ConfigSetName>/default-nodegroup/NodeVolumeSize~~
+        CustomAmiId: ~~/<ConfigSetName>/default-nodegroup/CustomAmiId~~
+        EKSClusterName: !If [GenerateClusterName, !Ref GenerateName, !Ref EKSClusterName]
+        NodeInstanceFamily: !Ref NodeInstanceFamily
+        NodeGroupType: !Ref NodeGroupType
+        NodeSecurityGroupId: ~~/<ConfigSetName>/default-nodegroup/NodeSecurityGroupId~~
+        #OndemandPercentage: ~~/<ConfigSetName>/default-nodegroup/OnDemandPercentage~~
+        #NodeInstanceType2: ~~/<ConfigSetName>/default-nodegroup/NodeInstanceType2~~
+        #NodeInstanceType3: ~~/<ConfigSetName>/default-nodegroup/NodeInstanceType3~~
+        #NodeInstanceType4: ~~/<ConfigSetName>/default-nodegroup/NodeInstanceType4~~
+        #Labels: ~~/<ConfigSetName>/default-nodegroup/Labels~~
+        #Taints: ~~/<ConfigSetName>/default-nodegroup/Taints~~
+        #LaunchTemplateId: ~~/<ConfigSetName>/default-nodegroup/LaunchTemplateId~~
+        #LaunchTemplateVersion: ~~/<ConfigSetName>/default-nodegroup/LaunchTemplateVersion~~
+        EC2MetadataPutResponseHopLimit: ~~/<ConfigSetName>/default-nodegroup/EC2MetadataPutResponseHopLimit~~
+        EC2MetadataHttpTokens: ~~/<ConfigSetName>/default-nodegroup/EC2MetadataHttpTokens~~
+  CloudFormationKubernetesVPCRoleExists:
+    Type: Custom::CliQuery
+    Properties:
+      ServiceToken: !Sub ['arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${Prefix}-ResourceReader', {Prefix: !FindInMap [Config, Prefix, Value]}]
+      AwsCliCommand: "iam list-roles --query 'Roles[?RoleName==`CloudFormation-Kubernetes-VPC`].RoleName | {RoleName: [0]}'"
+      IdField: 'RoleName'
+  IamStack:
+    Type: "AWS::CloudFormation::Stack"
+    Properties:
+      TemplateURL: !Sub 'https://${QSS3BucketName}.s3.amazonaws.com/${QSS3KeyPrefix}templates/amazon-eks-iam.template.yaml'
+      Parameters:
+        QSS3BucketName: !Ref QSS3BucketName
+        CreateBastionRole: "Disabled"
+        CloudFormationKubernetesVPCRoleExists: !Ref CloudFormationKubernetesVPCRoleExists
+  FunctionStack:
+    Type: "AWS::CloudFormation::Stack"
+    Properties:
+      TemplateURL: !Sub 'https://${QSS3BucketName}.s3.amazonaws.com/${QSS3KeyPrefix}templates/amazon-eks-functions.template.yaml'
+      Parameters:
+        QSS3BucketName: !Ref QSS3BucketName
+        QSS3KeyPrefix: !Ref QSS3KeyPrefix
+        KubernetesAdminRoleArn: !GetAtt IamStack.Outputs.KubernetesAdminRoleArn
+        ControlPlaneSecurityGroup: !Ref ControlPlaneSecurityGroup
+        VPCID: !Ref VPCID
+        EKSSubnetIds: !If
+          - 3AZDeployment
+          - !Join [",", [ !Ref PrivateSubnet1ID, !Ref PrivateSubnet2ID, !Ref PrivateSubnet3ID ]]
+          - !If
+            - 2AZDeployment
+            - !Join [",", [ !Ref PrivateSubnet1ID, !Ref PrivateSubnet2ID ]]
+            - !Ref PrivateSubnet1ID
+        EKSClusterName: !If [GenerateClusterName, !Ref GenerateName, !Ref EKSClusterName]
+        HttpProxy: !Ref HttpProxy
+  ClusterAutoScalerStack:
+    Condition: EnableClusterAutoScaler
+    Metadata:
+      DependsOn:
+       - !Ref ControlPlaneSecurityGroupIngress
+       - !If [EnableFargate, !Ref FargateNamespaces, !Ref 'AWS::NoValue']
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub 'https://${QSS3BucketName}.s3.amazonaws.com/${QSS3KeyPrefix}templates/amazon-eks-cluster-autoscaler.template.yaml'
+      Parameters:
+        NodeAutoScalingGroup: !GetAtt NodeGroupStack.Outputs.NodeAutoScalingGroup
+        EksClusterName: !GetAtt EKSControlPlane.Outputs.EKSName
+        KubernetesVersion: ~~/<ConfigSetName>/controlplane/KubernetesVersion~~
+  CleanupLambdas:
+    Type: Custom::LambdaCleanup
+    DependsOn: CleanupControlPlaneSecurityGroupDependencies
+    Properties:
+      ServiceToken: !Sub ['arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${Prefix}-CleanupLambdas', {Prefix: !FindInMap [Config, Prefix, Value]}]
+      SecurityGroupId: !GetAtt ControlPlaneSecurityGroup.GroupId
+  CleanupControlPlaneSecurityGroupDependencies:
+    Type: Custom::LambdaSGCleanup
+    Properties:
+      ServiceToken: !Sub ['arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${Prefix}-CleanupSecurityGroupDependencies', {Prefix: !FindInMap [Config, Prefix, Value]}]
+      Region: !Ref "AWS::Region"
+      SecurityGroups:
+        - !GetAtt ControlPlaneSecurityGroup.GroupId
+  ControlPlaneSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Cluster communication
+      VpcId: !Ref VPCID
+  ControlPlaneSecurityGroupIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Allow SG members to access k8s api
+      GroupId: !Ref ControlPlaneSecurityGroup
+      SourceSecurityGroupId: !Ref ControlPlaneSecurityGroup
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+  ControlPlaneNodeSecurityGroupIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Allow Node SG members to access k8s api
+      GroupId: !Ref ControlPlaneSecurityGroup
+      SourceSecurityGroupId: ~~/<ConfigSetName>/default-nodegroup/NodeSecurityGroupId~~
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+  EKSControlPlane:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: [CleanupControlPlaneSecurityGroupDependencies, ControlPlaneSecurityGroupIngress, FunctionStack]
+    Properties:
+      TemplateURL: !Sub 'https://${QSS3BucketName}.s3.amazonaws.com/${QSS3KeyPrefix}templates/amazon-eks-controlplane.template.yaml'
+      Parameters:
+        SecurityGroupIds: !Ref ControlPlaneSecurityGroup
+        SubnetIds: !If
+          - EnablePublicSubnets
+          - !If
+            - 3AZDeployment
+            - !Join [",", [ !Ref PrivateSubnet1ID, !Ref PrivateSubnet2ID, !Ref PrivateSubnet3ID, !Ref PublicSubnet1ID, !Ref PublicSubnet2ID, !Ref PublicSubnet3ID ]]
+            - !If
+              - 2AZDeployment
+              - !Join [",", [ !Ref PrivateSubnet1ID, !Ref PrivateSubnet2ID, !Ref PublicSubnet1ID, !Ref PublicSubnet2ID ]]
+              - !Join [",", [ !Ref PrivateSubnet1ID, !Ref PublicSubnet1ID ]]
+          - !If
+            - 3AZDeployment
+            - !Join [",", [ !Ref PrivateSubnet1ID, !Ref PrivateSubnet2ID, !Ref PrivateSubnet3ID ]]
+            - !If
+              - 2AZDeployment
+              - !Join [",", [ !Ref PrivateSubnet1ID, !Ref PrivateSubnet2ID ]]
+              - !Join [",", [ !Ref PrivateSubnet1ID ]]
+        RoleArn: !Sub ["arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${Prefix}-ControlPlane", {Prefix: !FindInMap [Config, Prefix, Value]}]
+        AdditionalEKSAdminUserArn: !Ref AdditionalEKSAdminUserArn
+        AdditionalEKSAdminRoleArn: !Ref AdditionalEKSAdminRoleArn
+        AdditionalEKSAdminNodeRoleArn: !Ref AdditionalEKSAdminNodeRoleArn
+        KubernetesVersion: ~~/<ConfigSetName>/controlplane/KubernetesVersion~~
+        BastionRole: !GetAtt IamStack.Outputs.BastionRole
+        FunctionRoleArn: !GetAtt IamStack.Outputs.KubernetesAdminRoleArn
+        EKSPublicAccessCIDRs: ~~/<ConfigSetName>/controlplane/EKSPublicAccessCIDRs~~
+        EKSPublicAccessEndpoint: !Ref EKSPublicAccessEndpoint
+        EKSPrivateAccessEndpoint: ~~/<ConfigSetName>/controlplane/EKSPrivateAccessEndpoint~~
+        EKSClusterLoggingTypes: ~~/<ConfigSetName>/controlplane/EKSClusterLoggingTypes~~
+        #EKSEncryptSecrets: ~~/<ConfigSetName>/controlplane/EKSEncryptSecrets~~
+        #EKSEncryptSecretsKmsKeyArn: ~~/<ConfigSetName>/controlplane/EKSEncryptSecretsKmsKeyArn~~
+        IamOidcProvider: !If [EnableOIDC, 'Enabled', 'Disabled']
+        EKSClusterName: !If [GenerateClusterName, !Ref GenerateName, !Ref EKSClusterName]
+#  PrometheusStack:
+#    Metadata:
+#      cfn-lint: { config: { ignore_checks: [ W9901 ] } }
+#      DependsOn:
+#        - !Ref ControlPlaneSecurityGroupIngress
+#        - !Ref NodeGroupStack
+#        - !Ref LoadBalancerStack
+#        - !If [EnableFargate, !Ref FargateNamespaces, !Ref 'AWS::NoValue']
+#    Condition: EnablePrometheus
+#    Type: AWS::CloudFormation::Stack
+#    Properties:
+#      TemplateURL: !Sub 'https://${QSS3BucketName}.s3.amazonaws.com/${QSS3KeyPrefix}submodules/eks-prometheus/templates/eks-prometheus.template.yaml'
+#      Parameters:
+#        KubeClusterName: !GetAtt EKSControlPlane.Outputs.EKSName
+
+#  AppNamespaceStack:
+#    Metadata:
+#      cfn-lint: { config: { ignore_checks: [ W9901 ] } }
+#      DependsOn:
+#        - !Ref ControlPlaneSecurityGroupIngress
+#        - !Ref NodeGroupStack
+#        - !If [EnableFargate, !Ref FargateNamespaces, !Ref 'AWS::NoValue']
+#    Type: AWS::CloudFormation::Stack
+#    Properties:
+#      TemplateURL: !Sub 'https://${QSS3BucketName}.s3.amazonaws.com/${QSS3KeyPrefix}templates/amazon-eks-app-namespace.yaml'
+#      Parameters:
+#        EksClusterName: !GetAtt EKSControlPlane.Outputs.EKSName
+
+  LoadBalancerStack:
+    Metadata:
+      DependsOn:
+        - !Ref ControlPlaneSecurityGroupIngress
+        - !Ref NodeGroupStack
+        - !If [EnableFargate, !Ref FargateNamespaces, !Ref 'AWS::NoValue']
+    Condition: EnableLoadBalancerController
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub 'https://${QSS3BucketName}.s3.amazonaws.com/${QSS3KeyPrefix}templates/amazon-eks-load-balancer-controller.template.yaml'
+      Parameters:
+        OIDCIssuerURLWithoutProtocol:  !Join [ '', !Split [ 'https://', !GetAtt EKSControlPlane.Outputs.OIDCIssuerURL ] ]
+        EksClusterName: !GetAtt EKSControlPlane.Outputs.EKSName
+        VpcId: !Ref VPCID
+  GenerateNameFunction:
+    Condition: GenerateClusterName
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.handler
+      Runtime: python3.7
+      Role: !Sub ["arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${Prefix}-CopyZips", {Prefix: !FindInMap [Config, Prefix, Value]}]
+      Timeout: 900
+      Code:
+        ZipFile: |
+          import cfnresponse
+          import logging
+          from random import choice
+          from string import ascii_uppercase, digits
+          logger = logging.getLogger(__name__)
+          def handler(event, context):
+              logger.debug(event)
+              status = cfnresponse.SUCCESS
+              pid = None
+              try:
+                  if event['RequestType'] == 'Create':
+                      pid = 'EKS-' + ''.join((choice(ascii_uppercase + digits) for i in range(8)))
+                  else:
+                      pid = event['PhysicalResourceId']
+              except Exception:
+                  logging.error('Unhandled exception', exc_info=True)
+                  status = cfnresponse.FAILED
+              finally:
+                  cfnresponse.send(event, context, status, {}, pid)
+  GenerateName:
+    Condition: GenerateClusterName
+    Type: Custom::GenerateName
+    Properties:
+      ServiceToken: !GetAtt 'GenerateNameFunction.Arn'
+  AwsNodeIrsa:
+    DependsOn: NodeGroupStack
+    Condition: EnableOIDC
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub 'https://${QSS3BucketName}.s3.amazonaws.com/${QSS3KeyPrefix}templates/aws-node-daemonset-IRSA.template.yaml'
+      Parameters:
+        OIDCProvider: !Join [ '', !Split [ 'https://', !GetAtt EKSControlPlane.Outputs.OIDCIssuerURL ] ]
+        ClusterName: !GetAtt EKSControlPlane.Outputs.EKSName
+Outputs:
+  EKSClusterName:
+    Value: !GetAtt EKSControlPlane.Outputs.EKSName
+  ControlPlaneSecurityGroup:
+    Value: !GetAtt ControlPlaneSecurityGroup.GroupId
+  NodeGroupSecurityGroup:
+    Value: !GetAtt NodeGroupStack.Outputs.EKSNodeSecurityGroup
+  NodeAutoScalingGroup:
+    Value: !GetAtt NodeGroupStack.Outputs.NodeAutoScalingGroup
+  OIDCIssuerURL:
+    Value : !GetAtt EKSControlPlane.Outputs.OIDCIssuerURL

@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: MySQL stack that creates Aurora RDS
+Description: Deploys Amazon Aurora RDS
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -13,7 +13,6 @@ Metadata:
           - DBSubnet2
           - DBClusterIdentifier
           - Environment
-          - EksClusterName
           - EksClusterName
           - DBInstanceClass
           - EngineVersion
@@ -110,7 +109,7 @@ Resources:
         Type: "AWS::EC2::SecurityGroupIngress"
         Properties:
             GroupId: !Ref RDSSecurityGroup
-            SourceSecurityGroupId: !Sub "{{resolve:ssm:/${Environment}/${EksClusterName}/eks/clusterSecurityGroupId}}"
+            SourceSecurityGroupId: !Sub "{{resolve:ssm:/${Environment}/${EksClusterName}/eks/clusterSecurityGroupId}}" 
             SourceSecurityGroupOwnerId: !Ref AWS::AccountId
             FromPort: 3306
             IpProtocol: "tcp"
