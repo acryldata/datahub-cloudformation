@@ -1,4 +1,60 @@
 AWSTemplateFormatVersion: "2010-09-09"
+Metadata:
+    AWS::CloudFormation::Interface:
+      ParameterGroups:
+        - Label:
+            default: Network
+          Parameters:
+            - VPCID
+            - SubnetID
+        - Label:
+            default: AWS Credentials
+          Parameters:
+            - AwsAccessKeyId
+            - AwsSecretAccessKey
+            - AwsRegion
+        - Label:
+            default: DataHub Info
+          Parameters:
+            - DataHubBaseUrl
+            - AwsCommandQueueUrl
+            - AwsCommandQueueArn
+            - DataHubAccessToken
+            - ExistingDataHubAccessTokenSecretArn
+        - Label:
+            default: Ingestion Container Task
+          Parameters:
+            - ImageTag
+            - TaskCpu
+            - TaskMemory
+
+      ParameterLabels:
+        SubnetID: 
+          Default: "The Existing Subnet ID"
+        VPCID:
+          Default: "The Existing VPC ID"
+        AwsAccessKeyId:
+          Default: "AWS Access Key Id, if not specified, will use task execution IAM role"
+        AwsSecretAccessKey:
+          Default: "AWS Secret Access Key, if not specified, will use task execution IAM role"
+        AwsRegion:
+          Default: "AWS Region, only needed if using AwsAccessKeyId and AwsSecretAccessKey"
+        DataHubBaseUrl:
+          Default: "DataHub Base Url, for example: https://xxx.acryl.io/gms"
+        AwsCommandQueueUrl:
+          Default: "Command SQS Queue Url, for example: https://sqs.REGION.amazonaws.com/111111111111/xxx"
+        AwsCommandQueueArn: 
+          Default: "Command SQS Queue ARN, for example: arn:aws:sqs:REGION:11111111111:xxx"
+        DataHubAccessToken:
+          Default: "DataHub Access Token, if not specified, will get it from ExistingDataHubAccessTokenSecretArn"
+        ExistingDataHubAccessTokenSecretArn:
+          Default: "Existing DataHub Access Token Secret Arn, if not specified, will use DataHubAccessToken"
+        ImageTag:
+          Default: "specify image tag, will use latest if not specified"
+        TaskCpu:
+          Default: "The ECS Task CPU value, check https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-cpu-memory-error.html"
+        TaskMemory:
+          Default: "The ECS Task Memory value, check https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-cpu-memory-error.html"
 Parameters:
   SubnetID:
     Type: "AWS::EC2::Subnet::Id"
@@ -6,24 +62,38 @@ Parameters:
     Type: "AWS::EC2::VPC::Id"
   DataHubBaseUrl:
     Type: "String"
-    Default: "https://staging.acryl.io/gms"
+    Default: ""
+    Description: "DataHub Base Url, for example: https://xxx.acryl.io/gms"
   DataHubAccessToken:
     Type: "String"
     NoEcho: Yes
+    Description: "DataHub Access Token, if not specified, will get it from ExistingDataHubAccessTokenSecretArn"
+  ExistingDataHubAccessTokenSecretArn:
+    Type: "String"
+    Description: "Existing DataHub Access Token Secret Arn, if not specified, will use DataHubAccessToken"
   AwsAccessKeyId:
     Type: "String"
     NoEcho: Yes
+    Description: "AWS Access Key Id, if not specified, will use task execution IAM role"
   AwsSecretAccessKey:
     Type: "String"
     NoEcho: Yes
+    Description: "AWS Secret Access Key, if not specified, will use task execution IAM role"
   AwsRegion:
     Type: "String"
+    Description: "AWS Region, only needed if using AwsAccessKeyId and AwsSecretAccessKey"
   AwsCommandQueueUrl:
     Type: "String"
-    Default: "https://sqs.us-west-2.amazonaws.com/795586375822/datahub-executor-command-test"
+    Default: ""
+    Description: "Command SQS Queue Url, for example: https://sqs.REGION.amazonaws.com/111111111111/xxx"
   AwsCommandQueueArn:
     Type: "String"
-    Default: "arn:aws:sqs:us-west-2:795586375822:datahub-executor-command-test"
+    Default: ""
+    Description: "Command SQS Queue ARN, for example: arn:aws:sqs:REGION:11111111111:xxx"
+  ImageTag:
+    Type: "String"
+    Default: ""
+    Description: "specify image tag, will use latest if not specified"
   TaskCpu:
     Type: "String"
     Default: "1024"
@@ -69,11 +139,18 @@ Parameters:
       - 28672
       - 29696
       - 30720
+Conditions:
+  UseAwsAccessKeyId: !Not [!Equals [!Ref AwsAccessKeyId, ""]]
+  UseAwsSecretAccessKey: !Not [!Equals [!Ref AwsSecretAccessKey, ""]]
+  UseAwsRegion: !Not [!Equals [!Ref AwsRegion, ""]]
+  UseExistingDataHubAccessTokenSecret: !Not [!Equals [!Ref ExistingDataHubAccessTokenSecretArn, ""]]
+  UseDataHubAccessToken: !Not [!Equals [!Ref DataHubAccessToken, ""]]
+  UseImageTag: !Not [!Equals [!Ref ImageTag, ""]]
 
-### ECS Cluster ###
 Resources:
   DataHubAccessTokenSecret:
     Type: AWS::SecretsManager::Secret
+    Condition: UseDataHubAccessToken
     Properties:
       Name: !Sub "/${AWS::StackName}/DataHubAccessToken"
       Description: !Sub "${AWS::StackName}: Secrets for DataHubAccessToken"
@@ -167,12 +244,24 @@ Resources:
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
-            - Action:
-                - secretsmanager:GetSecretValue
-                #- ssm:GetParameters
-                #- kms:Decrypt
-              Effect: Allow
-              Resource: !Sub "${DataHubAccessTokenSecret}"
+            - !If 
+              - UseExistingDataHubAccessTokenSecret
+              - Action:
+                  - secretsmanager:GetSecretValue
+                  #- ssm:GetParameters
+                  #- kms:Decrypt
+                Effect: Allow
+                Resource: !Ref ExistingDataHubAccessTokenSecretArn
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseDataHubAccessToken
+              - Action:
+                  - secretsmanager:GetSecretValue
+                  #- ssm:GetParameters
+                  #- kms:Decrypt
+                Effect: Allow
+                Resource: !Ref DataHubAccessTokenSecret
+              - !Ref "AWS::NoValue"
       AssumeRolePolicyDocument:
         Version: 2012-10-17
         Statement:
@@ -189,15 +278,17 @@ Resources:
       GroupName: ContainerSecurityGroup
       GroupDescription: Security group for container
       VpcId: !Ref VPCID
-      #SecurityGroupIngress:
-      #  - IpProtocol: tcp
-      #    FromPort: 80
-      #    ToPort: 80
-      #    CidrIp: 0.0.0.0/0
 
 ### Task Definition and ECS Service ###
   TaskDefinition:
-    DependsOn: DataHubAccessTokenSecret
+    Metadata:
+      DependsOn: !If 
+        - UseExistingDataHubAccessTokenSecret
+        - !Ref ExistingDataHubAccessTokenSecretArn
+        - !If 
+          - UseDataHubAccessToken
+          - !Ref DataHubAccessTokenSecret
+          - !Ref 'AWS::NoValue'
     Type: AWS::ECS::TaskDefinition
     Properties:
       Family: !Sub "${AWS::StackName}-task"
@@ -208,7 +299,10 @@ Resources:
       ExecutionRoleArn: !Ref ExecutionRole
       ContainerDefinitions:
         - Name: !Sub "${AWS::StackName}-container"
-          Image: 795586375822.dkr.ecr.us-west-2.amazonaws.com/acryl-sqs-remote-executor
+          Image: !If 
+            - UseImageTag
+            - !Join [":", [ "795586375822.dkr.ecr.us-west-2.amazonaws.com/acryl-sqs-remote-executor", !Ref ImageTag]]
+            - 795586375822.dkr.ecr.us-west-2.amazonaws.com/acryl-sqs-remote-executor
           PortMappings:
             - ContainerPort: 80
           LogConfiguration:
@@ -219,20 +313,27 @@ Resources:
               awslogs-stream-prefix: ecs
           Secrets:
             - Name: DATAHUB_ACCESS_TOKEN
-              ValueFrom: !Sub "${DataHubAccessTokenSecret}"
+              ValueFrom: !If [UseExistingDataHubAccessTokenSecret, !Ref ExistingDataHubAccessTokenSecretArn, !Ref DataHubAccessTokenSecret]
           Environment: 
             - Name: DATAHUB_BASE_URL
               Value: !Ref DataHubBaseUrl
-            - Name: AWS_ACCESS_KEY_ID
-              Value: !Ref AwsAccessKeyId
-            - Name: AWS_SECRET_ACCESS_KEY
-              Value: !Ref AwsSecretAccessKey
-            - Name: AWS_SESSION_TOKEN
-              Value: ""
-            - Name: AWS_REGION 
-              Value: !Ref AwsRegion
             - Name: AWS_COMMAND_QUEUE_URL
               Value: !Ref AwsCommandQueueUrl
+            - !If 
+              - UseAwsAccessKeyId
+              - Name: AWS_ACCESS_KEY_ID
+                Value: !Ref AwsAccessKeyId
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseAwsSecretAccessKey
+              - Name: AWS_SECRET_ACCESS_KEY
+                Value: !Ref AwsSecretAccessKey
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseAwsRegion
+              - Name: AWS_REGION
+                Value: !Ref AwsRegion
+              - !Ref "AWS::NoValue"
       RequiresCompatibilities:
         - EC2
         - FARGATE
