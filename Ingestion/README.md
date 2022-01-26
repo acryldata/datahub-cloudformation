@@ -20,6 +20,7 @@
     - DataHubBaseUrl: DataHub Base Url, for example: https://xxx.acryl.io/gms
     - AwsCommandQueueUrl: Command SQS Queue Url, for example: https://sqs.REGION.amazonaws.com/111111111111/xxx
     - AwsCommandQueueArn: Command SQS Queue ARN, for example: arn:aws:sqs:REGION:11111111111:xxx
+    - ExecutorId: unique executor id
     - To use existing datahub access token from AWS secrets manager, fillout below
         - ExistingDataHubAccessTokenSecretArn
     - To use datahub access token directly, fillout below

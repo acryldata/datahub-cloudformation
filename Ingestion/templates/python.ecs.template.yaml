@@ -20,6 +20,7 @@ Metadata:
             - AwsCommandQueueUrl
             - AwsCommandQueueArn
             - DataHubAccessToken
+            - ExecutorId
             - ExistingDataHubAccessTokenSecretArn
         - Label:
             default: Ingestion Container Task
@@ -47,6 +48,8 @@ Metadata:
           Default: "Command SQS Queue ARN, for example: arn:aws:sqs:REGION:11111111111:xxx"
         DataHubAccessToken:
           Default: "DataHub Access Token, if not specified, will get it from ExistingDataHubAccessTokenSecretArn"
+        ExecutorId:
+          Default: "Unique Executor Id"
         ExistingDataHubAccessTokenSecretArn:
           Default: "Existing DataHub Access Token Secret Arn, if not specified, will use DataHubAccessToken"
         ImageTag:
@@ -68,6 +71,9 @@ Parameters:
     Type: "String"
     NoEcho: Yes
     Description: "DataHub Access Token, if not specified, will get it from ExistingDataHubAccessTokenSecretArn"
+  ExecutorId:
+    Type: "String"
+    Description: "Unique Executor Id"
   ExistingDataHubAccessTokenSecretArn:
     Type: "String"
     Description: "Existing DataHub Access Token Secret Arn, if not specified, will use DataHubAccessToken"
@@ -146,6 +152,7 @@ Conditions:
   UseExistingDataHubAccessTokenSecret: !Not [!Equals [!Ref ExistingDataHubAccessTokenSecretArn, ""]]
   UseDataHubAccessToken: !Not [!Equals [!Ref DataHubAccessToken, ""]]
   UseImageTag: !Not [!Equals [!Ref ImageTag, ""]]
+  UseExecutorId: !Not [!Equals [!Ref ExecutorId, ""]]
 
 Resources:
   DataHubAccessTokenSecret:
@@ -333,6 +340,11 @@ Resources:
               - UseAwsRegion
               - Name: AWS_REGION
                 Value: !Ref AwsRegion
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseExecutorId
+              - Name: EXECUTOR_ID
+                Value: !Ref ExecutorId
               - !Ref "AWS::NoValue"
       RequiresCompatibilities:
         - EC2
