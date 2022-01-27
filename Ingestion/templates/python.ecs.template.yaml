@@ -1,0 +1,368 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Metadata:
+    AWS::CloudFormation::Interface:
+      ParameterGroups:
+        - Label:
+            default: Network
+          Parameters:
+            - VPCID
+            - SubnetID
+        - Label:
+            default: AWS Credentials
+          Parameters:
+            - AwsAccessKeyId
+            - AwsSecretAccessKey
+            - AwsRegion
+        - Label:
+            default: DataHub Info
+          Parameters:
+            - DataHubBaseUrl
+            - AwsCommandQueueUrl
+            - AwsCommandQueueArn
+            - DataHubAccessToken
+            - ExecutorId
+            - ExistingDataHubAccessTokenSecretArn
+        - Label:
+            default: Ingestion Container Task
+          Parameters:
+            - ImageTag
+            - TaskCpu
+            - TaskMemory
+
+      ParameterLabels:
+        SubnetID: 
+          Default: "The Existing Subnet ID"
+        VPCID:
+          Default: "The Existing VPC ID"
+        AwsAccessKeyId:
+          Default: "AWS Access Key Id, if not specified, will use task execution IAM role"
+        AwsSecretAccessKey:
+          Default: "AWS Secret Access Key, if not specified, will use task execution IAM role"
+        AwsRegion:
+          Default: "AWS Region, only needed if using AwsAccessKeyId and AwsSecretAccessKey"
+        DataHubBaseUrl:
+          Default: "DataHub Base Url, for example: https://xxx.acryl.io/gms"
+        AwsCommandQueueUrl:
+          Default: "Command SQS Queue Url, for example: https://sqs.REGION.amazonaws.com/111111111111/xxx"
+        AwsCommandQueueArn: 
+          Default: "Command SQS Queue ARN, for example: arn:aws:sqs:REGION:11111111111:xxx"
+        DataHubAccessToken:
+          Default: "DataHub Access Token, if not specified, will get it from ExistingDataHubAccessTokenSecretArn"
+        ExecutorId:
+          Default: "Unique Executor Id"
+        ExistingDataHubAccessTokenSecretArn:
+          Default: "Existing DataHub Access Token Secret Arn, if not specified, will use DataHubAccessToken"
+        ImageTag:
+          Default: "specify image tag, will use latest if not specified"
+        TaskCpu:
+          Default: "The ECS Task CPU value, check https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-cpu-memory-error.html"
+        TaskMemory:
+          Default: "The ECS Task Memory value, check https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-cpu-memory-error.html"
+Parameters:
+  SubnetID:
+    Type: "AWS::EC2::Subnet::Id"
+  VPCID:
+    Type: "AWS::EC2::VPC::Id"
+  DataHubBaseUrl:
+    Type: "String"
+    Default: ""
+    Description: "DataHub Base Url, for example: https://xxx.acryl.io/gms"
+  DataHubAccessToken:
+    Type: "String"
+    NoEcho: Yes
+    Description: "DataHub Access Token, if not specified, will get it from ExistingDataHubAccessTokenSecretArn"
+  ExecutorId:
+    Type: "String"
+    Description: "Unique Executor Id"
+  ExistingDataHubAccessTokenSecretArn:
+    Type: "String"
+    Description: "Existing DataHub Access Token Secret Arn, if not specified, will use DataHubAccessToken"
+  AwsAccessKeyId:
+    Type: "String"
+    NoEcho: Yes
+    Description: "AWS Access Key Id, if not specified, will use task execution IAM role"
+  AwsSecretAccessKey:
+    Type: "String"
+    NoEcho: Yes
+    Description: "AWS Secret Access Key, if not specified, will use task execution IAM role"
+  AwsRegion:
+    Type: "String"
+    Description: "AWS Region, only needed if using AwsAccessKeyId and AwsSecretAccessKey"
+  AwsCommandQueueUrl:
+    Type: "String"
+    Default: ""
+    Description: "Command SQS Queue Url, for example: https://sqs.REGION.amazonaws.com/111111111111/xxx"
+  AwsCommandQueueArn:
+    Type: "String"
+    Default: ""
+    Description: "Command SQS Queue ARN, for example: arn:aws:sqs:REGION:11111111111:xxx"
+  ImageTag:
+    Type: "String"
+    Default: ""
+    Description: "specify image tag, will use latest if not specified"
+  TaskCpu:
+    Type: "String"
+    Default: "1024"
+    Description: "The ECS Task CPU value, check https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-cpu-memory-error.html"
+    AllowedValues:
+      - 256
+      - 512
+      - 1024
+      - 2048
+      - 4096
+  TaskMemory:
+    Type: "String"
+    Default: "2048"
+    Description: "The ECS Task Memory value (MiB), check https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-cpu-memory-error.html"
+    AllowedValues:
+      - 512
+      - 1024
+      - 2048
+      - 4096
+      - 5120
+      - 6144
+      - 7168
+      - 8192
+      - 9216
+      - 10240
+      - 11264
+      - 12288
+      - 13312
+      - 14336
+      - 15360
+      - 16384
+      - 17408
+      - 18432
+      - 19456
+      - 20480
+      - 21504
+      - 22528
+      - 23552
+      - 24576
+      - 25600
+      - 26624
+      - 27648
+      - 28672
+      - 29696
+      - 30720
+Conditions:
+  UseAwsAccessKeyId: !Not [!Equals [!Ref AwsAccessKeyId, ""]]
+  UseAwsSecretAccessKey: !Not [!Equals [!Ref AwsSecretAccessKey, ""]]
+  UseAwsRegion: !Not [!Equals [!Ref AwsRegion, ""]]
+  UseExistingDataHubAccessTokenSecret: !Not [!Equals [!Ref ExistingDataHubAccessTokenSecretArn, ""]]
+  UseDataHubAccessToken: !Not [!Equals [!Ref DataHubAccessToken, ""]]
+  UseImageTag: !Not [!Equals [!Ref ImageTag, ""]]
+  UseExecutorId: !Not [!Equals [!Ref ExecutorId, ""]]
+
+Resources:
+  DataHubAccessTokenSecret:
+    Type: AWS::SecretsManager::Secret
+    Condition: UseDataHubAccessToken
+    Properties:
+      Name: !Sub "/${AWS::StackName}/DataHubAccessToken"
+      Description: !Sub "${AWS::StackName}: Secrets for DataHubAccessToken"
+      SecretString: !Ref DataHubAccessToken
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub "${AWS::StackName}"
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "${AWS::StackName}-log-group"
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AWS::StackName}-task-role"
+      #RoleName: !Sub "datahub-ingestion-task-role"
+      Policies:
+        - PolicyName: ssmmessages-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+            - Action: 
+                - ssmmessages:CreateControlChannel
+                - ssmmessages:CreateDataChannel
+                - ssmmessages:OpenControlChannel
+                - ssmmessages:OpenDataChannel
+              Effect: Allow
+              Resource: "*"
+        - PolicyName: logs-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+            - Action: 
+                - logs:DescribeLogGroups
+              Effect: Allow
+              Resource: "*"
+        - PolicyName: logs-streams-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+            - Action:
+                - logs:CreateLogStream
+                - logs:DescribeLogStreams
+                - logs:PutLogEvents
+              Effect: Allow
+              Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/ecs/${AWS::StackName}-log-group:*"
+        - PolicyName: sqs-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+            - Action:
+                - sqs:ChangeMessageVisibility
+                - sqs:DeleteMessage
+                - sqs:ReceiveMessage
+                - sqs:GetQueueUrl
+              Effect: Allow
+              Resource: !Ref AwsCommandQueueArn
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AWS::StackName}-execution-role"
+      #RoleName: !Sub "datahub-ingestion-execution-role"
+      Policies:
+        - PolicyName: logs-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+            - Action:
+                - logs:DescribeLogGroups
+              Resource: "*"
+              Effect: Allow
+        - PolicyName: logs-streams-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+            - Action:
+                - logs:CreateLogStream
+                - logs:DescribeLogStreams
+                - logs:PutLogEvents
+              Effect: Allow
+              Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/ecs/${AWS::StackName}-log-group:*"
+        - PolicyName: secretsmanager-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+            - !If 
+              - UseExistingDataHubAccessTokenSecret
+              - Action:
+                  - secretsmanager:GetSecretValue
+                  #- ssm:GetParameters
+                  #- kms:Decrypt
+                Effect: Allow
+                Resource: !Ref ExistingDataHubAccessTokenSecretArn
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseDataHubAccessToken
+              - Action:
+                  - secretsmanager:GetSecretValue
+                  #- ssm:GetParameters
+                  #- kms:Decrypt
+                Effect: Allow
+                Resource: !Ref DataHubAccessTokenSecret
+              - !Ref "AWS::NoValue"
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+
+  ContainerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: ContainerSecurityGroup
+      GroupDescription: Security group for container
+      VpcId: !Ref VPCID
+
+### Task Definition and ECS Service ###
+  TaskDefinition:
+    Metadata:
+      DependsOn: !If 
+        - UseExistingDataHubAccessTokenSecret
+        - !Ref ExistingDataHubAccessTokenSecretArn
+        - !If 
+          - UseDataHubAccessToken
+          - !Ref DataHubAccessTokenSecret
+          - !Ref 'AWS::NoValue'
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${AWS::StackName}-task"
+      Cpu: !Ref TaskCpu
+      Memory: !Ref TaskMemory
+      TaskRoleArn: !Ref TaskRole
+      NetworkMode: awsvpc
+      ExecutionRoleArn: !Ref ExecutionRole
+      ContainerDefinitions:
+        - Name: !Sub "${AWS::StackName}-container"
+          Image: !If 
+            - UseImageTag
+            - !Join [":", [ "795586375822.dkr.ecr.us-west-2.amazonaws.com/acryl-sqs-remote-executor", !Ref ImageTag]]
+            - 795586375822.dkr.ecr.us-west-2.amazonaws.com/acryl-sqs-remote-executor
+          PortMappings:
+            - ContainerPort: 80
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-region: !Ref AWS::Region
+              awslogs-group: !Ref LogGroup
+              awslogs-stream-prefix: ecs
+          Secrets:
+            - Name: DATAHUB_ACCESS_TOKEN
+              ValueFrom: !If [UseExistingDataHubAccessTokenSecret, !Ref ExistingDataHubAccessTokenSecretArn, !Ref DataHubAccessTokenSecret]
+          Environment: 
+            - Name: DATAHUB_BASE_URL
+              Value: !Ref DataHubBaseUrl
+            - Name: AWS_COMMAND_QUEUE_URL
+              Value: !Ref AwsCommandQueueUrl
+            - !If 
+              - UseAwsAccessKeyId
+              - Name: AWS_ACCESS_KEY_ID
+                Value: !Ref AwsAccessKeyId
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseAwsSecretAccessKey
+              - Name: AWS_SECRET_ACCESS_KEY
+                Value: !Ref AwsSecretAccessKey
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseAwsRegion
+              - Name: AWS_REGION
+                Value: !Ref AwsRegion
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseExecutorId
+              - Name: EXECUTOR_ID
+                Value: !Ref ExecutorId
+              - !Ref "AWS::NoValue"
+      RequiresCompatibilities:
+        - EC2
+        - FARGATE
+  ECSService:
+    DependsOn: Cluster
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Sub "${AWS::StackName}-service"
+      Cluster: !Ref Cluster
+      TaskDefinition: !Ref TaskDefinition
+      DesiredCount: 1
+      LaunchType: FARGATE
+      EnableExecuteCommand: true
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets:
+            - !Ref SubnetID
+          SecurityGroups:
+            - !GetAtt ContainerSecurityGroup.GroupId
