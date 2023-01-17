@@ -273,6 +273,41 @@ Resources:
                 Resource: !Ref ExistingDataHubAccessTokenSecretArn
               - !Ref "AWS::NoValue"
             - !If 
+              - UseOptionalSecret01
+              - Action:
+                  - secretsmanager:GetSecretValue
+                Effect: Allow
+                Resource: !Select [1, !Split ["|", !Select [0, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret02
+              - Action:
+                  - secretsmanager:GetSecretValue
+                Effect: Allow
+                Resource: !Select [1, !Split ["|", !Select [1, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret03
+              - Action:
+                  - secretsmanager:GetSecretValue
+                Effect: Allow
+                Resource: !Select [1, !Split ["|", !Select [2, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret04
+              - Action:
+                  - secretsmanager:GetSecretValue
+                Effect: Allow
+                Resource: !Select [1, !Split ["|", !Select [3, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret05
+              - Action:
+                  - secretsmanager:GetSecretValue
+                Effect: Allow
+                Resource: !Select [1, !Split ["|", !Select [4, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
               - UseDataHubAccessToken
               - Action:
                   - secretsmanager:GetSecretValue
