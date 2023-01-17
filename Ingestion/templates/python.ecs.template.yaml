@@ -82,7 +82,7 @@ Parameters:
     Description: "Existing DataHub Access Token Secret Arn, if not specified, will use DataHubAccessToken"
   OptionalSecrets:
     Type: "String"
-    Description: "A list of Optional AWS Secrets, for example: SECRET01|{secret01_arn},SECRET02|{secret02_arn}, supports up to 5 secrets"
+    Description: "A list of Optional AWS Secrets, for example: SECRET01_ENV|{secret01_arn},SECRET02_ENV|{secret02_arn}, supports up to 5 secrets"
   AwsAccessKeyId:
     Type: "String"
     NoEcho: Yes
