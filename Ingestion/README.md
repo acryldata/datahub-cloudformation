@@ -23,7 +23,7 @@
     - ExecutorId: unique executor id
     - To use existing datahub access token from AWS secrets manager, fillout below
         - ExistingDataHubAccessTokenSecretArn
-    - To use existing secrets from AWS secrets manager, fillout below
+    - To use optional existing secrets from AWS secrets manager, fillout below
         - OptionalSecrets
         - NumOfOptionalSecrets
     - To use datahub access token directly, fillout below
