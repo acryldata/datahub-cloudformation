@@ -23,6 +23,7 @@ Metadata:
             - ExecutorId
             - ExistingDataHubAccessTokenSecretArn
             - OptionalSecrets
+            - NumOfOptionalSecrets
         - Label:
             default: Ingestion Container Task
           Parameters:
@@ -55,6 +56,8 @@ Metadata:
           Default: "Existing DataHub Access Token Secret Arn, if not specified, will use DataHubAccessToken"
         OptionalSecrets:
           Default: ""
+        NumOfOptionalSecrets:
+          Default: ""
         ImageTag:
           Default: "specify image tag, will use latest if not specified"
         TaskCpu:
@@ -82,7 +85,10 @@ Parameters:
     Description: "Existing DataHub Access Token Secret Arn, if not specified, will use DataHubAccessToken"
   OptionalSecrets:
     Type: "String"
-    Description: "A list of Optional AWS Secrets, for example: SECRET01_ENV|{secret01_arn},SECRET02_ENV|{secret02_arn}, supports up to 5 secrets"
+    Description: "A list of Optional AWS Secrets,for example: SECRET01_ENV|{$SECRET01_ARN},SECRET02_ENV|{$SECRET02_ARN} (supports up to 5 secrets)"
+  NumOfOptionalSecrets:
+    Type: "String"
+    Description: "Number of Optional AWS Secrets (supports up to 5 secrets)" 
   AwsAccessKeyId:
     Type: "String"
     NoEcho: Yes
@@ -159,11 +165,25 @@ Conditions:
   UseDataHubAccessToken: !Not [!Equals [!Ref DataHubAccessToken, ""]]
   UseImageTag: !Not [!Equals [!Ref ImageTag, ""]]
   UseExecutorId: !Not [!Equals [!Ref ExecutorId, ""]]
-  UseOptionalSecret01: !Not [!Equals [!Select [0, !Split ["|", !Select [0, !Split [",", !Ref OptionalSecrets]]]], ""]]
-  UseOptionalSecret02: !Not [!Equals [!Select [0, !Split ["|", !Select [1, !Split [",", !Ref OptionalSecrets]]]], ""]]
-  UseOptionalSecret03: !Not [!Equals [!Select [0, !Split ["|", !Select [2, !Split [",", !Ref OptionalSecrets]]]], ""]]
-  UseOptionalSecret04: !Not [!Equals [!Select [0, !Split ["|", !Select [3, !Split [",", !Ref OptionalSecrets]]]], ""]]
-  UseOptionalSecret05: !Not [!Equals [!Select [0, !Split ["|", !Select [4, !Split [",", !Ref OptionalSecrets]]]], ""]]
+  UseOptionalSecret01: !Or
+    - !Equals [!Ref NumOfOptionalSecrets, '1']
+    - !Equals [!Ref NumOfOptionalSecrets, '2']
+    - !Equals [!Ref NumOfOptionalSecrets, '3']
+    - !Equals [!Ref NumOfOptionalSecrets, '4']
+    - !Equals [!Ref NumOfOptionalSecrets, '5']
+  UseOptionalSecret02: !Or
+    - !Equals [!Ref NumOfOptionalSecrets, '2']
+    - !Equals [!Ref NumOfOptionalSecrets, '3']
+    - !Equals [!Ref NumOfOptionalSecrets, '4']
+    - !Equals [!Ref NumOfOptionalSecrets, '5']
+  UseOptionalSecret03: !Or
+    - !Equals [!Ref NumOfOptionalSecrets, '3']
+    - !Equals [!Ref NumOfOptionalSecrets, '4']
+    - !Equals [!Ref NumOfOptionalSecrets, '5']
+  UseOptionalSecret04: !Or
+    - !Equals [!Ref NumOfOptionalSecrets, '4']
+    - !Equals [!Ref NumOfOptionalSecrets, '5']
+  UseOptionalSecret05: !Equals [!Ref NumOfOptionalSecrets, '5']
   
 
 Resources:
@@ -186,7 +206,6 @@ Resources:
     Type: AWS::IAM::Role
     Properties:
       RoleName: !Sub "${AWS::StackName}-task-role"
-      #RoleName: !Sub "datahub-ingestion-task-role"
       Policies:
         - PolicyName: ssmmessages-policy
           PolicyDocument:
@@ -216,7 +235,8 @@ Resources:
                 - logs:DescribeLogStreams
                 - logs:PutLogEvents
               Effect: Allow
-              Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/ecs/${AWS::StackName}-log-group:*"
+              Resource:
+                - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/ecs/${AWS::StackName}-log-group:*"
         - PolicyName: sqs-policy
           PolicyDocument:
             Version: "2012-10-17"
@@ -239,7 +259,6 @@ Resources:
     Type: AWS::IAM::Role
     Properties:
       RoleName: !Sub "${AWS::StackName}-execution-role"
-      #RoleName: !Sub "datahub-ingestion-execution-role"
       Policies:
         - PolicyName: logs-policy
           PolicyDocument:
@@ -258,7 +277,8 @@ Resources:
                 - logs:DescribeLogStreams
                 - logs:PutLogEvents
               Effect: Allow
-              Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/ecs/${AWS::StackName}-log-group:*"
+              Resource:
+                - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/ecs/${AWS::StackName}-log-group:*"
         - PolicyName: secretsmanager-policy
           PolicyDocument:
             Version: "2012-10-17"
