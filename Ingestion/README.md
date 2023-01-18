@@ -25,7 +25,6 @@
         - ExistingDataHubAccessTokenSecretArn
     - To use optional existing secrets from AWS secrets manager, fillout below
         - OptionalSecrets
-        - NumOfOptionalSecrets
     - To use datahub access token directly, fillout below
         - DataHubAccessToken (it will create secret in secrets manager and use it)
 
