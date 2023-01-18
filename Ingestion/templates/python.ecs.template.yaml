@@ -24,7 +24,6 @@ Metadata:
             - ExecutorId
             - ExistingDataHubAccessTokenSecretArn
             - OptionalSecrets
-            - SingleOptionalSecret
         - Label:
             default: Ingestion Container Task
           Parameters:
@@ -57,8 +56,6 @@ Metadata:
           Default: "Existing DataHub Access Token Secret Arn, if not specified, will use DataHubAccessToken"
         OptionalSecrets:
           Default: ""
-        SingleOptionalSecret:
-          Default: true
         ImageTag:
           Default: "specify image tag, will use latest if not specified"
         TaskCpu:
@@ -87,11 +84,6 @@ Parameters:
   OptionalSecrets:
     Type: "String"
     Description: "A List of Optional AWS Secrets,for example: SECRET01_ENV={$SECRET01_ARN},SECRET02_ENV={$SECRET02_ARN} (NO SPACE, supports up to 10 secrets)"
-  SingleOptionalSecret:
-    Description: Whether OptionalSecrets contain single secret
-    Default: true
-    Type: String
-    AllowedValues: [true, false]
   AwsAccessKeyId:
     Type: "String"
     NoEcho: Yes
@@ -167,64 +159,54 @@ Conditions:
   UseDataHubAccessToken: !Not [!Equals [!Ref DataHubAccessToken, ""]]
   UseExistingDataHubAccessTokenSecret: !Not [!Equals [!Ref ExistingDataHubAccessTokenSecretArn, ""]]
   NonEmptyOptionalSecrets: !Not [!Equals [!Ref OptionalSecrets, ""]]
-  NonEmptySingleOptionalSecret: !Equals [true, !Ref SingleOptionalSecret]
-  NonEmptyMultiOptionalSecret: !Not [!Equals [true, !Ref SingleOptionalSecret]]
+
   UseOptionalSecret01: !Or
     - !And
-        - !Condition NonEmptySingleOptionalSecret
-        - !Condition NonEmptyOptionalSecrets
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 1]
+      - !Condition NonEmptyOptionalSecrets
     - !Condition UseOptionalSecret02
   UseOptionalSecret02: !Or
     - !And
-        - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 2]
-        - !Condition NonEmptyMultiOptionalSecret
-        - !Condition NonEmptyOptionalSecrets
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 2]
+      - !Condition NonEmptyOptionalSecrets
     - !Condition UseOptionalSecret03
   UseOptionalSecret03: !Or
     - !And
-        - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 3]
-        - !Condition NonEmptyMultiOptionalSecret
-        - !Condition NonEmptyOptionalSecrets
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 3]
+      - !Condition NonEmptyOptionalSecrets
     - !Condition UseOptionalSecret04
   UseOptionalSecret04: !Or
     - !And
-        - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 4]
-        - !Condition NonEmptyMultiOptionalSecret
-        - !Condition NonEmptyOptionalSecrets
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 4]
+      - !Condition NonEmptyOptionalSecrets
     - !Condition UseOptionalSecret05
   UseOptionalSecret05: !Or
     - !And
-        - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 5]
-        - !Condition NonEmptyMultiOptionalSecret
-        - !Condition NonEmptyOptionalSecrets
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 5]
+      - !Condition NonEmptyOptionalSecrets
     - !Condition UseOptionalSecret06
   UseOptionalSecret06: !Or
     - !And
-        - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 6]
-        - !Condition NonEmptyMultiOptionalSecret
-        - !Condition NonEmptyOptionalSecrets
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 6]
+      - !Condition NonEmptyOptionalSecrets
     - !Condition UseOptionalSecret07
   UseOptionalSecret07: !Or
     - !And
-        - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 7]
-        - !Condition NonEmptyMultiOptionalSecret
-        - !Condition NonEmptyOptionalSecrets
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 7]
+      - !Condition NonEmptyOptionalSecrets
     - !Condition UseOptionalSecret08
   UseOptionalSecret08: !Or
     - !And
-        - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 8]
-        - !Condition NonEmptyMultiOptionalSecret
-        - !Condition NonEmptyOptionalSecrets
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 8]
+      - !Condition NonEmptyOptionalSecrets
     - !Condition UseOptionalSecret09
   UseOptionalSecret09: !Or
     - !And
-        - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 9]
-        - !Condition NonEmptyMultiOptionalSecret
-        - !Condition NonEmptyOptionalSecrets
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 9]
+      - !Condition NonEmptyOptionalSecrets
     - !Condition UseOptionalSecret10
   UseOptionalSecret10: !And
     - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 10]
-    - !Condition NonEmptyMultiOptionalSecret
     - !Condition NonEmptyOptionalSecrets
   UseImageTag: !Not [!Equals [!Ref ImageTag, ""]]
   UseExecutorId: !Not [!Equals [!Ref ExecutorId, ""]]
