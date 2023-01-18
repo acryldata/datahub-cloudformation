@@ -1,4 +1,5 @@
-AWSTemplateFormatVersion: "2010-09-09"
+AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::LanguageExtensions
 Metadata:
     AWS::CloudFormation::Interface:
       ParameterGroups:
@@ -23,7 +24,7 @@ Metadata:
             - ExecutorId
             - ExistingDataHubAccessTokenSecretArn
             - OptionalSecrets
-            - NumOfOptionalSecrets
+            - SingleOptionalSecret
         - Label:
             default: Ingestion Container Task
           Parameters:
@@ -45,9 +46,9 @@ Metadata:
         DataHubBaseUrl:
           Default: "DataHub Base Url, for example: https://xxx.acryl.io/gms"
         AwsCommandQueueUrl:
-          Default: "Command SQS Queue Url, for example: https://sqs.REGION.amazonaws.com/111111111111/xxx"
+          Default: "Command SQS Queue Url, for example: https://sqs.us-east-1.amazonaws.com/111111111111/xxx"
         AwsCommandQueueArn: 
-          Default: "Command SQS Queue ARN, for example: arn:aws:sqs:REGION:11111111111:xxx"
+          Default: "Command SQS Queue ARN, for example: arn:aws:sqs:us-east-1:11111111111:xxx"
         DataHubAccessToken:
           Default: "DataHub Access Token, if not specified, will get it from ExistingDataHubAccessTokenSecretArn"
         ExecutorId:
@@ -56,8 +57,8 @@ Metadata:
           Default: "Existing DataHub Access Token Secret Arn, if not specified, will use DataHubAccessToken"
         OptionalSecrets:
           Default: ""
-        NumOfOptionalSecrets:
-          Default: ""
+        SingleOptionalSecret:
+          Default: true
         ImageTag:
           Default: "specify image tag, will use latest if not specified"
         TaskCpu:
@@ -85,10 +86,12 @@ Parameters:
     Description: "Existing DataHub Access Token Secret Arn, if not specified, will use DataHubAccessToken"
   OptionalSecrets:
     Type: "String"
-    Description: "A list of Optional AWS Secrets,for example: SECRET01_ENV|{$SECRET01_ARN},SECRET02_ENV|{$SECRET02_ARN} (supports up to 5 secrets)"
-  NumOfOptionalSecrets:
-    Type: "String"
-    Description: "Number of Optional AWS Secrets (supports up to 5 secrets)" 
+    Description: "A List of Optional AWS Secrets,for example: SECRET01_ENV={$SECRET01_ARN},SECRET02_ENV={$SECRET02_ARN} (NO SPACE, supports up to 10 secrets)"
+  SingleOptionalSecret:
+    Description: Whether OptionalSecrets contain single secret
+    Default: true
+    Type: String
+    AllowedValues: [true, false]
   AwsAccessKeyId:
     Type: "String"
     NoEcho: Yes
@@ -103,11 +106,11 @@ Parameters:
   AwsCommandQueueUrl:
     Type: "String"
     Default: ""
-    Description: "Command SQS Queue Url, for example: https://sqs.REGION.amazonaws.com/111111111111/xxx"
+    Description: "Command SQS Queue Url, for example: https://sqs.us-east-1.amazonaws.com/111111111111/xxx"
   AwsCommandQueueArn:
     Type: "String"
     Default: ""
-    Description: "Command SQS Queue ARN, for example: arn:aws:sqs:REGION:11111111111:xxx"
+    Description: "Command SQS Queue ARN, for example: arn:aws:sqs:us-east-1:11111111111:xxx"
   ImageTag:
     Type: "String"
     Default: ""
@@ -161,30 +164,70 @@ Conditions:
   UseAwsAccessKeyId: !Not [!Equals [!Ref AwsAccessKeyId, ""]]
   UseAwsSecretAccessKey: !Not [!Equals [!Ref AwsSecretAccessKey, ""]]
   UseAwsRegion: !Not [!Equals [!Ref AwsRegion, ""]]
-  UseExistingDataHubAccessTokenSecret: !Not [!Equals [!Ref ExistingDataHubAccessTokenSecretArn, ""]]
   UseDataHubAccessToken: !Not [!Equals [!Ref DataHubAccessToken, ""]]
+  UseExistingDataHubAccessTokenSecret: !Not [!Equals [!Ref ExistingDataHubAccessTokenSecretArn, ""]]
+  NonEmptyOptionalSecrets: !Not [!Equals [!Ref OptionalSecrets, ""]]
+  NonEmptySingleOptionalSecret: !Equals [true, !Ref SingleOptionalSecret]
+  NonEmptyMultiOptionalSecret: !Not [!Equals [true, !Ref SingleOptionalSecret]]
+  UseOptionalSecret01: !Or
+    - !And
+        - !Condition NonEmptySingleOptionalSecret
+        - !Condition NonEmptyOptionalSecrets
+    - !Condition UseOptionalSecret02
+  UseOptionalSecret02: !Or
+    - !And
+        - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 2]
+        - !Condition NonEmptyMultiOptionalSecret
+        - !Condition NonEmptyOptionalSecrets
+    - !Condition UseOptionalSecret03
+  UseOptionalSecret03: !Or
+    - !And
+        - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 3]
+        - !Condition NonEmptyMultiOptionalSecret
+        - !Condition NonEmptyOptionalSecrets
+    - !Condition UseOptionalSecret04
+  UseOptionalSecret04: !Or
+    - !And
+        - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 4]
+        - !Condition NonEmptyMultiOptionalSecret
+        - !Condition NonEmptyOptionalSecrets
+    - !Condition UseOptionalSecret05
+  UseOptionalSecret05: !Or
+    - !And
+        - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 5]
+        - !Condition NonEmptyMultiOptionalSecret
+        - !Condition NonEmptyOptionalSecrets
+    - !Condition UseOptionalSecret06
+  UseOptionalSecret06: !Or
+    - !And
+        - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 6]
+        - !Condition NonEmptyMultiOptionalSecret
+        - !Condition NonEmptyOptionalSecrets
+    - !Condition UseOptionalSecret07
+  UseOptionalSecret07: !Or
+    - !And
+        - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 7]
+        - !Condition NonEmptyMultiOptionalSecret
+        - !Condition NonEmptyOptionalSecrets
+    - !Condition UseOptionalSecret08
+  UseOptionalSecret08: !Or
+    - !And
+        - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 8]
+        - !Condition NonEmptyMultiOptionalSecret
+        - !Condition NonEmptyOptionalSecrets
+    - !Condition UseOptionalSecret09
+  UseOptionalSecret09: !Or
+    - !And
+        - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 9]
+        - !Condition NonEmptyMultiOptionalSecret
+        - !Condition NonEmptyOptionalSecrets
+    - !Condition UseOptionalSecret10
+  UseOptionalSecret10: !And
+    - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 10]
+    - !Condition NonEmptyMultiOptionalSecret
+    - !Condition NonEmptyOptionalSecrets
   UseImageTag: !Not [!Equals [!Ref ImageTag, ""]]
   UseExecutorId: !Not [!Equals [!Ref ExecutorId, ""]]
-  UseOptionalSecret01: !Or
-    - !Equals [!Ref NumOfOptionalSecrets, '1']
-    - !Equals [!Ref NumOfOptionalSecrets, '2']
-    - !Equals [!Ref NumOfOptionalSecrets, '3']
-    - !Equals [!Ref NumOfOptionalSecrets, '4']
-    - !Equals [!Ref NumOfOptionalSecrets, '5']
-  UseOptionalSecret02: !Or
-    - !Equals [!Ref NumOfOptionalSecrets, '2']
-    - !Equals [!Ref NumOfOptionalSecrets, '3']
-    - !Equals [!Ref NumOfOptionalSecrets, '4']
-    - !Equals [!Ref NumOfOptionalSecrets, '5']
-  UseOptionalSecret03: !Or
-    - !Equals [!Ref NumOfOptionalSecrets, '3']
-    - !Equals [!Ref NumOfOptionalSecrets, '4']
-    - !Equals [!Ref NumOfOptionalSecrets, '5']
-  UseOptionalSecret04: !Or
-    - !Equals [!Ref NumOfOptionalSecrets, '4']
-    - !Equals [!Ref NumOfOptionalSecrets, '5']
-  UseOptionalSecret05: !Equals [!Ref NumOfOptionalSecrets, '5']
-  
 
 Resources:
   DataHubAccessTokenSecret:
@@ -287,54 +330,85 @@ Resources:
               - UseExistingDataHubAccessTokenSecret
               - Action:
                   - secretsmanager:GetSecretValue
-                  #- ssm:GetParameters
-                  #- kms:Decrypt
                 Effect: Allow
                 Resource: !Ref ExistingDataHubAccessTokenSecretArn
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseDataHubAccessToken
+              - Action:
+                  - secretsmanager:GetSecretValue
+                Effect: Allow
+                Resource: !Ref DataHubAccessTokenSecret
               - !Ref "AWS::NoValue"
             - !If 
               - UseOptionalSecret01
               - Action:
                   - secretsmanager:GetSecretValue
                 Effect: Allow
-                Resource: !Select [1, !Split ["|", !Select [0, !Split [",", !Ref OptionalSecrets]]]]
+                Resource: !Select [1, !Split ["=", !Select [0, !Split [",", !Ref OptionalSecrets]]]]
               - !Ref "AWS::NoValue"
             - !If 
               - UseOptionalSecret02
               - Action:
                   - secretsmanager:GetSecretValue
                 Effect: Allow
-                Resource: !Select [1, !Split ["|", !Select [1, !Split [",", !Ref OptionalSecrets]]]]
+                Resource: !Select [1, !Split ["=", !Select [1, !Split [",", !Ref OptionalSecrets]]]]
               - !Ref "AWS::NoValue"
             - !If 
               - UseOptionalSecret03
               - Action:
                   - secretsmanager:GetSecretValue
                 Effect: Allow
-                Resource: !Select [1, !Split ["|", !Select [2, !Split [",", !Ref OptionalSecrets]]]]
+                Resource: !Select [1, !Split ["=", !Select [2, !Split [",", !Ref OptionalSecrets]]]]
               - !Ref "AWS::NoValue"
             - !If 
               - UseOptionalSecret04
               - Action:
                   - secretsmanager:GetSecretValue
                 Effect: Allow
-                Resource: !Select [1, !Split ["|", !Select [3, !Split [",", !Ref OptionalSecrets]]]]
+                Resource: !Select [1, !Split ["=", !Select [3, !Split [",", !Ref OptionalSecrets]]]]
               - !Ref "AWS::NoValue"
             - !If 
               - UseOptionalSecret05
               - Action:
                   - secretsmanager:GetSecretValue
                 Effect: Allow
-                Resource: !Select [1, !Split ["|", !Select [4, !Split [",", !Ref OptionalSecrets]]]]
+                Resource: !Select [1, !Split ["=", !Select [4, !Split [",", !Ref OptionalSecrets]]]]
               - !Ref "AWS::NoValue"
             - !If 
-              - UseDataHubAccessToken
+              - UseOptionalSecret06
               - Action:
                   - secretsmanager:GetSecretValue
-                  #- ssm:GetParameters
-                  #- kms:Decrypt
                 Effect: Allow
-                Resource: !Ref DataHubAccessTokenSecret
+                Resource: !Select [1, !Split ["=", !Select [5, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret07
+              - Action:
+                  - secretsmanager:GetSecretValue
+                Effect: Allow
+                Resource: !Select [1, !Split ["=", !Select [6, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret08
+              - Action:
+                  - secretsmanager:GetSecretValue
+                Effect: Allow
+                Resource: !Select [1, !Split ["=", !Select [7, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret09
+              - Action:
+                  - secretsmanager:GetSecretValue
+                Effect: Allow
+                Resource: !Select [1, !Split ["=", !Select [8, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret10
+              - Action:
+                  - secretsmanager:GetSecretValue
+                Effect: Allow
+                Resource: !Select [1, !Split ["=", !Select [9, !Split [",", !Ref OptionalSecrets]]]]
               - !Ref "AWS::NoValue"
       AssumeRolePolicyDocument:
         Version: 2012-10-17
@@ -370,7 +444,7 @@ Resources:
       Memory: !Ref TaskMemory
       TaskRoleArn: !Ref TaskRole
       NetworkMode: awsvpc
-      ExecutionRoleArn: !Ref ExecutionRole
+      ExecutionRoleArn: !GetAtt ExecutionRole.Arn
       ContainerDefinitions:
         - Name: !Sub "${AWS::StackName}-container"
           Image: !If 
@@ -390,28 +464,53 @@ Resources:
               ValueFrom: !If [UseExistingDataHubAccessTokenSecret, !Ref ExistingDataHubAccessTokenSecretArn, !Ref DataHubAccessTokenSecret]
             - !If 
               - UseOptionalSecret01
-              - Name: !Select [0, !Split ["|", !Select [0, !Split [",", !Ref OptionalSecrets]]]]
-                ValueFrom: !Select [1, !Split ["|", !Select [0, !Split [",", !Ref OptionalSecrets]]]]
+              - Name: !Select [0, !Split ["=", !Ref OptionalSecrets]]
+                ValueFrom: !Select [1, !Split ["=", !Ref OptionalSecrets]]
               - !Ref "AWS::NoValue"
             - !If 
               - UseOptionalSecret02
-              - Name: !Select [0, !Split ["|", !Select [1, !Split [",", !Ref OptionalSecrets]]]]
-                ValueFrom: !Select [1, !Split ["|", !Select [1, !Split [",", !Ref OptionalSecrets]]]]
+              - Name: !Select [0, !Split ["=", !Select [1, !Split [",", !Ref OptionalSecrets]]]]
+                ValueFrom: !Select [1, !Split ["=", !Select [1, !Split [",", !Ref OptionalSecrets]]]]
               - !Ref "AWS::NoValue"
             - !If 
               - UseOptionalSecret03
-              - Name: !Select [0, !Split ["|", !Select [2, !Split [",", !Ref OptionalSecrets]]]]
-                ValueFrom: !Select [1, !Split ["|", !Select [2, !Split [",", !Ref OptionalSecrets]]]]
+              - Name: !Select [0, !Split ["=", !Select [2, !Split [",", !Ref OptionalSecrets]]]]
+                ValueFrom: !Select [1, !Split ["=", !Select [2, !Split [",", !Ref OptionalSecrets]]]]
               - !Ref "AWS::NoValue"
             - !If 
               - UseOptionalSecret04
-              - Name: !Select [0, !Split ["|", !Select [3, !Split [",", !Ref OptionalSecrets]]]]
-                ValueFrom: !Select [1, !Split ["|", !Select [3, !Split [",", !Ref OptionalSecrets]]]]
+              - Name: !Select [0, !Split ["=", !Select [3, !Split [",", !Ref OptionalSecrets]]]]
+                ValueFrom: !Select [1, !Split ["=", !Select [3, !Split [",", !Ref OptionalSecrets]]]]
               - !Ref "AWS::NoValue"
             - !If 
               - UseOptionalSecret05
-              - Name: !Select [0, !Split ["|", !Select [4, !Split [",", !Ref OptionalSecrets]]]]
-                ValueFrom: !Select [1, !Split ["|", !Select [4, !Split [",", !Ref OptionalSecrets]]]]
+              - Name: !Select [0, !Split ["=", !Select [4, !Split [",", !Ref OptionalSecrets]]]]
+                ValueFrom: !Select [1, !Split ["=", !Select [4, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret06
+              - Name: !Select [0, !Split ["=", !Select [5, !Split [",", !Ref OptionalSecrets]]]]
+                ValueFrom: !Select [1, !Split ["=", !Select [5, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret07
+              - Name: !Select [0, !Split ["=", !Select [6, !Split [",", !Ref OptionalSecrets]]]]
+                ValueFrom: !Select [1, !Split ["=", !Select [6, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret08
+              - Name: !Select [0, !Split ["=", !Select [7, !Split [",", !Ref OptionalSecrets]]]]
+                ValueFrom: !Select [1, !Split ["=", !Select [7, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret09
+              - Name: !Select [0, !Split ["=", !Select [8, !Split [",", !Ref OptionalSecrets]]]]
+                ValueFrom: !Select [1, !Split ["=", !Select [8, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret10
+              - Name: !Select [0, !Split ["=", !Select [9, !Split [",", !Ref OptionalSecrets]]]]
+                ValueFrom: !Select [1, !Split ["=", !Select [9, !Split [",", !Ref OptionalSecrets]]]]
               - !Ref "AWS::NoValue"
           Environment: 
             - Name: DATAHUB_BASE_URL
