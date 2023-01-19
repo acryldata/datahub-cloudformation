@@ -20,9 +20,9 @@ Metadata:
             - DataHubBaseUrl
             - AwsCommandQueueUrl
             - AwsCommandQueueArn
-            - DataHubAccessToken
             - ExecutorId
             - ExistingDataHubAccessTokenSecretArn
+            - DataHubAccessToken
             - OptionalSecrets
         - Label:
             default: Ingestion Container Task
@@ -69,40 +69,40 @@ Parameters:
     Type: "AWS::EC2::VPC::Id"
   DataHubBaseUrl:
     Type: "String"
-    Default: ""
+    Default: "https://xxx.acryl.io/gms"
     Description: "DataHub Base Url, for example: https://xxx.acryl.io/gms"
   DataHubAccessToken:
     Type: "String"
-    NoEcho: Yes
-    Default: ""
+    NoEcho: true
     Description: "DataHub Access Token, if not specified, will get it from ExistingDataHubAccessTokenSecretArn"
   ExecutorId:
     Type: "String"
     Description: "Unique Executor Id"
   ExistingDataHubAccessTokenSecretArn:
     Type: "String"
+    Default: ""
     Description: "Existing DataHub Access Token Secret Arn, if not specified, will use DataHubAccessToken"
   OptionalSecrets:
     Type: "String"
     Description: "A List of Optional AWS Secrets,for example: SECRET01_ENV=arn:aws:secretsmanager:us-east-1:111111111111:secret:xxx,SECRET02_ENV=arn:aws:secretsmanager:us-east-1:111111111111:secret:yyy (NO SPACE, supports up to 10 secrets)"
   AwsAccessKeyId:
     Type: "String"
-    NoEcho: Yes
+    NoEcho: true
     Description: "AWS Access Key Id, if not specified, will use task execution IAM role"
   AwsSecretAccessKey:
     Type: "String"
-    NoEcho: Yes
+    NoEcho: true
     Description: "AWS Secret Access Key, if not specified, will use task execution IAM role"
   AwsRegion:
     Type: "String"
     Description: "AWS Region, only needed if using AwsAccessKeyId and AwsSecretAccessKey"
   AwsCommandQueueUrl:
     Type: "String"
-    Default: ""
+    Default: "https://sqs.us-east-1.amazonaws.com/111111111111/xxx"
     Description: "Command SQS Queue Url, for example: https://sqs.us-east-1.amazonaws.com/111111111111/xxx"
   AwsCommandQueueArn:
     Type: "String"
-    Default: ""
+    Default: "arn:aws:sqs:us-east-1:11111111111:xxx"
     Description: "Command SQS Queue ARN, for example: arn:aws:sqs:us-east-1:11111111111:xxx"
   ImageTag:
     Type: "String"
@@ -157,10 +157,9 @@ Conditions:
   UseAwsAccessKeyId: !Not [!Equals [!Ref AwsAccessKeyId, ""]]
   UseAwsSecretAccessKey: !Not [!Equals [!Ref AwsSecretAccessKey, ""]]
   UseAwsRegion: !Not [!Equals [!Ref AwsRegion, ""]]
-  UseDataHubAccessToken: !Not [!Equals [!Ref DataHubAccessToken, ""]]
   UseExistingDataHubAccessTokenSecret: !Not [!Equals [!Ref ExistingDataHubAccessTokenSecretArn, ""]]
+  UseDataHubAccessToken: !Not [!Condition UseExistingDataHubAccessTokenSecret]  
   NonEmptyOptionalSecrets: !Not [!Equals [!Ref OptionalSecrets, ""]]
-
   UseOptionalSecret01: !Or
     - !And
       - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 1]
@@ -214,12 +213,14 @@ Conditions:
 
 Resources:
   DataHubAccessTokenSecret:
-    Type: AWS::SecretsManager::Secret
     Condition: UseDataHubAccessToken
+    Type: AWS::SecretsManager::Secret
     Properties:
       Name: !Sub "/${AWS::StackName}/DataHubAccessToken"
       Description: !Sub "${AWS::StackName}: Secrets for DataHubAccessToken"
-      SecretString: !Ref DataHubAccessToken
+      SecretString:
+        !Ref DataHubAccessToken
+
   Cluster:
     Type: AWS::ECS::Cluster
     Properties:
@@ -315,14 +316,13 @@ Resources:
                   - secretsmanager:GetSecretValue
                 Effect: Allow
                 Resource: !Ref ExistingDataHubAccessTokenSecretArn
-              - !Ref "AWS::NoValue"
-            - !If 
-              - UseDataHubAccessToken
-              - Action:
-                  - secretsmanager:GetSecretValue
-                Effect: Allow
-                Resource: !Ref DataHubAccessTokenSecret
-              - !Ref "AWS::NoValue"
+              - !If
+                - UseDataHubAccessToken
+                - Action:
+                    - secretsmanager:GetSecretValue
+                  Effect: Allow
+                  Resource: !Ref DataHubAccessTokenSecret
+                - !Ref "AWS::NoValue"
             - !If 
               - UseOptionalSecret01
               - Action:
@@ -406,20 +406,12 @@ Resources:
   ContainerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupName: ContainerSecurityGroup
+      GroupName: !Sub "${AWS::StackName}-container-sg"
       GroupDescription: Security group for container
       VpcId: !Ref VPCID
 
 ### Task Definition and ECS Service ###
   TaskDefinition:
-    Metadata:
-      DependsOn: !If 
-        - UseExistingDataHubAccessTokenSecret
-        - !Ref ExistingDataHubAccessTokenSecretArn
-        - !If 
-          - UseDataHubAccessToken
-          - !Ref DataHubAccessTokenSecret
-          - !Ref 'AWS::NoValue'
     Type: AWS::ECS::TaskDefinition
     Properties:
       Family: !Sub "${AWS::StackName}-task"
@@ -443,8 +435,15 @@ Resources:
               awslogs-group: !Ref LogGroup
               awslogs-stream-prefix: ecs
           Secrets:
-            - Name: DATAHUB_ACCESS_TOKEN
-              ValueFrom: !If [UseExistingDataHubAccessTokenSecret, !Ref ExistingDataHubAccessTokenSecretArn, !Ref DataHubAccessTokenSecret]
+            - !If 
+              - UseExistingDataHubAccessTokenSecret
+              - Name: DATAHUB_ACCESS_TOKEN
+                ValueFrom: !Ref ExistingDataHubAccessTokenSecretArn
+              - !If 
+                - UseDataHubAccessToken
+                - Name: DATAHUB_ACCESS_TOKEN
+                  ValueFrom: !Ref DataHubAccessTokenSecret
+                - !Ref "AWS::NoValue"
             - !If 
               - UseOptionalSecret01
               - Name: !Select [0, !Split ["=", !Ref OptionalSecrets]]
@@ -523,6 +522,8 @@ Resources:
       RequiresCompatibilities:
         - EC2
         - FARGATE
+  
+  
   ECSService:
     DependsOn: Cluster
     Type: AWS::ECS::Service
