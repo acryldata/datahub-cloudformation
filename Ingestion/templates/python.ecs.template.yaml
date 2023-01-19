@@ -49,15 +49,15 @@ Metadata:
         AwsCommandQueueArn: 
           Default: "Command SQS Queue ARN, for example: arn:aws:sqs:us-east-1:11111111111:xxx"
         DataHubAccessToken:
-          Default: "DataHub Access Token, if not specified, will get it from ExistingDataHubAccessTokenSecretArn"
+          Default: "DataHub Personal Access Token. If not specified, ExistingDataHubAccessTokenSecretArn is required."
         ExecutorId:
-          Default: "Unique Executor Id"
+          Default: "Unique Executor Id. Warning - do not change this without consulting with your Acryl rep."
         ExistingDataHubAccessTokenSecretArn:
           Default: "Existing DataHub Access Token Secret Arn, if not specified, will use DataHubAccessToken"
         OptionalSecrets:
           Default: ""
         ImageTag:
-          Default: "specify image tag, will use latest if not specified"
+          Default: "The image tag for the Acryl Remote Executor, defaults to the latest release."
         TaskCpu:
           Default: "The ECS Task CPU value, check https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-cpu-memory-error.html"
         TaskMemory:
@@ -74,10 +74,11 @@ Parameters:
   DataHubAccessToken:
     Type: "String"
     NoEcho: true
-    Description: "DataHub Access Token, if not specified, will get it from ExistingDataHubAccessTokenSecretArn"
+    Description: "DataHub Personal Access Token. If not specified, we'll get it from ExistingDataHubAccessTokenSecretArn"
   ExecutorId:
     Type: "String"
-    Description: "Unique Executor Id"
+    Description: "Unique Executor Id. Warning - do not change this without consulting with your Acryl rep."
+    Default: "remote"
   ExistingDataHubAccessTokenSecretArn:
     Type: "String"
     Default: ""
@@ -106,8 +107,8 @@ Parameters:
     Description: "Command SQS Queue ARN, for example: arn:aws:sqs:us-east-1:11111111111:xxx"
   ImageTag:
     Type: "String"
-    Default: ""
-    Description: "specify image tag, will use latest if not specified"
+    Default: "v0.0.3.6"
+    Description: "The image tag for the Acryl Remote Executor, defaults to the latest release."
   TaskCpu:
     Type: "String"
     Default: 1024
