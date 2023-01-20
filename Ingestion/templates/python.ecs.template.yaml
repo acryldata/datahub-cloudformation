@@ -1,4 +1,5 @@
-AWSTemplateFormatVersion: "2010-09-09"
+AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::LanguageExtensions
 Metadata:
     AWS::CloudFormation::Interface:
       ParameterGroups:
@@ -19,9 +20,10 @@ Metadata:
             - DataHubBaseUrl
             - AwsCommandQueueUrl
             - AwsCommandQueueArn
-            - DataHubAccessToken
             - ExecutorId
             - ExistingDataHubAccessTokenSecretArn
+            - DataHubAccessToken
+            - OptionalSecrets
         - Label:
             default: Ingestion Container Task
           Parameters:
@@ -43,17 +45,19 @@ Metadata:
         DataHubBaseUrl:
           Default: "DataHub Base Url, for example: https://xxx.acryl.io/gms"
         AwsCommandQueueUrl:
-          Default: "Command SQS Queue Url, for example: https://sqs.REGION.amazonaws.com/111111111111/xxx"
+          Default: "Command SQS Queue Url, for example: https://sqs.us-east-1.amazonaws.com/111111111111/xxx"
         AwsCommandQueueArn: 
-          Default: "Command SQS Queue ARN, for example: arn:aws:sqs:REGION:11111111111:xxx"
+          Default: "Command SQS Queue ARN, for example: arn:aws:sqs:us-east-1:11111111111:xxx"
         DataHubAccessToken:
-          Default: "DataHub Access Token, if not specified, will get it from ExistingDataHubAccessTokenSecretArn"
+          Default: "DataHub Personal Access Token. If not specified, ExistingDataHubAccessTokenSecretArn is required."
         ExecutorId:
-          Default: "Unique Executor Id"
+          Default: "Unique Executor Id. Warning - do not change this without consulting with your Acryl rep."
         ExistingDataHubAccessTokenSecretArn:
           Default: "Existing DataHub Access Token Secret Arn, if not specified, will use DataHubAccessToken"
+        OptionalSecrets:
+          Default: ""
         ImageTag:
-          Default: "specify image tag, will use latest if not specified"
+          Default: "The image tag for the Acryl Remote Executor, defaults to the latest release."
         TaskCpu:
           Default: "The ECS Task CPU value, check https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-cpu-memory-error.html"
         TaskMemory:
@@ -65,44 +69,49 @@ Parameters:
     Type: "AWS::EC2::VPC::Id"
   DataHubBaseUrl:
     Type: "String"
-    Default: ""
+    Default: "https://xxx.acryl.io/gms"
     Description: "DataHub Base Url, for example: https://xxx.acryl.io/gms"
   DataHubAccessToken:
     Type: "String"
-    NoEcho: Yes
-    Description: "DataHub Access Token, if not specified, will get it from ExistingDataHubAccessTokenSecretArn"
+    NoEcho: true
+    Description: "DataHub Personal Access Token. If not specified, we'll get it from ExistingDataHubAccessTokenSecretArn"
   ExecutorId:
     Type: "String"
-    Description: "Unique Executor Id"
+    Description: "Unique Executor Id. Warning - do not change this without consulting with your Acryl rep."
+    Default: "remote"
   ExistingDataHubAccessTokenSecretArn:
     Type: "String"
+    Default: ""
     Description: "Existing DataHub Access Token Secret Arn, if not specified, will use DataHubAccessToken"
+  OptionalSecrets:
+    Type: "String"
+    Description: "A List of Optional AWS Secrets,for example: SECRET01_ENV=arn:aws:secretsmanager:us-east-1:111111111111:secret:xxx,SECRET02_ENV=arn:aws:secretsmanager:us-east-1:111111111111:secret:yyy (NO SPACE, supports up to 10 secrets)"
   AwsAccessKeyId:
     Type: "String"
-    NoEcho: Yes
+    NoEcho: true
     Description: "AWS Access Key Id, if not specified, will use task execution IAM role"
   AwsSecretAccessKey:
     Type: "String"
-    NoEcho: Yes
+    NoEcho: true
     Description: "AWS Secret Access Key, if not specified, will use task execution IAM role"
   AwsRegion:
     Type: "String"
     Description: "AWS Region, only needed if using AwsAccessKeyId and AwsSecretAccessKey"
   AwsCommandQueueUrl:
     Type: "String"
-    Default: ""
-    Description: "Command SQS Queue Url, for example: https://sqs.REGION.amazonaws.com/111111111111/xxx"
+    Default: "https://sqs.us-east-1.amazonaws.com/111111111111/xxx"
+    Description: "Command SQS Queue Url, for example: https://sqs.us-east-1.amazonaws.com/111111111111/xxx"
   AwsCommandQueueArn:
     Type: "String"
-    Default: ""
-    Description: "Command SQS Queue ARN, for example: arn:aws:sqs:REGION:11111111111:xxx"
+    Default: "arn:aws:sqs:us-east-1:11111111111:xxx"
+    Description: "Command SQS Queue ARN, for example: arn:aws:sqs:us-east-1:11111111111:xxx"
   ImageTag:
     Type: "String"
-    Default: ""
-    Description: "specify image tag, will use latest if not specified"
+    Default: "v0.0.3.6"
+    Description: "The image tag for the Acryl Remote Executor, defaults to the latest release."
   TaskCpu:
     Type: "String"
-    Default: "1024"
+    Default: 1024
     Description: "The ECS Task CPU value, check https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-cpu-memory-error.html"
     AllowedValues:
       - 256
@@ -112,7 +121,7 @@ Parameters:
       - 4096
   TaskMemory:
     Type: "String"
-    Default: "2048"
+    Default: 2048
     Description: "The ECS Task Memory value (MiB), check https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-cpu-memory-error.html"
     AllowedValues:
       - 512
@@ -150,18 +159,69 @@ Conditions:
   UseAwsSecretAccessKey: !Not [!Equals [!Ref AwsSecretAccessKey, ""]]
   UseAwsRegion: !Not [!Equals [!Ref AwsRegion, ""]]
   UseExistingDataHubAccessTokenSecret: !Not [!Equals [!Ref ExistingDataHubAccessTokenSecretArn, ""]]
-  UseDataHubAccessToken: !Not [!Equals [!Ref DataHubAccessToken, ""]]
+  UseDataHubAccessToken: !Not [!Condition UseExistingDataHubAccessTokenSecret]  
+  NonEmptyOptionalSecrets: !Not [!Equals [!Ref OptionalSecrets, ""]]
+  UseOptionalSecret01: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 1]
+      - !Condition NonEmptyOptionalSecrets
+    - !Condition UseOptionalSecret02
+  UseOptionalSecret02: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 2]
+      - !Condition NonEmptyOptionalSecrets
+    - !Condition UseOptionalSecret03
+  UseOptionalSecret03: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 3]
+      - !Condition NonEmptyOptionalSecrets
+    - !Condition UseOptionalSecret04
+  UseOptionalSecret04: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 4]
+      - !Condition NonEmptyOptionalSecrets
+    - !Condition UseOptionalSecret05
+  UseOptionalSecret05: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 5]
+      - !Condition NonEmptyOptionalSecrets
+    - !Condition UseOptionalSecret06
+  UseOptionalSecret06: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 6]
+      - !Condition NonEmptyOptionalSecrets
+    - !Condition UseOptionalSecret07
+  UseOptionalSecret07: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 7]
+      - !Condition NonEmptyOptionalSecrets
+    - !Condition UseOptionalSecret08
+  UseOptionalSecret08: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 8]
+      - !Condition NonEmptyOptionalSecrets
+    - !Condition UseOptionalSecret09
+  UseOptionalSecret09: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 9]
+      - !Condition NonEmptyOptionalSecrets
+    - !Condition UseOptionalSecret10
+  UseOptionalSecret10: !And
+    - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 10]
+    - !Condition NonEmptyOptionalSecrets
   UseImageTag: !Not [!Equals [!Ref ImageTag, ""]]
   UseExecutorId: !Not [!Equals [!Ref ExecutorId, ""]]
 
 Resources:
   DataHubAccessTokenSecret:
-    Type: AWS::SecretsManager::Secret
     Condition: UseDataHubAccessToken
+    Type: AWS::SecretsManager::Secret
     Properties:
       Name: !Sub "/${AWS::StackName}/DataHubAccessToken"
       Description: !Sub "${AWS::StackName}: Secrets for DataHubAccessToken"
-      SecretString: !Ref DataHubAccessToken
+      SecretString:
+        !Ref DataHubAccessToken
+
   Cluster:
     Type: AWS::ECS::Cluster
     Properties:
@@ -174,7 +234,6 @@ Resources:
     Type: AWS::IAM::Role
     Properties:
       RoleName: !Sub "${AWS::StackName}-task-role"
-      #RoleName: !Sub "datahub-ingestion-task-role"
       Policies:
         - PolicyName: ssmmessages-policy
           PolicyDocument:
@@ -204,7 +263,8 @@ Resources:
                 - logs:DescribeLogStreams
                 - logs:PutLogEvents
               Effect: Allow
-              Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/ecs/${AWS::StackName}-log-group:*"
+              Resource:
+                - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/ecs/${AWS::StackName}-log-group:*"
         - PolicyName: sqs-policy
           PolicyDocument:
             Version: "2012-10-17"
@@ -227,7 +287,6 @@ Resources:
     Type: AWS::IAM::Role
     Properties:
       RoleName: !Sub "${AWS::StackName}-execution-role"
-      #RoleName: !Sub "datahub-ingestion-execution-role"
       Policies:
         - PolicyName: logs-policy
           PolicyDocument:
@@ -246,7 +305,8 @@ Resources:
                 - logs:DescribeLogStreams
                 - logs:PutLogEvents
               Effect: Allow
-              Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/ecs/${AWS::StackName}-log-group:*"
+              Resource:
+                - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/ecs/${AWS::StackName}-log-group:*"
         - PolicyName: secretsmanager-policy
           PolicyDocument:
             Version: "2012-10-17"
@@ -255,19 +315,84 @@ Resources:
               - UseExistingDataHubAccessTokenSecret
               - Action:
                   - secretsmanager:GetSecretValue
-                  #- ssm:GetParameters
-                  #- kms:Decrypt
                 Effect: Allow
                 Resource: !Ref ExistingDataHubAccessTokenSecretArn
-              - !Ref "AWS::NoValue"
+              - !If
+                - UseDataHubAccessToken
+                - Action:
+                    - secretsmanager:GetSecretValue
+                  Effect: Allow
+                  Resource: !Ref DataHubAccessTokenSecret
+                - !Ref "AWS::NoValue"
             - !If 
-              - UseDataHubAccessToken
+              - UseOptionalSecret01
               - Action:
                   - secretsmanager:GetSecretValue
-                  #- ssm:GetParameters
-                  #- kms:Decrypt
                 Effect: Allow
-                Resource: !Ref DataHubAccessTokenSecret
+                Resource: !Select [1, !Split ["=", !Select [0, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret02
+              - Action:
+                  - secretsmanager:GetSecretValue
+                Effect: Allow
+                Resource: !Select [1, !Split ["=", !Select [1, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret03
+              - Action:
+                  - secretsmanager:GetSecretValue
+                Effect: Allow
+                Resource: !Select [1, !Split ["=", !Select [2, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret04
+              - Action:
+                  - secretsmanager:GetSecretValue
+                Effect: Allow
+                Resource: !Select [1, !Split ["=", !Select [3, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret05
+              - Action:
+                  - secretsmanager:GetSecretValue
+                Effect: Allow
+                Resource: !Select [1, !Split ["=", !Select [4, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret06
+              - Action:
+                  - secretsmanager:GetSecretValue
+                Effect: Allow
+                Resource: !Select [1, !Split ["=", !Select [5, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret07
+              - Action:
+                  - secretsmanager:GetSecretValue
+                Effect: Allow
+                Resource: !Select [1, !Split ["=", !Select [6, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret08
+              - Action:
+                  - secretsmanager:GetSecretValue
+                Effect: Allow
+                Resource: !Select [1, !Split ["=", !Select [7, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret09
+              - Action:
+                  - secretsmanager:GetSecretValue
+                Effect: Allow
+                Resource: !Select [1, !Split ["=", !Select [8, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret10
+              - Action:
+                  - secretsmanager:GetSecretValue
+                Effect: Allow
+                Resource: !Select [1, !Split ["=", !Select [9, !Split [",", !Ref OptionalSecrets]]]]
               - !Ref "AWS::NoValue"
       AssumeRolePolicyDocument:
         Version: 2012-10-17
@@ -282,20 +407,12 @@ Resources:
   ContainerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupName: ContainerSecurityGroup
+      GroupName: !Sub "${AWS::StackName}-container-sg"
       GroupDescription: Security group for container
       VpcId: !Ref VPCID
 
 ### Task Definition and ECS Service ###
   TaskDefinition:
-    Metadata:
-      DependsOn: !If 
-        - UseExistingDataHubAccessTokenSecret
-        - !Ref ExistingDataHubAccessTokenSecretArn
-        - !If 
-          - UseDataHubAccessToken
-          - !Ref DataHubAccessTokenSecret
-          - !Ref 'AWS::NoValue'
     Type: AWS::ECS::TaskDefinition
     Properties:
       Family: !Sub "${AWS::StackName}-task"
@@ -303,7 +420,7 @@ Resources:
       Memory: !Ref TaskMemory
       TaskRoleArn: !Ref TaskRole
       NetworkMode: awsvpc
-      ExecutionRoleArn: !Ref ExecutionRole
+      ExecutionRoleArn: !GetAtt ExecutionRole.Arn
       ContainerDefinitions:
         - Name: !Sub "${AWS::StackName}-container"
           Image: !If 
@@ -319,8 +436,65 @@ Resources:
               awslogs-group: !Ref LogGroup
               awslogs-stream-prefix: ecs
           Secrets:
-            - Name: DATAHUB_ACCESS_TOKEN
-              ValueFrom: !If [UseExistingDataHubAccessTokenSecret, !Ref ExistingDataHubAccessTokenSecretArn, !Ref DataHubAccessTokenSecret]
+            - !If 
+              - UseExistingDataHubAccessTokenSecret
+              - Name: DATAHUB_ACCESS_TOKEN
+                ValueFrom: !Ref ExistingDataHubAccessTokenSecretArn
+              - !If 
+                - UseDataHubAccessToken
+                - Name: DATAHUB_ACCESS_TOKEN
+                  ValueFrom: !Ref DataHubAccessTokenSecret
+                - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret01
+              - Name: !Select [0, !Split ["=", !Ref OptionalSecrets]]
+                ValueFrom: !Select [1, !Split ["=", !Ref OptionalSecrets]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret02
+              - Name: !Select [0, !Split ["=", !Select [1, !Split [",", !Ref OptionalSecrets]]]]
+                ValueFrom: !Select [1, !Split ["=", !Select [1, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret03
+              - Name: !Select [0, !Split ["=", !Select [2, !Split [",", !Ref OptionalSecrets]]]]
+                ValueFrom: !Select [1, !Split ["=", !Select [2, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret04
+              - Name: !Select [0, !Split ["=", !Select [3, !Split [",", !Ref OptionalSecrets]]]]
+                ValueFrom: !Select [1, !Split ["=", !Select [3, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret05
+              - Name: !Select [0, !Split ["=", !Select [4, !Split [",", !Ref OptionalSecrets]]]]
+                ValueFrom: !Select [1, !Split ["=", !Select [4, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret06
+              - Name: !Select [0, !Split ["=", !Select [5, !Split [",", !Ref OptionalSecrets]]]]
+                ValueFrom: !Select [1, !Split ["=", !Select [5, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret07
+              - Name: !Select [0, !Split ["=", !Select [6, !Split [",", !Ref OptionalSecrets]]]]
+                ValueFrom: !Select [1, !Split ["=", !Select [6, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret08
+              - Name: !Select [0, !Split ["=", !Select [7, !Split [",", !Ref OptionalSecrets]]]]
+                ValueFrom: !Select [1, !Split ["=", !Select [7, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret09
+              - Name: !Select [0, !Split ["=", !Select [8, !Split [",", !Ref OptionalSecrets]]]]
+                ValueFrom: !Select [1, !Split ["=", !Select [8, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret10
+              - Name: !Select [0, !Split ["=", !Select [9, !Split [",", !Ref OptionalSecrets]]]]
+                ValueFrom: !Select [1, !Split ["=", !Select [9, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
           Environment: 
             - Name: DATAHUB_BASE_URL
               Value: !Ref DataHubBaseUrl
@@ -349,6 +523,8 @@ Resources:
       RequiresCompatibilities:
         - EC2
         - FARGATE
+  
+  
   ECSService:
     DependsOn: Cluster
     Type: AWS::ECS::Service
