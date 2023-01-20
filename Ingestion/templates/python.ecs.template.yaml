@@ -315,6 +315,7 @@ Resources:
               - UseExistingDataHubAccessTokenSecret
               - Action:
                   - secretsmanager:GetSecretValue
+                  - ssm:GetParameters
                 Effect: Allow
                 Resource: !Ref ExistingDataHubAccessTokenSecretArn
               - !If
@@ -328,6 +329,7 @@ Resources:
               - UseOptionalSecret01
               - Action:
                   - secretsmanager:GetSecretValue
+                  - ssm:GetParameters
                 Effect: Allow
                 Resource: !Select [1, !Split ["=", !Select [0, !Split [",", !Ref OptionalSecrets]]]]
               - !Ref "AWS::NoValue"
@@ -335,6 +337,7 @@ Resources:
               - UseOptionalSecret02
               - Action:
                   - secretsmanager:GetSecretValue
+                  - ssm:GetParameters
                 Effect: Allow
                 Resource: !Select [1, !Split ["=", !Select [1, !Split [",", !Ref OptionalSecrets]]]]
               - !Ref "AWS::NoValue"
@@ -342,6 +345,7 @@ Resources:
               - UseOptionalSecret03
               - Action:
                   - secretsmanager:GetSecretValue
+                  - ssm:GetParameters
                 Effect: Allow
                 Resource: !Select [1, !Split ["=", !Select [2, !Split [",", !Ref OptionalSecrets]]]]
               - !Ref "AWS::NoValue"
@@ -349,6 +353,7 @@ Resources:
               - UseOptionalSecret04
               - Action:
                   - secretsmanager:GetSecretValue
+                  - ssm:GetParameters
                 Effect: Allow
                 Resource: !Select [1, !Split ["=", !Select [3, !Split [",", !Ref OptionalSecrets]]]]
               - !Ref "AWS::NoValue"
@@ -356,6 +361,7 @@ Resources:
               - UseOptionalSecret05
               - Action:
                   - secretsmanager:GetSecretValue
+                  - ssm:GetParameters
                 Effect: Allow
                 Resource: !Select [1, !Split ["=", !Select [4, !Split [",", !Ref OptionalSecrets]]]]
               - !Ref "AWS::NoValue"
@@ -363,6 +369,7 @@ Resources:
               - UseOptionalSecret06
               - Action:
                   - secretsmanager:GetSecretValue
+                  - ssm:GetParameters
                 Effect: Allow
                 Resource: !Select [1, !Split ["=", !Select [5, !Split [",", !Ref OptionalSecrets]]]]
               - !Ref "AWS::NoValue"
@@ -370,6 +377,7 @@ Resources:
               - UseOptionalSecret07
               - Action:
                   - secretsmanager:GetSecretValue
+                  - ssm:GetParameters
                 Effect: Allow
                 Resource: !Select [1, !Split ["=", !Select [6, !Split [",", !Ref OptionalSecrets]]]]
               - !Ref "AWS::NoValue"
@@ -377,6 +385,7 @@ Resources:
               - UseOptionalSecret08
               - Action:
                   - secretsmanager:GetSecretValue
+                  - ssm:GetParameters
                 Effect: Allow
                 Resource: !Select [1, !Split ["=", !Select [7, !Split [",", !Ref OptionalSecrets]]]]
               - !Ref "AWS::NoValue"
@@ -384,6 +393,7 @@ Resources:
               - UseOptionalSecret09
               - Action:
                   - secretsmanager:GetSecretValue
+                  - ssm:GetParameters
                 Effect: Allow
                 Resource: !Select [1, !Split ["=", !Select [8, !Split [",", !Ref OptionalSecrets]]]]
               - !Ref "AWS::NoValue"
@@ -391,6 +401,7 @@ Resources:
               - UseOptionalSecret10
               - Action:
                   - secretsmanager:GetSecretValue
+                  - ssm:GetParameters
                 Effect: Allow
                 Resource: !Select [1, !Split ["=", !Select [9, !Split [",", !Ref OptionalSecrets]]]]
               - !Ref "AWS::NoValue"
