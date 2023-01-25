@@ -9,12 +9,6 @@ Metadata:
             - VPCID
             - SubnetID
         - Label:
-            default: AWS Credentials
-          Parameters:
-            - AwsAccessKeyId
-            - AwsSecretAccessKey
-            - AwsRegion
-        - Label:
             default: DataHub Info
           Parameters:
             - DataHubBaseUrl
@@ -36,12 +30,6 @@ Metadata:
           Default: "The Existing Subnet ID"
         VPCID:
           Default: "The Existing VPC ID"
-        AwsAccessKeyId:
-          Default: "AWS Access Key Id, if not specified, will use task execution IAM role"
-        AwsSecretAccessKey:
-          Default: "AWS Secret Access Key, if not specified, will use task execution IAM role"
-        AwsRegion:
-          Default: "AWS Region, only needed if using AwsAccessKeyId and AwsSecretAccessKey"
         DataHubBaseUrl:
           Default: "DataHub Base Url, for example: https://xxx.acryl.io/gms"
         AwsCommandQueueUrl:
@@ -86,17 +74,6 @@ Parameters:
   OptionalSecrets:
     Type: "String"
     Description: "A List of Optional AWS Secrets,for example: SECRET01_ENV=arn:aws:secretsmanager:us-east-1:111111111111:secret:xxx,SECRET02_ENV=arn:aws:secretsmanager:us-east-1:111111111111:secret:yyy (NO SPACE, supports up to 10 secrets)"
-  AwsAccessKeyId:
-    Type: "String"
-    NoEcho: true
-    Description: "AWS Access Key Id, if not specified, will use task execution IAM role"
-  AwsSecretAccessKey:
-    Type: "String"
-    NoEcho: true
-    Description: "AWS Secret Access Key, if not specified, will use task execution IAM role"
-  AwsRegion:
-    Type: "String"
-    Description: "AWS Region, only needed if using AwsAccessKeyId and AwsSecretAccessKey"
   AwsCommandQueueUrl:
     Type: "String"
     Default: "https://sqs.us-east-1.amazonaws.com/111111111111/xxx"
@@ -155,9 +132,6 @@ Parameters:
       - 29696
       - 30720
 Conditions:
-  UseAwsAccessKeyId: !Not [!Equals [!Ref AwsAccessKeyId, ""]]
-  UseAwsSecretAccessKey: !Not [!Equals [!Ref AwsSecretAccessKey, ""]]
-  UseAwsRegion: !Not [!Equals [!Ref AwsRegion, ""]]
   UseExistingDataHubAccessTokenSecret: !Not [!Equals [!Ref ExistingDataHubAccessTokenSecretArn, ""]]
   UseDataHubAccessToken: !Not [!Condition UseExistingDataHubAccessTokenSecret]  
   NonEmptyOptionalSecrets: !Not [!Equals [!Ref OptionalSecrets, ""]]
@@ -500,21 +474,8 @@ Resources:
               Value: !Ref DataHubBaseUrl
             - Name: AWS_COMMAND_QUEUE_URL
               Value: !Ref AwsCommandQueueUrl
-            - !If 
-              - UseAwsAccessKeyId
-              - Name: AWS_ACCESS_KEY_ID
-                Value: !Ref AwsAccessKeyId
-              - !Ref "AWS::NoValue"
-            - !If 
-              - UseAwsSecretAccessKey
-              - Name: AWS_SECRET_ACCESS_KEY
-                Value: !Ref AwsSecretAccessKey
-              - !Ref "AWS::NoValue"
-            - !If 
-              - UseAwsRegion
-              - Name: AWS_REGION
-                Value: !Ref AwsRegion
-              - !Ref "AWS::NoValue"
+            - Name: AWS_REGION
+              Value: "us-west-2"
             - !If 
               - UseExecutorId
               - Name: EXECUTOR_ID
