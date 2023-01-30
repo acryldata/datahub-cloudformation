@@ -541,52 +541,52 @@ Resources:
             - !If 
               - UseOptionalEnvVar01
               - Name: !Select [0, !Split ["=", !Ref OptionalEnvVars]]
-                ValueFrom: !Select [1, !Split ["=", !Ref OptionalEnvVars]]
+                Value: !Select [1, !Split ["=", !Ref OptionalEnvVars]]
               - !Ref "AWS::NoValue"
             - !If 
               - UseOptionalEnvVar02
               - Name: !Select [0, !Split ["=", !Select [1, !Split [",", !Ref OptionalEnvVars]]]]
-                ValueFrom: !Select [1, !Split ["=", !Select [1, !Split [",", !Ref OptionalEnvVars]]]]
+                Value: !Select [1, !Split ["=", !Select [1, !Split [",", !Ref OptionalEnvVars]]]]
               - !Ref "AWS::NoValue"
             - !If 
               - UseOptionalEnvVar03
               - Name: !Select [0, !Split ["=", !Select [2, !Split [",", !Ref OptionalEnvVars]]]]
-                ValueFrom: !Select [1, !Split ["=", !Select [2, !Split [",", !Ref OptionalEnvVars]]]]
+                Value: !Select [1, !Split ["=", !Select [2, !Split [",", !Ref OptionalEnvVars]]]]
               - !Ref "AWS::NoValue"
             - !If 
               - UseOptionalEnvVar04
               - Name: !Select [0, !Split ["=", !Select [3, !Split [",", !Ref OptionalEnvVars]]]]
-                ValueFrom: !Select [1, !Split ["=", !Select [3, !Split [",", !Ref OptionalEnvVars]]]]
+                Value: !Select [1, !Split ["=", !Select [3, !Split [",", !Ref OptionalEnvVars]]]]
               - !Ref "AWS::NoValue"
             - !If 
               - UseOptionalEnvVar05
               - Name: !Select [0, !Split ["=", !Select [4, !Split [",", !Ref OptionalEnvVars]]]]
-                ValueFrom: !Select [1, !Split ["=", !Select [4, !Split [",", !Ref OptionalEnvVars]]]]
+                Value: !Select [1, !Split ["=", !Select [4, !Split [",", !Ref OptionalEnvVars]]]]
               - !Ref "AWS::NoValue"
             - !If 
               - UseOptionalEnvVar06
               - Name: !Select [0, !Split ["=", !Select [5, !Split [",", !Ref OptionalEnvVars]]]]
-                ValueFrom: !Select [1, !Split ["=", !Select [5, !Split [",", !Ref OptionalEnvVars]]]]
+                Value: !Select [1, !Split ["=", !Select [5, !Split [",", !Ref OptionalEnvVars]]]]
               - !Ref "AWS::NoValue"
             - !If 
               - UseOptionalEnvVar07
               - Name: !Select [0, !Split ["=", !Select [6, !Split [",", !Ref OptionalEnvVars]]]]
-                ValueFrom: !Select [1, !Split ["=", !Select [6, !Split [",", !Ref OptionalEnvVars]]]]
+                Value: !Select [1, !Split ["=", !Select [6, !Split [",", !Ref OptionalEnvVars]]]]
               - !Ref "AWS::NoValue"
             - !If 
               - UseOptionalEnvVar08
               - Name: !Select [0, !Split ["=", !Select [7, !Split [",", !Ref OptionalEnvVars]]]]
-                ValueFrom: !Select [1, !Split ["=", !Select [7, !Split [",", !Ref OptionalEnvVars]]]]
+                Value: !Select [1, !Split ["=", !Select [7, !Split [",", !Ref OptionalEnvVars]]]]
               - !Ref "AWS::NoValue"
             - !If 
               - UseOptionalEnvVar09
               - Name: !Select [0, !Split ["=", !Select [8, !Split [",", !Ref OptionalEnvVars]]]]
-                ValueFrom: !Select [1, !Split ["=", !Select [8, !Split [",", !Ref OptionalEnvVars]]]]
+                Value: !Select [1, !Split ["=", !Select [8, !Split [",", !Ref OptionalEnvVars]]]]
               - !Ref "AWS::NoValue"
             - !If 
               - UseOptionalEnvVar10
               - Name: !Select [0, !Split ["=", !Select [9, !Split [",", !Ref OptionalEnvVars]]]]
-                ValueFrom: !Select [1, !Split ["=", !Select [9, !Split [",", !Ref OptionalEnvVars]]]]
+                Value: !Select [1, !Split ["=", !Select [9, !Split [",", !Ref OptionalEnvVars]]]]
               - !Ref "AWS::NoValue"
 
       RequiresCompatibilities:
