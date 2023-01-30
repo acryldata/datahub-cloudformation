@@ -18,6 +18,7 @@ Metadata:
             - ExistingDataHubAccessTokenSecretArn
             - DataHubAccessToken
             - OptionalSecrets
+            - OptionalEnvVars
         - Label:
             default: Ingestion Container Task
           Parameters:
@@ -44,6 +45,8 @@ Metadata:
           Default: "Existing DataHub Access Token Secret Arn, if not specified, will use DataHubAccessToken"
         OptionalSecrets:
           Default: ""
+        OptionalEnvVars:
+          Default: "Optional environment variables to set in the ECS task container."
         ImageTag:
           Default: "The image tag for the Acryl Remote Executor, defaults to the latest release."
         TaskCpu:
@@ -73,7 +76,12 @@ Parameters:
     Description: "Existing DataHub Access Token Secret Arn, if not specified, will use DataHubAccessToken"
   OptionalSecrets:
     Type: "String"
+    Default: ""
     Description: "A List of Optional AWS Secrets,for example: SECRET01_ENV=arn:aws:secretsmanager:us-east-1:111111111111:secret:xxx,SECRET02_ENV=arn:aws:secretsmanager:us-east-1:111111111111:secret:yyy (NO SPACE, supports up to 10 secrets)"
+  OptionalEnvVars:
+    Type: "String"
+    Default: ""
+    Description: "A List of Optional environment variables for the ECS task container. Values are not sourced from secrets, but set directly. Environment variables are specified using this parameter in the following form (a single string, multiple variables separated by commas, no spaces, up to 10 envrionemnt variables): ENV_VAR_NAME1=ENV_VAR_VALUE1,ENV_VAR_NAME2=ENV_VAR_VALUE2"
   AwsCommandQueueUrl:
     Type: "String"
     Default: "https://sqs.us-east-1.amazonaws.com/111111111111/xxx"
@@ -185,6 +193,55 @@ Conditions:
     - !Condition NonEmptyOptionalSecrets
   UseImageTag: !Not [!Equals [!Ref ImageTag, ""]]
   UseExecutorId: !Not [!Equals [!Ref ExecutorId, ""]]
+  NonEmptyOptionalEnvVars: !Not [!Equals [!Ref OptionalEnvVars, ""]]
+  UseOptionalEnvVar01: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalEnvVars], 1]
+      - !Condition NonEmptyOptionalEnvVars
+    - !Condition UseOptionalEnvVar02
+  UseOptionalEnvVar02: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalEnvVars], 2]
+      - !Condition NonEmptyOptionalEnvVars
+    - !Condition UseOptionalEnvVar03
+  UseOptionalEnvVar03: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalEnvVars], 3]
+      - !Condition NonEmptyOptionalEnvVars
+    - !Condition UseOptionalEnvVar04
+  UseOptionalEnvVar04: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalEnvVars], 4]
+      - !Condition NonEmptyOptionalEnvVars
+    - !Condition UseOptionalEnvVar05
+  UseOptionalEnvVar05: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 5]
+      - !Condition NonEmptyOptionalEnvVars
+    - !Condition UseOptionalEnvVar06
+  UseOptionalEnvVar06: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalEnvVars], 6]
+      - !Condition NonEmptyOptionalEnvVars
+    - !Condition UseOptionalEnvVar07
+  UseOptionalEnvVar07: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalEnvVars], 7]
+      - !Condition NonEmptyOptionalEnvVars
+    - !Condition UseOptionalEnvVar08
+  UseOptionalEnvVar08: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalEnvVars], 8]
+      - !Condition NonEmptyOptionalEnvVars
+    - !Condition UseOptionalEnvVar09
+  UseOptionalEnvVar09: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalEnvVars], 9]
+      - !Condition NonEmptyOptionalSecrets
+    - !Condition UseOptionalEnvVar10
+  UseOptionalEnvVar10: !And
+    - !Equals [Fn::Length: !Split [",", !Ref OptionalEnvVars], 10]
+    - !Condition NonEmptyOptionalEnvVars
 
 Resources:
   DataHubAccessTokenSecret:
@@ -481,6 +538,57 @@ Resources:
               - Name: EXECUTOR_ID
                 Value: !Ref ExecutorId
               - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalEnvVar01
+              - Name: !Select [0, !Split ["=", !Ref OptionalEnvVars]]
+                ValueFrom: !Select [1, !Split ["=", !Ref OptionalEnvVars]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalEnvVar02
+              - Name: !Select [0, !Split ["=", !Select [1, !Split [",", !Ref OptionalEnvVars]]]]
+                ValueFrom: !Select [1, !Split ["=", !Select [1, !Split [",", !Ref OptionalEnvVars]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalEnvVar03
+              - Name: !Select [0, !Split ["=", !Select [2, !Split [",", !Ref OptionalEnvVars]]]]
+                ValueFrom: !Select [1, !Split ["=", !Select [2, !Split [",", !Ref OptionalEnvVars]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalEnvVar04
+              - Name: !Select [0, !Split ["=", !Select [3, !Split [",", !Ref OptionalEnvVars]]]]
+                ValueFrom: !Select [1, !Split ["=", !Select [3, !Split [",", !Ref OptionalEnvVars]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalEnvVar05
+              - Name: !Select [0, !Split ["=", !Select [4, !Split [",", !Ref OptionalEnvVars]]]]
+                ValueFrom: !Select [1, !Split ["=", !Select [4, !Split [",", !Ref OptionalEnvVars]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalEnvVar06
+              - Name: !Select [0, !Split ["=", !Select [5, !Split [",", !Ref OptionalEnvVars]]]]
+                ValueFrom: !Select [1, !Split ["=", !Select [5, !Split [",", !Ref OptionalEnvVars]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalEnvVar07
+              - Name: !Select [0, !Split ["=", !Select [6, !Split [",", !Ref OptionalEnvVars]]]]
+                ValueFrom: !Select [1, !Split ["=", !Select [6, !Split [",", !Ref OptionalEnvVars]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalEnvVar08
+              - Name: !Select [0, !Split ["=", !Select [7, !Split [",", !Ref OptionalEnvVars]]]]
+                ValueFrom: !Select [1, !Split ["=", !Select [7, !Split [",", !Ref OptionalEnvVars]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalEnvVar09
+              - Name: !Select [0, !Split ["=", !Select [8, !Split [",", !Ref OptionalEnvVars]]]]
+                ValueFrom: !Select [1, !Split ["=", !Select [8, !Split [",", !Ref OptionalEnvVars]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalEnvVar10
+              - Name: !Select [0, !Split ["=", !Select [9, !Split [",", !Ref OptionalEnvVars]]]]
+                ValueFrom: !Select [1, !Split ["=", !Select [9, !Split [",", !Ref OptionalEnvVars]]]]
+              - !Ref "AWS::NoValue"
+
       RequiresCompatibilities:
         - EC2
         - FARGATE
