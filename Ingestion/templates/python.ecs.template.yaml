@@ -526,7 +526,7 @@ Resources:
               - Name: !Select [0, !Split ["=", !Select [9, !Split [",", !Ref OptionalSecrets]]]]
                 ValueFrom: !Select [1, !Split ["=", !Select [9, !Split [",", !Ref OptionalSecrets]]]]
               - !Ref "AWS::NoValue"
-          Environment: 
+          Environment:
             - Name: DATAHUB_BASE_URL
               Value: !Ref DataHubBaseUrl
             - Name: AWS_COMMAND_QUEUE_URL
