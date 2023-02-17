@@ -65,6 +65,7 @@ Parameters:
   DataHubAccessToken:
     Type: "String"
     NoEcho: true
+    Default: ""
     Description: "DataHub Personal Access Token. If not specified, we'll get it from ExistingDataHubAccessTokenSecretArn"
   ExecutorId:
     Type: "String"
