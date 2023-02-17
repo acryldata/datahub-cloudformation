@@ -611,3 +611,14 @@ Resources:
             - !Ref SubnetID
           SecurityGroups:
             - !GetAtt ContainerSecurityGroup.GroupId
+
+Outputs:
+  ClusterName:
+    Description: Name of ECS Cluster
+    Value: !Ref Cluster
+  ECSLogGroupName:
+    Description: Name of ECS Cluster Log Group
+    Value: !Ref LogGroup
+  ServiceName:
+    Description: Name of ECS Service
+    Value: !GetAtt ECSService.Name
