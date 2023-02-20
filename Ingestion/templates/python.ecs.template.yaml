@@ -479,7 +479,7 @@ Resources:
             - !If 
               - UseOptionalSecret01
               - Name: !Select [0, !Split ["=", !Ref OptionalSecrets]]
-                ValueFrom: !Select [1, !Split ["=", !Ref OptionalSecrets]]
+                ValueFrom: !Select [1, !Split ["=", !Select [0, !Split [",", !Ref OptionalSecrets]]]]
               - !Ref "AWS::NoValue"
             - !If 
               - UseOptionalSecret02
@@ -541,7 +541,7 @@ Resources:
             - !If 
               - UseOptionalEnvVar01
               - Name: !Select [0, !Split ["=", !Ref OptionalEnvVars]]
-                Value: !Select [1, !Split ["=", !Ref OptionalEnvVars]]
+                Value: !Select [1, !Split ["=", !Select [0, !Split [",", !Ref OptionalEnvVars]]]]
               - !Ref "AWS::NoValue"
             - !If 
               - UseOptionalEnvVar02
