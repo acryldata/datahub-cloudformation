@@ -83,6 +83,7 @@ Parameters:
     Description: "Existing DataHub Access Token Secret Arn, if not specified, will use DataHubAccessToken"
   AwsRegion:
     Type: "String"
+    Default: "us-west-2"
     Description: "AWS Region where executor is hosted."
   OptionalSecrets:
     Type: "String"
@@ -542,8 +543,11 @@ Resources:
               Value: !Ref DataHubBaseUrl
             - Name: AWS_COMMAND_QUEUE_URL
               Value: !Ref AwsCommandQueueUrl
-            - Name: AWS_REGION
-              Value: "us-west-2"
+            - !If 
+              - UseAwsRegion
+              - Name: AWS_REGION
+                Value: !Ref AwsRegion
+              - !Ref "AWS::NoValue"
             - !If 
               - UseExecutorId
               - Name: EXECUTOR_ID
