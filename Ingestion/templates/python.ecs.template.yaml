@@ -9,6 +9,10 @@ Metadata:
             - VPCID
             - SubnetID
         - Label:
+            default: AWS Environment
+          Parameters:
+            - AwsRegion
+        - Label:
             default: DataHub Info
           Parameters:
             - DataHubBaseUrl
@@ -31,6 +35,8 @@ Metadata:
           Default: "The Existing Subnet ID"
         VPCID:
           Default: "The Existing VPC ID"
+        AwsRegion:
+          Default: "The region where the Queue is deployed. Most often, us-west-2."
         DataHubBaseUrl:
           Default: "DataHub Base Url, for example: https://xxx.acryl.io/gms"
         AwsCommandQueueUrl:
@@ -75,6 +81,10 @@ Parameters:
     Type: "String"
     Default: ""
     Description: "Existing DataHub Access Token Secret Arn, if not specified, will use DataHubAccessToken"
+  AwsRegion:
+    Type: "String"
+    Default: "us-west-2"
+    Description: "AWS Region where executor is hosted."
   OptionalSecrets:
     Type: "String"
     Default: ""
@@ -141,6 +151,7 @@ Parameters:
       - 29696
       - 30720
 Conditions:
+  UseAwsRegion: !Not [!Equals [!Ref AwsRegion, ""]]
   UseExistingDataHubAccessTokenSecret: !Not [!Equals [!Ref ExistingDataHubAccessTokenSecretArn, ""]]
   UseDataHubAccessToken: !Not [!Condition UseExistingDataHubAccessTokenSecret]  
   NonEmptyOptionalSecrets: !Not [!Equals [!Ref OptionalSecrets, ""]]
@@ -532,8 +543,11 @@ Resources:
               Value: !Ref DataHubBaseUrl
             - Name: AWS_COMMAND_QUEUE_URL
               Value: !Ref AwsCommandQueueUrl
-            - Name: AWS_REGION
-              Value: "us-west-2"
+            - !If 
+              - UseAwsRegion
+              - Name: AWS_REGION
+                Value: !Ref AwsRegion
+              - !Ref "AWS::NoValue"
             - !If 
               - UseExecutorId
               - Name: EXECUTOR_ID
