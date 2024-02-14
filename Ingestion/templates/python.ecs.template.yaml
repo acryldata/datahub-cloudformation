@@ -29,6 +29,7 @@ Metadata:
             - ImageTag
             - TaskCpu
             - TaskMemory
+            - TaskEphemeralStorageSizeInGiB
 
       ParameterLabels:
         SubnetID: 
@@ -59,6 +60,8 @@ Metadata:
           Default: "The ECS Task CPU value, check https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-cpu-memory-error.html"
         TaskMemory:
           Default: "The ECS Task Memory value, check https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-cpu-memory-error.html"
+        TaskEphemeralStorageSizeInGiB:
+          Default: "The amount of ephemeral storage to allocate for the task"
 Parameters:
   SubnetID:
     Type: "AWS::EC2::Subnet::Id"
@@ -150,6 +153,10 @@ Parameters:
       - 28672
       - 29696
       - 30720
+  TaskEphemeralStorageSizeInGiB:
+    Type: "String"
+    Default: "21"
+    Description: "The total amount, in GiB, of ephemeral storage to set for the task"
 Conditions:
   UseAwsRegion: !Not [!Equals [!Ref AwsRegion, ""]]
   UseExistingDataHubAccessTokenSecret: !Not [!Equals [!Ref ExistingDataHubAccessTokenSecretArn, ""]]
@@ -461,6 +468,8 @@ Resources:
       Family: !Sub "${AWS::StackName}-task"
       Cpu: !Ref TaskCpu
       Memory: !Ref TaskMemory
+      EphemeralStorage:
+        SizeInGiB: !Ref TaskEphemeralStorageSizeInGiB
       TaskRoleArn: !Ref TaskRole
       NetworkMode: awsvpc
       ExecutionRoleArn: !GetAtt ExecutionRole.Arn
@@ -605,7 +614,6 @@ Resources:
               - !Ref "AWS::NoValue"
 
       RequiresCompatibilities:
-        - EC2
         - FARGATE
   
   
