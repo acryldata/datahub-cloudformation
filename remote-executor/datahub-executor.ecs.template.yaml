@@ -1,0 +1,668 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::LanguageExtensions
+Metadata:
+    AWS::CloudFormation::Interface:
+      ParameterGroups:
+        - Label:
+            default: Network Parameters
+          Parameters:
+            - VPCID
+            - SubnetID
+        - Label:
+            default: AWS Environment
+          Parameters:
+            - AwsRegion
+        - Label:
+            default: DataHub Parameters
+          Parameters:
+            - DataHubBaseUrl
+            - ExecutorId
+            - ExistingDataHubAccessTokenSecretArn
+            - DataHubAccessToken
+            - DataHubIngestionsMaxWorkers
+            - DataHubMonitorsMaxWorkers
+            - DataHubIngestionsSignalPollInterval
+            - OptionalSecrets
+            - OptionalEnvVars
+        - Label:
+            default: Worker Task Parameters
+          Parameters:
+            - DesiredCount
+            - ImageTag
+            - TaskCpu
+            - TaskMemory
+            - TaskEphemeralStorageSizeInGiB
+
+      ParameterLabels:
+        SubnetID: 
+          Default: "The Existing Subnet ID"
+        VPCID:
+          Default: "The Existing VPC ID"
+        AwsRegion:
+          Default: "The region where the Queue is deployed. Most often, us-west-2."
+        DataHubBaseUrl:
+          Default: "DataHub Base Url, for example: https://xxx.acryl.io/gms"
+        DataHubAccessToken:
+          Default: "DataHub Personal Access Token. If not specified, ExistingDataHubAccessTokenSecretArn is required."
+        ExecutorId:
+          Default: "Unique Executor Id. Warning - do not change this without consulting with your Acryl rep."
+        DataHubIngestionsMaxWorkers:
+          Default: "(Optional) Maximum number of ingestion tasks allowed to run in parallel. Warning - do not change this without consulting with your Acryl rep."
+        DataHubMonitorsMaxWorkers:
+          Default: "(Optional) Maximum number of monitoring tasks allowed to run in parallel. Warning - do not change this without consulting with your Acryl rep."
+        DataHubIngestionsSignalPollInterval:
+          Default: "(Optional) Ingestion queue signal polling interval. Warning - do not change this without consulting with your Acryl rep."
+        ExistingDataHubAccessTokenSecretArn:
+          Default: "Existing DataHub Access Token Secret Arn, if not specified, will use DataHubAccessToken"
+        OptionalSecrets:
+          Default: ""
+        OptionalEnvVars:
+          Default: "Optional environment variables to set in the ECS task container."
+        DesiredCount:
+          Default: "Number of worker replicas"
+        ImageTag:
+          Default: "The image tag for the Acryl Remote Executor, defaults to the latest release."
+        TaskCpu:
+          Default: "The ECS Task CPU value, check https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-cpu-memory-error.html"
+        TaskMemory:
+          Default: "The ECS Task Memory value, check https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-cpu-memory-error.html"
+        TaskEphemeralStorageSizeInGiB:
+          Default: "The amount of ephemeral storage to allocate for the task"
+Parameters:
+  SubnetID:
+    Type: "AWS::EC2::Subnet::Id"
+  VPCID:
+    Type: "AWS::EC2::VPC::Id"
+  DataHubBaseUrl:
+    Type: "String"
+    Default: "https://xxx.acryl.io/gms"
+    Description: "DataHub Base Url, for example: https://xxx.acryl.io/gms"
+  DataHubAccessToken:
+    Type: "String"
+    NoEcho: true
+    Default: ""
+    Description: "DataHub Personal Access Token. If not specified, we'll get it from ExistingDataHubAccessTokenSecretArn"
+  ExecutorId:
+    Type: "String"
+    Description: "Unique Executor Id. Warning - do not change this without consulting with your Acryl rep."
+    Default: "remote"
+  DataHubIngestionsMaxWorkers:
+    Type: "String"
+    Description: "(Optional) Maximum number of ingestion tasks allowed to run in parallel. Warning - do not change this without consulting with your Acryl rep."
+    Default: ""
+  DataHubMonitorsMaxWorkers:
+    Type: "String"
+    Description: "(Optional) Maximum number of monitoring tasks allowed to run in parallel. Warning - do not change this without consulting with your Acryl rep."
+    Default: ""
+  DataHubIngestionsSignalPollInterval:
+    Type: "String"
+    Description: "(Optional) Ingestion queue signal polling interval. Warning - do not change this without consulting with your Acryl rep."
+    Default: ""
+  ExistingDataHubAccessTokenSecretArn:
+    Type: "String"
+    Default: ""
+    Description: "Existing DataHub Access Token Secret Arn, if not specified, will use DataHubAccessToken"
+  AwsRegion:
+    Type: "String"
+    Default: "us-west-2"
+    Description: "AWS Region where executor is hosted."
+  OptionalSecrets:
+    Type: "String"
+    Default: ""
+    Description: "A List of Optional AWS Secrets,for example: SECRET01_ENV=arn:aws:secretsmanager:us-east-1:111111111111:secret:xxx,SECRET02_ENV=arn:aws:secretsmanager:us-east-1:111111111111:secret:yyy (NO SPACE, supports up to 10 secrets)"
+  OptionalEnvVars:
+    Type: "String"
+    Default: ""
+    Description: "A List of Optional environment variables for the ECS task container. Values are not sourced from secrets, but set directly. Environment variables are specified using this parameter in the following form (a single string, multiple variables separated by commas, no spaces, up to 10 environment variables): ENV_VAR_NAME1=ENV_VAR_VALUE1,ENV_VAR_NAME2=ENV_VAR_VALUE2. The name of these secrets should match the name of the secrets in your DataHub ingestion recipe."
+  ImageTag:
+    Type: "String"
+    Default: "v0.2.15.2"
+    Description: "The image tag for the Acryl Remote Executor. See the Remote Executor docs for version information."
+  DesiredCount:
+    Type: "String"
+    Default: "1"
+    Description: "Number of worker replicas."
+  TaskCpu:
+    Type: "String"
+    Default: 1024
+    Description: "The ECS Task CPU value, check https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-cpu-memory-error.html"
+    AllowedValues:
+      - 256
+      - 512
+      - 1024
+      - 2048
+      - 4096
+  TaskMemory:
+    Type: "String"
+    Default: 2048
+    Description: "The ECS Task Memory value (MiB), check https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-cpu-memory-error.html"
+    AllowedValues:
+      - 512
+      - 1024
+      - 2048
+      - 4096
+      - 5120
+      - 6144
+      - 7168
+      - 8192
+      - 9216
+      - 10240
+      - 11264
+      - 12288
+      - 13312
+      - 14336
+      - 15360
+      - 16384
+      - 17408
+      - 18432
+      - 19456
+      - 20480
+      - 21504
+      - 22528
+      - 23552
+      - 24576
+      - 25600
+      - 26624
+      - 27648
+      - 28672
+      - 29696
+      - 30720
+  TaskEphemeralStorageSizeInGiB:
+    Type: "String"
+    Default: "21"
+    Description: "The total amount, in GiB, of ephemeral storage to set for the task"
+Conditions:
+  UseAwsRegion: !Not [!Equals [!Ref AwsRegion, ""]]
+  UseExistingDataHubAccessTokenSecret: !Not [!Equals [!Ref ExistingDataHubAccessTokenSecretArn, ""]]
+  UseDataHubAccessToken: !Not [!Condition UseExistingDataHubAccessTokenSecret]  
+  NonEmptyOptionalSecrets: !Not [!Equals [!Ref OptionalSecrets, ""]]
+  UseOptionalSecret01: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 1]
+      - !Condition NonEmptyOptionalSecrets
+    - !Condition UseOptionalSecret02
+  UseOptionalSecret02: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 2]
+      - !Condition NonEmptyOptionalSecrets
+    - !Condition UseOptionalSecret03
+  UseOptionalSecret03: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 3]
+      - !Condition NonEmptyOptionalSecrets
+    - !Condition UseOptionalSecret04
+  UseOptionalSecret04: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 4]
+      - !Condition NonEmptyOptionalSecrets
+    - !Condition UseOptionalSecret05
+  UseOptionalSecret05: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 5]
+      - !Condition NonEmptyOptionalSecrets
+    - !Condition UseOptionalSecret06
+  UseOptionalSecret06: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 6]
+      - !Condition NonEmptyOptionalSecrets
+    - !Condition UseOptionalSecret07
+  UseOptionalSecret07: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 7]
+      - !Condition NonEmptyOptionalSecrets
+    - !Condition UseOptionalSecret08
+  UseOptionalSecret08: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 8]
+      - !Condition NonEmptyOptionalSecrets
+    - !Condition UseOptionalSecret09
+  UseOptionalSecret09: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 9]
+      - !Condition NonEmptyOptionalSecrets
+    - !Condition UseOptionalSecret10
+  UseOptionalSecret10: !And
+    - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 10]
+    - !Condition NonEmptyOptionalSecrets
+  UseImageTag: !Not [!Equals [!Ref ImageTag, ""]]
+  UseExecutorId: !Not [!Equals [!Ref ExecutorId, ""]]
+  UseDataHubIngestionsMaxWorkers: !Not [!Equals [!Ref DataHubIngestionsMaxWorkers, ""]]
+  UseDataHubMonitorsMaxWorkers: !Not [!Equals [!Ref DataHubMonitorsMaxWorkers, ""]]
+  UseDataHubIngestionsSignalPollInterval: !Not [!Equals [!Ref DataHubIngestionsSignalPollInterval, ""]]
+  NonEmptyOptionalEnvVars: !Not [!Equals [!Ref OptionalEnvVars, ""]]
+  UseOptionalEnvVar01: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalEnvVars], 1]
+      - !Condition NonEmptyOptionalEnvVars
+    - !Condition UseOptionalEnvVar02
+  UseOptionalEnvVar02: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalEnvVars], 2]
+      - !Condition NonEmptyOptionalEnvVars
+    - !Condition UseOptionalEnvVar03
+  UseOptionalEnvVar03: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalEnvVars], 3]
+      - !Condition NonEmptyOptionalEnvVars
+    - !Condition UseOptionalEnvVar04
+  UseOptionalEnvVar04: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalEnvVars], 4]
+      - !Condition NonEmptyOptionalEnvVars
+    - !Condition UseOptionalEnvVar05
+  UseOptionalEnvVar05: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 5]
+      - !Condition NonEmptyOptionalEnvVars
+    - !Condition UseOptionalEnvVar06
+  UseOptionalEnvVar06: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalEnvVars], 6]
+      - !Condition NonEmptyOptionalEnvVars
+    - !Condition UseOptionalEnvVar07
+  UseOptionalEnvVar07: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalEnvVars], 7]
+      - !Condition NonEmptyOptionalEnvVars
+    - !Condition UseOptionalEnvVar08
+  UseOptionalEnvVar08: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalEnvVars], 8]
+      - !Condition NonEmptyOptionalEnvVars
+    - !Condition UseOptionalEnvVar09
+  UseOptionalEnvVar09: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalEnvVars], 9]
+      - !Condition NonEmptyOptionalSecrets
+    - !Condition UseOptionalEnvVar10
+  UseOptionalEnvVar10: !And
+    - !Equals [Fn::Length: !Split [",", !Ref OptionalEnvVars], 10]
+    - !Condition NonEmptyOptionalEnvVars
+
+Resources:
+  DataHubAccessTokenSecret:
+    Condition: UseDataHubAccessToken
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "/${AWS::StackName}/DataHubAccessToken"
+      Description: !Sub "${AWS::StackName}: Secrets for DataHubAccessToken"
+      SecretString:
+        !Ref DataHubAccessToken
+
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub "${AWS::StackName}"
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "${AWS::StackName}-log-group"
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AWS::StackName}-task-role"
+      Policies:
+        - PolicyName: ssmmessages-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+            - Action: 
+                - ssmmessages:CreateControlChannel
+                - ssmmessages:CreateDataChannel
+                - ssmmessages:OpenControlChannel
+                - ssmmessages:OpenDataChannel
+              Effect: Allow
+              Resource: "*"
+        - PolicyName: logs-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+            - Action: 
+                - logs:DescribeLogGroups
+              Effect: Allow
+              Resource: "*"
+        - PolicyName: logs-streams-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+            - Action:
+                - logs:CreateLogStream
+                - logs:DescribeLogStreams
+                - logs:PutLogEvents
+              Effect: Allow
+              Resource:
+                - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/ecs/${AWS::StackName}-log-group:*"
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AWS::StackName}-execution-role"
+      Policies:
+        - PolicyName: logs-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+            - Action:
+                - logs:DescribeLogGroups
+              Resource: "*"
+              Effect: Allow
+        - PolicyName: logs-streams-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+            - Action:
+                - logs:CreateLogStream
+                - logs:DescribeLogStreams
+                - logs:PutLogEvents
+              Effect: Allow
+              Resource:
+                - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/ecs/${AWS::StackName}-log-group:*"
+        - PolicyName: secretsmanager-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+            - !If 
+              - UseExistingDataHubAccessTokenSecret
+              - Action:
+                  - secretsmanager:GetSecretValue
+                Effect: Allow
+                Resource: !Ref ExistingDataHubAccessTokenSecretArn
+              - !If
+                - UseDataHubAccessToken
+                - Action:
+                    - secretsmanager:GetSecretValue
+                  Effect: Allow
+                  Resource: !Ref DataHubAccessTokenSecret
+                - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret01
+              - Action:
+                  - secretsmanager:GetSecretValue
+                Effect: Allow
+                Resource: !Select [1, !Split ["=", !Select [0, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret02
+              - Action:
+                  - secretsmanager:GetSecretValue
+                Effect: Allow
+                Resource: !Select [1, !Split ["=", !Select [1, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret03
+              - Action:
+                  - secretsmanager:GetSecretValue
+                Effect: Allow
+                Resource: !Select [1, !Split ["=", !Select [2, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret04
+              - Action:
+                  - secretsmanager:GetSecretValue
+                Effect: Allow
+                Resource: !Select [1, !Split ["=", !Select [3, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret05
+              - Action:
+                  - secretsmanager:GetSecretValue
+                Effect: Allow
+                Resource: !Select [1, !Split ["=", !Select [4, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret06
+              - Action:
+                  - secretsmanager:GetSecretValue
+                Effect: Allow
+                Resource: !Select [1, !Split ["=", !Select [5, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret07
+              - Action:
+                  - secretsmanager:GetSecretValue
+                Effect: Allow
+                Resource: !Select [1, !Split ["=", !Select [6, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret08
+              - Action:
+                  - secretsmanager:GetSecretValue
+                Effect: Allow
+                Resource: !Select [1, !Split ["=", !Select [7, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret09
+              - Action:
+                  - secretsmanager:GetSecretValue
+                Effect: Allow
+                Resource: !Select [1, !Split ["=", !Select [8, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret10
+              - Action:
+                  - secretsmanager:GetSecretValue
+                Effect: Allow
+                Resource: !Select [1, !Split ["=", !Select [9, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+
+  ContainerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub "${AWS::StackName}-container-sg"
+      GroupDescription: Security group for container
+      VpcId: !Ref VPCID
+
+### Task Definition and ECS Service ###
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${AWS::StackName}-task"
+      Cpu: !Ref TaskCpu
+      Memory: !Ref TaskMemory
+      EphemeralStorage:
+        SizeInGiB: !Ref TaskEphemeralStorageSizeInGiB
+      TaskRoleArn: !Ref TaskRole
+      NetworkMode: awsvpc
+      ExecutionRoleArn: !GetAtt ExecutionRole.Arn
+      ContainerDefinitions:
+        - Name: !Sub "${AWS::StackName}-container"
+          Image: !If 
+            - UseImageTag
+            - !Join [":", [ "795586375822.dkr.ecr.us-west-2.amazonaws.com/datahub-executor", !Ref ImageTag]]
+            - 795586375822.dkr.ecr.us-west-2.amazonaws.com/datahub-executor
+          Command: ["dockerize", "/start_datahub_monitors_service.sh"]
+          PortMappings:
+            - ContainerPort: 80
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-region: !Ref AWS::Region
+              awslogs-group: !Ref LogGroup
+              awslogs-stream-prefix: ecs
+          Secrets:
+            - !If 
+              - UseExistingDataHubAccessTokenSecret
+              - Name: DATAHUB_GMS_TOKEN
+                ValueFrom: !Ref ExistingDataHubAccessTokenSecretArn
+              - !If 
+                - UseDataHubAccessToken
+                - Name: DATAHUB_GMS_TOKEN
+                  ValueFrom: !Ref DataHubAccessTokenSecret
+                - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret01
+              - Name: !Select [0, !Split ["=", !Ref OptionalSecrets]]
+                ValueFrom: !Select [1, !Split ["=", !Select [0, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret02
+              - Name: !Select [0, !Split ["=", !Select [1, !Split [",", !Ref OptionalSecrets]]]]
+                ValueFrom: !Select [1, !Split ["=", !Select [1, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret03
+              - Name: !Select [0, !Split ["=", !Select [2, !Split [",", !Ref OptionalSecrets]]]]
+                ValueFrom: !Select [1, !Split ["=", !Select [2, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret04
+              - Name: !Select [0, !Split ["=", !Select [3, !Split [",", !Ref OptionalSecrets]]]]
+                ValueFrom: !Select [1, !Split ["=", !Select [3, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret05
+              - Name: !Select [0, !Split ["=", !Select [4, !Split [",", !Ref OptionalSecrets]]]]
+                ValueFrom: !Select [1, !Split ["=", !Select [4, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret06
+              - Name: !Select [0, !Split ["=", !Select [5, !Split [",", !Ref OptionalSecrets]]]]
+                ValueFrom: !Select [1, !Split ["=", !Select [5, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret07
+              - Name: !Select [0, !Split ["=", !Select [6, !Split [",", !Ref OptionalSecrets]]]]
+                ValueFrom: !Select [1, !Split ["=", !Select [6, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret08
+              - Name: !Select [0, !Split ["=", !Select [7, !Split [",", !Ref OptionalSecrets]]]]
+                ValueFrom: !Select [1, !Split ["=", !Select [7, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret09
+              - Name: !Select [0, !Split ["=", !Select [8, !Split [",", !Ref OptionalSecrets]]]]
+                ValueFrom: !Select [1, !Split ["=", !Select [8, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalSecret10
+              - Name: !Select [0, !Split ["=", !Select [9, !Split [",", !Ref OptionalSecrets]]]]
+                ValueFrom: !Select [1, !Split ["=", !Select [9, !Split [",", !Ref OptionalSecrets]]]]
+              - !Ref "AWS::NoValue"
+          Environment:
+            - Name: DATAHUB_GMS_URL
+              Value: !Ref DataHubBaseUrl
+            - Name: DATAHUB_EXECUTOR_MODE
+              Value: worker
+            - !If 
+              - UseAwsRegion
+              - Name: AWS_REGION
+                Value: !Ref AwsRegion
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseExecutorId
+              - Name: DATAHUB_EXECUTOR_WORKER_ID
+                Value: !Ref ExecutorId
+              - !Ref "AWS::NoValue"
+            - !If
+              - UseDataHubIngestionsMaxWorkers
+              - Name: DATAHUB_EXECUTOR_ACTIONS_MAX_WORKERS
+                Value: !Ref DataHubIngestionsMaxWorkers
+              - !Ref "AWS::NoValue"
+            - !If
+              - UseDataHubMonitorsMaxWorkers
+              - Name: DATAHUB_EXECUTOR_MONITORS_MAX_WORKERS
+                Value: !Ref DataHubMonitorsMaxWorkers
+              - !Ref "AWS::NoValue"
+            - !If
+              - UseDataHubIngestionsSignalPollInterval
+              - Name: DATAHUB_EXECUTOR_ACTIONS_SIGNAL_POLL_INTERVAL
+                Value: !Ref DataHubIngestionsSignalPollInterval
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalEnvVar01
+              - Name: !Select [0, !Split ["=", !Ref OptionalEnvVars]]
+                Value: !Select [1, !Split ["=", !Select [0, !Split [",", !Ref OptionalEnvVars]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalEnvVar02
+              - Name: !Select [0, !Split ["=", !Select [1, !Split [",", !Ref OptionalEnvVars]]]]
+                Value: !Select [1, !Split ["=", !Select [1, !Split [",", !Ref OptionalEnvVars]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalEnvVar03
+              - Name: !Select [0, !Split ["=", !Select [2, !Split [",", !Ref OptionalEnvVars]]]]
+                Value: !Select [1, !Split ["=", !Select [2, !Split [",", !Ref OptionalEnvVars]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalEnvVar04
+              - Name: !Select [0, !Split ["=", !Select [3, !Split [",", !Ref OptionalEnvVars]]]]
+                Value: !Select [1, !Split ["=", !Select [3, !Split [",", !Ref OptionalEnvVars]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalEnvVar05
+              - Name: !Select [0, !Split ["=", !Select [4, !Split [",", !Ref OptionalEnvVars]]]]
+                Value: !Select [1, !Split ["=", !Select [4, !Split [",", !Ref OptionalEnvVars]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalEnvVar06
+              - Name: !Select [0, !Split ["=", !Select [5, !Split [",", !Ref OptionalEnvVars]]]]
+                Value: !Select [1, !Split ["=", !Select [5, !Split [",", !Ref OptionalEnvVars]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalEnvVar07
+              - Name: !Select [0, !Split ["=", !Select [6, !Split [",", !Ref OptionalEnvVars]]]]
+                Value: !Select [1, !Split ["=", !Select [6, !Split [",", !Ref OptionalEnvVars]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalEnvVar08
+              - Name: !Select [0, !Split ["=", !Select [7, !Split [",", !Ref OptionalEnvVars]]]]
+                Value: !Select [1, !Split ["=", !Select [7, !Split [",", !Ref OptionalEnvVars]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalEnvVar09
+              - Name: !Select [0, !Split ["=", !Select [8, !Split [",", !Ref OptionalEnvVars]]]]
+                Value: !Select [1, !Split ["=", !Select [8, !Split [",", !Ref OptionalEnvVars]]]]
+              - !Ref "AWS::NoValue"
+            - !If 
+              - UseOptionalEnvVar10
+              - Name: !Select [0, !Split ["=", !Select [9, !Split [",", !Ref OptionalEnvVars]]]]
+                Value: !Select [1, !Split ["=", !Select [9, !Split [",", !Ref OptionalEnvVars]]]]
+              - !Ref "AWS::NoValue"
+
+      RequiresCompatibilities:
+        - FARGATE
+
+  ECSService:
+    DependsOn: Cluster
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Sub "${AWS::StackName}-service"
+      Cluster: !Ref Cluster
+      TaskDefinition: !Ref TaskDefinition
+      DesiredCount: !Ref DesiredCount
+      LaunchType: FARGATE
+      EnableExecuteCommand: true
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets:
+            - !Ref SubnetID
+          SecurityGroups:
+            - !GetAtt ContainerSecurityGroup.GroupId
+
+Outputs:
+  ClusterName:
+    Description: Name of ECS Cluster
+    Value: !Ref Cluster
+  ECSLogGroupName:
+    Description: Name of ECS Cluster Log Group
+    Value: !Ref LogGroup
+  ServiceName:
+    Description: Name of ECS Service
+    Value: !GetAtt ECSService.Name
