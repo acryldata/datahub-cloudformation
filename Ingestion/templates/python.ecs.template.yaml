@@ -73,7 +73,6 @@ Parameters:
     Description: "DataHub Base Url, for example: https://xxx.acryl.io/gms"
   DataHubAccessToken:
     Type: "String"
-    NoEcho: true
     Default: ""
     Description: "DataHub Personal Access Token. If not specified, we'll get it from ExistingDataHubAccessTokenSecretArn"
   ExecutorId:
