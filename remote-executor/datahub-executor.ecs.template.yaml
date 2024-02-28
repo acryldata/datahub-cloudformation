@@ -485,7 +485,7 @@ Resources:
             - UseImageTag
             - !Join [":", [ "795586375822.dkr.ecr.us-west-2.amazonaws.com/datahub-executor", !Ref ImageTag]]
             - 795586375822.dkr.ecr.us-west-2.amazonaws.com/datahub-executor
-          Command: ["dockerize", "/start_datahub_monitors_service.sh"]
+          Command: ["dockerize", "/start_datahub_executor.sh"]
           PortMappings:
             - ContainerPort: 80
           LogConfiguration:
@@ -571,7 +571,7 @@ Resources:
               - !Ref "AWS::NoValue"
             - !If
               - UseDataHubIngestionsMaxWorkers
-              - Name: DATAHUB_EXECUTOR_ACTIONS_MAX_WORKERS
+              - Name: DATAHUB_EXECUTOR_INGESTION_MAX_WORKERS
                 Value: !Ref DataHubIngestionsMaxWorkers
               - !Ref "AWS::NoValue"
             - !If
@@ -581,7 +581,7 @@ Resources:
               - !Ref "AWS::NoValue"
             - !If
               - UseDataHubIngestionsSignalPollInterval
-              - Name: DATAHUB_EXECUTOR_ACTIONS_SIGNAL_POLL_INTERVAL
+              - Name: DATAHUB_EXECUTOR_INGESTION_SIGNAL_POLL_INTERVAL
                 Value: !Ref DataHubIngestionsSignalPollInterval
               - !Ref "AWS::NoValue"
             - !If 
