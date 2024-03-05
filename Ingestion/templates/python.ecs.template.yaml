@@ -106,7 +106,7 @@ Parameters:
     Description: "Command SQS Queue ARN, for example: arn:aws:sqs:us-east-1:11111111111:xxx"
   ImageTag:
     Type: "String"
-    Default: "v0.0.3.9"
+    Default: "v0.0.4.2"
     Description: "The image tag for the Acryl Remote Executor. See the Remote Executor docs for version information."
   TaskCpu:
     Type: "String"
