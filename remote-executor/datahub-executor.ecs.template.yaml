@@ -486,8 +486,6 @@ Resources:
             - !Join [":", [ "795586375822.dkr.ecr.us-west-2.amazonaws.com/datahub-executor", !Ref ImageTag]]
             - 795586375822.dkr.ecr.us-west-2.amazonaws.com/datahub-executor
           Command: ["dockerize", "/start_datahub_executor.sh"]
-          PortMappings:
-            - ContainerPort: 80
           LogConfiguration:
             LogDriver: awslogs
             Options:
