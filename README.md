@@ -1,4 +1,7 @@
 # Cloudformation Demo
+
+This main README is for on-prem setup of DataHub for on-prem customers. For remote executor setup please see `remote-executor` folder.
+
 ![AcryDatahubCFN](https://user-images.githubusercontent.com/1105928/138394072-c86ddffa-5b6d-433f-95c8-3764842445d4.png)
 
 ## step 1 to 4 runs on customer AWS account

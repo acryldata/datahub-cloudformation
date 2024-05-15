@@ -4,7 +4,7 @@
 1. create stack to deploy ingestion app in AWS
      - choose region -> Cloudformation -> Create stack
 
-     - Specify template, Upload a template file, choose python.ecs.template.yaml
+     - Specify template, Upload a template file, choose `datahub-executor.ecs.template.yaml``
 
 
 2. Input Parameters
@@ -29,6 +29,6 @@
         - DataHubAccessToken (it will create secret in secrets manager and use it)
 
 
-    - ImageTag: if empty, will use latest, otherwise use given tag, for example: v0.0.2.7
+    - ImageTag: if empty, will use latest, otherwise use given tag, for example: v0.3.1.12-acryl
     - TaskCpu: please reference https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-cpu-memory-error.html for available combination
     - TaskMemory: please reference https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-cpu-memory-error.html for available combination
