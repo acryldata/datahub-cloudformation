@@ -3,9 +3,7 @@
 ## step 1 to 4 runs on customer AWS account
 1. create stack to deploy ingestion app in AWS
      - choose region -> Cloudformation -> Create stack
-
      - Specify template, Upload a template file, choose `datahub-executor.ecs.template.yaml``
-
 
 2. Input Parameters
     - Stack name, for example: datahub-ingestion
@@ -18,9 +16,7 @@
         - AwsRegion
 
     - DataHubBaseUrl: DataHub Base Url, for example: https://xxx.acryl.io/gms
-    - AwsCommandQueueUrl: Command SQS Queue Url, for example: https://sqs.REGION.amazonaws.com/111111111111/xxx
-    - AwsCommandQueueArn: Command SQS Queue ARN, for example: arn:aws:sqs:REGION:11111111111:xxx
-    - ExecutorId: unique executor id
+    - ExecutorId: unique executor id (leave "default", unless instructed otherwise by an Acryl engineer)
     - To use existing datahub access token from AWS secrets manager, fillout below
         - ExistingDataHubAccessTokenSecretArn
     - To use optional existing secrets from AWS secrets manager, fillout below
