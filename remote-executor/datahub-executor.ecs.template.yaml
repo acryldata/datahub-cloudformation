@@ -637,7 +637,6 @@ Resources:
       EnableExecuteCommand: true
       NetworkConfiguration:
         AwsvpcConfiguration:
-          AssignPublicIp: ENABLED
           Subnets:
             - !Ref SubnetID
           SecurityGroups:
