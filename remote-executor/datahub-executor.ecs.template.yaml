@@ -116,7 +116,7 @@ Parameters:
     Description: "A List of Optional environment variables for the ECS task container. Values are not sourced from secrets, but set directly. Environment variables are specified using this parameter in the following form (a single string, multiple variables separated by commas, no spaces, up to 10 environment variables): ENV_VAR_NAME1=ENV_VAR_VALUE1,ENV_VAR_NAME2=ENV_VAR_VALUE2. The name of these secrets should match the name of the secrets in your DataHub ingestion recipe."
   ImageTag:
     Type: "String"
-    Default: "v0.3.7.3-acryl"
+    Default: "v0.3.8.1-acryl"
     Description: "The image tag for the Acryl Remote Executor. See the Remote Executor docs for version information."
   DesiredCount:
     Type: "String"
