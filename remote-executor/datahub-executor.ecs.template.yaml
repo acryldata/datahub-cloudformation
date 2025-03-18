@@ -16,7 +16,7 @@ Metadata:
             default: DataHub Parameters
           Parameters:
             - DataHubBaseUrl
-            - ExecutorId
+            - ExecutorPoolId
             - ExistingDataHubAccessTokenSecretArn
             - DataHubAccessToken
             - DataHubIngestionsMaxWorkers
@@ -44,8 +44,8 @@ Metadata:
           Default: "DataHub Base Url, for example: https://xxx.acryl.io/gms"
         DataHubAccessToken:
           Default: "DataHub Personal Access Token. If not specified, ExistingDataHubAccessTokenSecretArn is required."
-        ExecutorId:
-          Default: "Unique Executor Id. Do not prefix it with 'default' if it is for a remote executor. Warning - do not change this without consulting with your Acryl rep."
+        ExecutorPoolId:
+          Default: "Unique Executor Pool Id. Do not prefix it with 'default' if it is for a remote executor. Warning - do not change this without consulting with your Acryl rep."
         DataHubIngestionsMaxWorkers:
           Default: "(Optional) Maximum number of ingestion tasks allowed to run in parallel. Warning - do not change this without consulting with your Acryl rep."
         DataHubMonitorsMaxWorkers:
@@ -82,7 +82,7 @@ Parameters:
     NoEcho: true
     Default: ""
     Description: "DataHub Personal Access Token. If not specified, we'll get it from ExistingDataHubAccessTokenSecretArn"
-  ExecutorId:
+  ExecutorPoolId:
     Type: "String"
     Description: "Unique Executor Id. Do not prefix it with 'default' if it is for a remote executor. Warning - do not change this without consulting with your Acryl rep."
     Default: "remote"
@@ -225,7 +225,7 @@ Conditions:
     - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 10]
     - !Condition NonEmptyOptionalSecrets
   UseImageTag: !Not [!Equals [!Ref ImageTag, ""]]
-  UseExecutorId: !Not [!Equals [!Ref ExecutorId, ""]]
+  UseExecutorPoolId: !Not [!Equals [!Ref ExecutorPoolId, ""]]
   UseDataHubIngestionsMaxWorkers: !Not [!Equals [!Ref DataHubIngestionsMaxWorkers, ""]]
   UseDataHubMonitorsMaxWorkers: !Not [!Equals [!Ref DataHubMonitorsMaxWorkers, ""]]
   UseDataHubIngestionsSignalPollInterval: !Not [!Equals [!Ref DataHubIngestionsSignalPollInterval, ""]]
@@ -552,9 +552,9 @@ Resources:
                 Value: !Ref AwsRegion
               - !Ref "AWS::NoValue"
             - !If 
-              - UseExecutorId
-              - Name: DATAHUB_EXECUTOR_WORKER_ID
-                Value: !Ref ExecutorId
+              - UseExecutorPoolId
+              - Name: DATAHUB_EXECUTOR_POOL_ID
+                Value: !Ref ExecutorPoolId
               - !Ref "AWS::NoValue"
             - !If
               - UseDataHubIngestionsMaxWorkers
