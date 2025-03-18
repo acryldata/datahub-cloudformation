@@ -45,7 +45,7 @@ Metadata:
         DataHubAccessToken:
           Default: "DataHub Personal Access Token. If not specified, ExistingDataHubAccessTokenSecretArn is required."
         ExecutorPoolId:
-          Default: "Unique Executor Pool Id. Do not prefix it with 'default' if it is for a remote executor. Warning - do not change this without consulting with your Acryl rep."
+          Default: "Unique Executor Pool Id (previously known as Executor Id). Do not prefix it with 'default' if it is for a remote executor. Warning - do not change this without consulting with your Acryl rep."
         DataHubIngestionsMaxWorkers:
           Default: "(Optional) Maximum number of ingestion tasks allowed to run in parallel. Warning - do not change this without consulting with your Acryl rep."
         DataHubMonitorsMaxWorkers:
@@ -84,7 +84,7 @@ Parameters:
     Description: "DataHub Personal Access Token. If not specified, we'll get it from ExistingDataHubAccessTokenSecretArn"
   ExecutorPoolId:
     Type: "String"
-    Description: "Unique Executor Id. Do not prefix it with 'default' if it is for a remote executor. Warning - do not change this without consulting with your Acryl rep."
+    Description: "Unique Executor Pool Id (previously known as Executor Id). Do not prefix it with 'default' if it is for a remote executor. Warning - do not change this without consulting with your Acryl rep."
     Default: "remote"
   DataHubIngestionsMaxWorkers:
     Type: "String"
@@ -553,7 +553,7 @@ Resources:
               - !Ref "AWS::NoValue"
             - !If 
               - UseExecutorPoolId
-              - Name: DATAHUB_EXECUTOR_POOL_ID
+              - Name: DATAHUB_EXECUTOR_WORKER_ID
                 Value: !Ref ExecutorPoolId
               - !Ref "AWS::NoValue"
             - !If
