@@ -1,0 +1,93 @@
+# Terraform working directories
+**/.terraform/*
+.terraform.lock.hcl
+
+# Terraform state - contains sensitive resource details
+*.tfstate
+*.tfstate.*
+
+# Crash logs
+crash.log
+crash.*.log
+
+# Variable files - may contain passwords, keys, secrets
+*.tfvars
+*.tfvars.json
+
+# Override files - local-only resource overrides
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Terraform plan output - can contain secrets in plaintext
+*.tfplan
+
+# Terraform CLI config
+.terraformrc
+terraform.rc
+
+# Terraform state lock
+.terraform.tfstate.lock.info
+
+# Terragrunt cache - can contain provider configs with embedded credentials
+.terragrunt-cache/
+
+# Credentials and secrets
+.git-credentials
+.netrc
+._netrc
+.vault-token
+aws-config.json
+aws-secret.yaml
+.aws/
+application_default_credentials.json
+*-service-account-key.json
+*-sa-key.json
+service-account*.json
+*.dec.yaml
+*.pem
+*.key
+*.age
+id_rsa
+id_rsa.pub
+id_dsa
+id_dsa.pub
+id_ecdsa
+id_ecdsa.pub
+id_ed25519
+id_ed25519.pub
+.keys/
+secrets/
+!secrets/.gitkeep
+*creds*
+*password*
+client_secret.json
+client_secrets.json
+credentials.json
+google-services.json
+*.jks
+*.keystore
+rendered_script.sh
+.grafana.env
+
+# Environment files
+.env
+.env.*
+!.env.example
+!.env.template
+!.env.sample
+.envrc
+*.env
+
+# Kubeconfig
+kubeconfig_*
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Claude Code
+.claude/
