@@ -25,6 +25,6 @@
         - DataHubAccessToken (it will create secret in secrets manager and use it)
 
 
-    - ImageTag: if empty, will use latest, otherwise use given tag, for example: v0.3.1.12-acryl
+    - ImageTag: if empty, will use latest, otherwise use given tag, for example: v0.3.17-acryl
     - TaskCpu: please reference https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-cpu-memory-error.html for available combination
     - TaskMemory: please reference https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-cpu-memory-error.html for available combination
