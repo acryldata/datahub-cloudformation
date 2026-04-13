@@ -15,13 +15,11 @@ echo "ECS Cluster: ${STACK_NAME} --- TASK_ARN: $TASK_ARN"
 #echo "ECS Cluster: ${STACK_NAME} --- TASK_ID: $TASK_ID"
 TASK_ID=${TASK_ARN##*/}
 
-
-
+CONTAINER_NAME=$(aws ecs  describe-tasks --cluster "${STACK_NAME}" --tasks ${TASK_ARN} --query "tasks[*].overrides.containerOverrides[*].name" --output text)
 
 echo "login to TASK_ID: ${TASK_ID}"
-aws ecs execute-command  \
-    --cluster ${STACK_NAME} \
+aws ecs execute-command --cluster ${STACK_NAME} \
     --task ${TASK_ID} \
-    --container "${STACK_NAME}-container" \
-    --command "/bin/bash" \
-    --interactive
+    --container ${CONTAINER_NAME} \
+    --interactive \
+    --command "/bin/bash"
