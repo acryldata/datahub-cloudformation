@@ -474,7 +474,7 @@ Resources:
             - UseImageTag
             - !Join [":", [ "795586375822.dkr.ecr.us-west-2.amazonaws.com/datahub-executor", !Ref ImageTag]]
             - 795586375822.dkr.ecr.us-west-2.amazonaws.com/datahub-executor
-          Command: ["dockerize", "/start_datahub_executor.sh"]
+          Command: ["/start_datahub_executor.sh"]
           LogConfiguration:
             LogDriver: awslogs
             Options:
