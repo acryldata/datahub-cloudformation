@@ -17,6 +17,7 @@ Metadata:
           Parameters:
             - DataHubBaseUrl
             - ExecutorPoolId
+            - Channel
             - ExistingDataHubAccessTokenSecretArn
             - DataHubAccessToken
             - DataHubIngestionsMaxWorkers
@@ -46,6 +47,8 @@ Metadata:
           Default: "DataHub Personal Access Token. If not specified, ExistingDataHubAccessTokenSecretArn is required."
         ExecutorPoolId:
           Default: "Unique Executor Pool Id (previously known as Executor Id). Do not prefix it with 'default' if it is for a remote executor. Warning - do not change this without consulting with your Acryl rep."
+        Channel:
+          Default: "The channel the executor pool listens on. SQS (default) runs the standard worker; KAFKA runs the kafka-worker. Warning - do not change this without consulting with your Acryl rep."
         DataHubIngestionsMaxWorkers:
           Default: "(Optional) Maximum number of ingestion tasks allowed to run in parallel. Warning - do not change this without consulting with your Acryl rep."
         DataHubMonitorsMaxWorkers:
@@ -86,6 +89,13 @@ Parameters:
     Type: "String"
     Description: "Unique Executor Pool Id (previously known as Executor Id). Do not prefix it with 'default' if it is for a remote executor. Warning - do not change this without consulting with your Acryl rep."
     Default: "remote"
+  Channel:
+    Type: "String"
+    Default: "SQS"
+    AllowedValues:
+      - "SQS"
+      - "KAFKA"
+    Description: "The channel the executor pool listens on. SQS (default) runs the standard worker; KAFKA runs the kafka-worker (DataHub Bridge). Warning - do not change this without consulting with your Acryl rep."
   DataHubIngestionsMaxWorkers:
     Type: "String"
     Description: "(Optional) Maximum number of ingestion tasks allowed to run in parallel. Warning - do not change this without consulting with your Acryl rep."
@@ -226,6 +236,7 @@ Conditions:
     - !Condition NonEmptyOptionalSecrets
   UseImageTag: !Not [!Equals [!Ref ImageTag, ""]]
   UseExecutorPoolId: !Not [!Equals [!Ref ExecutorPoolId, ""]]
+  UseKafkaChannel: !Equals [!Ref Channel, "KAFKA"]
   UseDataHubIngestionsMaxWorkers: !Not [!Equals [!Ref DataHubIngestionsMaxWorkers, ""]]
   UseDataHubMonitorsMaxWorkers: !Not [!Equals [!Ref DataHubMonitorsMaxWorkers, ""]]
   UseDataHubIngestionsSignalPollInterval: !Not [!Equals [!Ref DataHubIngestionsSignalPollInterval, ""]]
@@ -252,7 +263,7 @@ Conditions:
     - !Condition UseOptionalEnvVar05
   UseOptionalEnvVar05: !Or
     - !And
-      - !Equals [Fn::Length: !Split [",", !Ref OptionalSecrets], 5]
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalEnvVars], 5]
       - !Condition NonEmptyOptionalEnvVars
     - !Condition UseOptionalEnvVar06
   UseOptionalEnvVar06: !Or
@@ -273,7 +284,7 @@ Conditions:
   UseOptionalEnvVar09: !Or
     - !And
       - !Equals [Fn::Length: !Split [",", !Ref OptionalEnvVars], 9]
-      - !Condition NonEmptyOptionalSecrets
+      - !Condition NonEmptyOptionalEnvVars
     - !Condition UseOptionalEnvVar10
   UseOptionalEnvVar10: !And
     - !Equals [Fn::Length: !Split [",", !Ref OptionalEnvVars], 10]
@@ -545,13 +556,21 @@ Resources:
             - Name: DATAHUB_GMS_URL
               Value: !Ref DataHubBaseUrl
             - Name: DATAHUB_EXECUTOR_MODE
-              Value: worker
-            - !If 
+              Value: !If [UseKafkaChannel, "kafka-worker", "worker"]
+            - !If
               - UseAwsRegion
               - Name: AWS_REGION
                 Value: !Ref AwsRegion
               - !Ref "AWS::NoValue"
-            - !If 
+            # Emit both pool id env vars set to the same value. Modern images read
+            # DATAHUB_EXECUTOR_POOL_ID; legacy images (<= v0.3.8) read DATAHUB_EXECUTOR_WORKER_ID.
+            # Writing both keeps the template compatible across image versions (mirrors the Helm chart).
+            - !If
+              - UseExecutorPoolId
+              - Name: DATAHUB_EXECUTOR_POOL_ID
+                Value: !Ref ExecutorPoolId
+              - !Ref "AWS::NoValue"
+            - !If
               - UseExecutorPoolId
               - Name: DATAHUB_EXECUTOR_WORKER_ID
                 Value: !Ref ExecutorPoolId
