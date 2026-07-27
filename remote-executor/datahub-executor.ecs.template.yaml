@@ -26,6 +26,19 @@ Metadata:
             - OptionalSecrets
             - OptionalEnvVars
         - Label:
+            default: Observe / Assertion / Monitor Parameters
+          Parameters:
+            - OnlineSmartAssertionsEnabled
+            - ObserveModelsEnabled
+            - InferenceV2Enabled
+            - EnableDeltaBounds
+            - AllowCallStatements
+            - SnowflakeQuoteColumns
+            - SnowflakeTimeout
+            - BigQueryTimeout
+            - RedshiftTimeout
+            - DatabricksTimeout
+        - Label:
             default: Worker Task Parameters
           Parameters:
             - DesiredCount
@@ -55,6 +68,26 @@ Metadata:
           Default: "(Optional) Maximum number of monitoring tasks allowed to run in parallel. Warning - do not change this without consulting with your Acryl rep."
         DataHubIngestionsSignalPollInterval:
           Default: "(Optional) Ingestion queue signal polling interval. Warning - do not change this without consulting with your Acryl rep."
+        OnlineSmartAssertionsEnabled:
+          Default: "(Optional) Enable online smart assertions. Default true."
+        ObserveModelsEnabled:
+          Default: "(Optional) Load observe-models in the smart-assertion trainer (no-op on slim images). Default true."
+        InferenceV2Enabled:
+          Default: "(Optional) Route smart-assertion training to the V2 pipeline (requires observe-models). Default false."
+        EnableDeltaBounds:
+          Default: "(Optional) Emit delta-space prediction bounds. Set false for workers not yet on delta-aware code. Default true."
+        AllowCallStatements:
+          Default: "(Optional) Allow stored-procedure CALL statements in custom SQL assertions. Default false."
+        SnowflakeQuoteColumns:
+          Default: "(Optional) Quote column identifiers in generated Snowflake assertion queries. Default false."
+        SnowflakeTimeout:
+          Default: "(Optional) Statement timeout (seconds) for Snowflake assertion/monitor queries. Default 600."
+        BigQueryTimeout:
+          Default: "(Optional) Statement timeout (seconds) for BigQuery assertion/monitor queries. Default 600."
+        RedshiftTimeout:
+          Default: "(Optional) Statement timeout (seconds) for Redshift assertion/monitor queries. Default 600."
+        DatabricksTimeout:
+          Default: "(Optional) Statement timeout (seconds) for Databricks assertion/monitor queries. Default 600."
         ExistingDataHubAccessTokenSecretArn:
           Default: "Existing DataHub Access Token Secret Arn, if not specified, will use DataHubAccessToken"
         OptionalSecrets:
@@ -108,6 +141,46 @@ Parameters:
     Type: "String"
     Description: "(Optional) Ingestion queue signal polling interval. Warning - do not change this without consulting with your Acryl rep."
     Default: ""
+  OnlineSmartAssertionsEnabled:
+    Type: "String"
+    Description: "(Optional) Enable online smart assertions in the executor. Default true. Warning - do not change this without consulting with your Acryl rep."
+    Default: "true"
+  ObserveModelsEnabled:
+    Type: "String"
+    Description: "(Optional) Load observe-models in the smart-assertion trainer (no-op on slim images). Default true. Warning - do not change this without consulting with your Acryl rep."
+    Default: "true"
+  InferenceV2Enabled:
+    Type: "String"
+    Description: "(Optional) Route smart-assertion training to the V2 pipeline (requires observe-models). Default false. Warning - do not change this without consulting with your Acryl rep."
+    Default: "false"
+  EnableDeltaBounds:
+    Type: "String"
+    Description: "(Optional) Emit delta-space prediction bounds. Set false for workers not yet on delta-aware code. Default true. Warning - do not change this without consulting with your Acryl rep."
+    Default: "true"
+  AllowCallStatements:
+    Type: "String"
+    Description: "(Optional) Allow stored-procedure CALL statements in custom SQL assertions. Default false. Warning - do not change this without consulting with your Acryl rep."
+    Default: "false"
+  SnowflakeQuoteColumns:
+    Type: "String"
+    Description: "(Optional) Quote column identifiers in generated Snowflake assertion queries. Default false. Warning - do not change this without consulting with your Acryl rep."
+    Default: "false"
+  SnowflakeTimeout:
+    Type: "String"
+    Description: "(Optional) Statement timeout (seconds) for Snowflake assertion/monitor queries. Default 600. Warning - do not change this without consulting with your Acryl rep."
+    Default: "600"
+  BigQueryTimeout:
+    Type: "String"
+    Description: "(Optional) Statement timeout (seconds) for BigQuery assertion/monitor queries. Default 600. Warning - do not change this without consulting with your Acryl rep."
+    Default: "600"
+  RedshiftTimeout:
+    Type: "String"
+    Description: "(Optional) Statement timeout (seconds) for Redshift assertion/monitor queries. Default 600. Warning - do not change this without consulting with your Acryl rep."
+    Default: "600"
+  DatabricksTimeout:
+    Type: "String"
+    Description: "(Optional) Statement timeout (seconds) for Databricks assertion/monitor queries. Default 600. Warning - do not change this without consulting with your Acryl rep."
+    Default: "600"
   ExistingDataHubAccessTokenSecretArn:
     Type: "String"
     Default: ""
@@ -240,6 +313,16 @@ Conditions:
   UseDataHubIngestionsMaxWorkers: !Not [!Equals [!Ref DataHubIngestionsMaxWorkers, ""]]
   UseDataHubMonitorsMaxWorkers: !Not [!Equals [!Ref DataHubMonitorsMaxWorkers, ""]]
   UseDataHubIngestionsSignalPollInterval: !Not [!Equals [!Ref DataHubIngestionsSignalPollInterval, ""]]
+  UseOnlineSmartAssertionsEnabled: !Not [!Equals [!Ref OnlineSmartAssertionsEnabled, ""]]
+  UseObserveModelsEnabled: !Not [!Equals [!Ref ObserveModelsEnabled, ""]]
+  UseInferenceV2Enabled: !Not [!Equals [!Ref InferenceV2Enabled, ""]]
+  UseEnableDeltaBounds: !Not [!Equals [!Ref EnableDeltaBounds, ""]]
+  UseAllowCallStatements: !Not [!Equals [!Ref AllowCallStatements, ""]]
+  UseSnowflakeQuoteColumns: !Not [!Equals [!Ref SnowflakeQuoteColumns, ""]]
+  UseSnowflakeTimeout: !Not [!Equals [!Ref SnowflakeTimeout, ""]]
+  UseBigQueryTimeout: !Not [!Equals [!Ref BigQueryTimeout, ""]]
+  UseRedshiftTimeout: !Not [!Equals [!Ref RedshiftTimeout, ""]]
+  UseDatabricksTimeout: !Not [!Equals [!Ref DatabricksTimeout, ""]]
   NonEmptyOptionalEnvVars: !Not [!Equals [!Ref OptionalEnvVars, ""]]
   UseOptionalEnvVar01: !Or
     - !And
@@ -589,6 +672,56 @@ Resources:
               - UseDataHubIngestionsSignalPollInterval
               - Name: DATAHUB_EXECUTOR_INGESTION_SIGNAL_POLL_INTERVAL
                 Value: !Ref DataHubIngestionsSignalPollInterval
+              - !Ref "AWS::NoValue"
+            - !If
+              - UseOnlineSmartAssertionsEnabled
+              - Name: ONLINE_SMART_ASSERTIONS_ENABLED
+                Value: !Ref OnlineSmartAssertionsEnabled
+              - !Ref "AWS::NoValue"
+            - !If
+              - UseObserveModelsEnabled
+              - Name: DATAHUB_USE_OBSERVE_MODELS
+                Value: !Ref ObserveModelsEnabled
+              - !Ref "AWS::NoValue"
+            - !If
+              - UseInferenceV2Enabled
+              - Name: DATAHUB_USE_INFERENCE_V2
+                Value: !Ref InferenceV2Enabled
+              - !Ref "AWS::NoValue"
+            - !If
+              - UseEnableDeltaBounds
+              - Name: DATAHUB_EXECUTOR_ENABLE_DELTA_BOUNDS
+                Value: !Ref EnableDeltaBounds
+              - !Ref "AWS::NoValue"
+            - !If
+              - UseAllowCallStatements
+              - Name: DATAHUB_EXECUTOR_ALLOW_CALL_STATEMENTS
+                Value: !Ref AllowCallStatements
+              - !Ref "AWS::NoValue"
+            - !If
+              - UseSnowflakeQuoteColumns
+              - Name: DATAHUB_EXECUTOR_SNOWFLAKE_QUOTE_COLUMNS
+                Value: !Ref SnowflakeQuoteColumns
+              - !Ref "AWS::NoValue"
+            - !If
+              - UseSnowflakeTimeout
+              - Name: DATAHUB_EXECUTOR_SNOWFLAKE_TIMEOUT
+                Value: !Ref SnowflakeTimeout
+              - !Ref "AWS::NoValue"
+            - !If
+              - UseBigQueryTimeout
+              - Name: DATAHUB_EXECUTOR_BIGQUERY_TIMEOUT
+                Value: !Ref BigQueryTimeout
+              - !Ref "AWS::NoValue"
+            - !If
+              - UseRedshiftTimeout
+              - Name: DATAHUB_EXECUTOR_REDSHIFT_TIMEOUT
+                Value: !Ref RedshiftTimeout
+              - !Ref "AWS::NoValue"
+            - !If
+              - UseDatabricksTimeout
+              - Name: DATAHUB_EXECUTOR_DATABRICKS_TIMEOUT
+                Value: !Ref DatabricksTimeout
               - !Ref "AWS::NoValue"
             - !If 
               - UseOptionalEnvVar01
