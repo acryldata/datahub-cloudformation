@@ -122,6 +122,11 @@ Parameters:
     Type: "String"
     Description: "Unique Executor Pool Id (previously known as Executor Id). Do not prefix it with 'default' if it is for a remote executor. Warning - do not change this without consulting with your Acryl rep."
     Default: "remote"
+  UvLinkMode:
+    Type: "String"
+    Description: "uv link mode for building ingestion venvs. 'hardlink' (default) shares package bytes with the uv cache (no per-venv copy / ephemeral spike) and needs the venv dir and cache on the same filesystem. Falls back to 'copy' automatically where hardlinks aren't possible."
+    Default: "hardlink"
+    AllowedValues: ["hardlink", "copy", "clone", "symlink"]
   Channel:
     Type: "String"
     Default: "SQS"
@@ -640,6 +645,8 @@ Resources:
               Value: !Ref DataHubBaseUrl
             - Name: DATAHUB_EXECUTOR_MODE
               Value: !If [UseKafkaChannel, "kafka-worker", "worker"]
+            - Name: UV_LINK_MODE
+              Value: !Ref UvLinkMode
             - !If
               - UseAwsRegion
               - Name: AWS_REGION
