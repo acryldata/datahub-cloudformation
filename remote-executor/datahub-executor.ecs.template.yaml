@@ -29,6 +29,7 @@ Metadata:
             default: Observe / Assertion / Monitor Parameters
           Parameters:
             - OnlineSmartAssertionsEnabled
+            - SmartFreshnessQueryGatingEnabled
             - ObserveModelsEnabled
             - InferenceV2Enabled
             - EnableDeltaBounds
@@ -70,6 +71,8 @@ Metadata:
           Default: "(Optional) Ingestion queue signal polling interval. Warning - do not change this without consulting with your Acryl rep."
         OnlineSmartAssertionsEnabled:
           Default: "(Optional) Enable online smart assertions. Default true."
+        SmartFreshnessQueryGatingEnabled:
+          Default: "(Optional) Skip the source freshness query while the learned update interval proves the table is still fresh. Default true."
         ObserveModelsEnabled:
           Default: "(Optional) Load observe-models in the smart-assertion trainer (no-op on slim images). Default true."
         InferenceV2Enabled:
@@ -149,6 +152,10 @@ Parameters:
   OnlineSmartAssertionsEnabled:
     Type: "String"
     Description: "(Optional) Enable online smart assertions in the executor. Default true. Warning - do not change this without consulting with your Acryl rep."
+    Default: "true"
+  SmartFreshnessQueryGatingEnabled:
+    Type: "String"
+    Description: "(Optional) Skip the source freshness query while the learned update interval proves the table is still fresh, so smart freshness assertions only query the warehouse once the result can change. Default true. Warning - do not change this without consulting with your Acryl rep."
     Default: "true"
   ObserveModelsEnabled:
     Type: "String"
@@ -319,6 +326,7 @@ Conditions:
   UseDataHubMonitorsMaxWorkers: !Not [!Equals [!Ref DataHubMonitorsMaxWorkers, ""]]
   UseDataHubIngestionsSignalPollInterval: !Not [!Equals [!Ref DataHubIngestionsSignalPollInterval, ""]]
   UseOnlineSmartAssertionsEnabled: !Not [!Equals [!Ref OnlineSmartAssertionsEnabled, ""]]
+  UseSmartFreshnessQueryGatingEnabled: !Not [!Equals [!Ref SmartFreshnessQueryGatingEnabled, ""]]
   UseObserveModelsEnabled: !Not [!Equals [!Ref ObserveModelsEnabled, ""]]
   UseInferenceV2Enabled: !Not [!Equals [!Ref InferenceV2Enabled, ""]]
   UseEnableDeltaBounds: !Not [!Equals [!Ref EnableDeltaBounds, ""]]
@@ -684,6 +692,11 @@ Resources:
               - UseOnlineSmartAssertionsEnabled
               - Name: ONLINE_SMART_ASSERTIONS_ENABLED
                 Value: !Ref OnlineSmartAssertionsEnabled
+              - !Ref "AWS::NoValue"
+            - !If
+              - UseSmartFreshnessQueryGatingEnabled
+              - Name: SMART_FRESHNESS_QUERY_GATING_ENABLED
+                Value: !Ref SmartFreshnessQueryGatingEnabled
               - !Ref "AWS::NoValue"
             - !If
               - UseObserveModelsEnabled
