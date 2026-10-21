@@ -89,3 +89,10 @@ export AWS_PROFILE=***
      - access https://{vpc_endpoint_dns} to use manage datahub release
 
 
+## License
+
+This repository is licensed under the [Apache License, Version 2.0](LICENSE.txt). Some third-party material under `templates/nested/amazon-eks/` is distributed under its own terms, and two AWS-authored files are excluded from the Apache License grant; see [NOTICE](NOTICE) for details.
+
+The `license/` directory is unrelated to the repository license: it is the upload location for the DataHub deployment license file used by `s3upload.sh` in the on-prem setup above.
+
+
