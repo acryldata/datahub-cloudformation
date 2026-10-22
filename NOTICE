@@ -1,0 +1,59 @@
+datahub-cloudformation
+Copyright (c) 2021, 2026 Acryl Data, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not
+use the files in this repository except in compliance with the License. A copy
+of the License is included in LICENSE, and is also available at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+License for the specific language governing permissions and limitations under
+the License.
+
+The exceptions below apply to third-party material included in this
+repository.
+
+================================================================================
+AWS Quick Start components
+================================================================================
+
+templates/nested/amazon-eks/ contains templates, AWS Lambda function sources
+and CloudFormation resource providers originating from AWS Quick Start
+projects, including quickstart-amazon-eks-cluster-resource-provider and
+quickstart-helm-resource-provider.
+Copyright Amazon.com, Inc. or its affiliates.
+
+Where a directory under templates/nested/amazon-eks/ carries its own
+LICENSE.txt or NOTICE.txt, those files govern the contents of that directory
+and are retained as distributed by AWS:
+
+  templates/nested/amazon-eks/functions/source/EksClusterResource/
+  templates/nested/amazon-eks/functions/source/kubernetesResources/
+
+--------------------------------------------------------------------------------
+Files excluded from the Apache License grant
+--------------------------------------------------------------------------------
+
+The following files state that they are licensed under the AWS Customer
+Agreement (http://aws.amazon.com/agreement/). Acryl Data, Inc. does not
+license them under the Apache License, Version 2.0; they remain subject to
+their own terms:
+
+  templates/nested/amazon-eks/functions/source/CleanupLoadBalancers/lambda_function.py
+  templates/nested/amazon-eks/functions/source/CleanupSecurityGroupDependencies/lambda_function.py
+  templates/nested/amazon-eks/functions/packages/CleanupLoadBalancers/lambda.zip
+  templates/nested/amazon-eks/functions/packages/CleanupSecurityGroupDependencies/lambda.zip
+
+--------------------------------------------------------------------------------
+Bundled third-party software
+--------------------------------------------------------------------------------
+
+The .zip archives under templates/nested/amazon-eks/functions/packages/ are
+pre-built AWS Lambda packages and layers. They bundle third-party software,
+including the AWS CLI, boto3, botocore, crhelper, kubectl,
+aws-iam-authenticator, Helm, requests, urllib3, certifi, idna, PyYAML and
+ruamel.yaml. Each is distributed under its own license terms, which are not
+altered by the License above.

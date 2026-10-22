@@ -10,11 +10,7 @@ else
   LICENSE=$3
 
   # upload license file to s3 bucket
-  cp $3 ./license/license.yaml
-  if [ $? -eq 0 ]; then
-    aws s3 cp ./license s3://$S3_BUCKET/$S3_KEY_PREFIX/license --recursive
-    rm ./license/license.yaml
-  fi
+  aws s3 cp "$LICENSE" s3://$S3_BUCKET/$S3_KEY_PREFIX/license/license.yaml
 
   # Check if access to the bucket
   if aws s3 ls "s3://$S3_BUCKET" 2>&1 | grep -q 'An error occurred'
