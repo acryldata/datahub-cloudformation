@@ -23,6 +23,8 @@ Metadata:
             - DataHubIngestionsMaxWorkers
             - DataHubMonitorsMaxWorkers
             - DataHubIngestionsSignalPollInterval
+            - StatusDetailsEnabled
+            - ReportRuntime
             - OptionalSecrets
             - OptionalEnvVars
         - Label:
@@ -69,6 +71,10 @@ Metadata:
           Default: "(Optional) Maximum number of monitoring tasks allowed to run in parallel. Warning - do not change this without consulting with your Acryl rep."
         DataHubIngestionsSignalPollInterval:
           Default: "(Optional) Ingestion queue signal polling interval. Warning - do not change this without consulting with your Acryl rep."
+        StatusDetailsEnabled:
+          Default: "(Optional) Send the detailed status (work intake, task slots, running tasks) with each heartbeat, shown on the Executors page. Default true. Set false to turn it off."
+        ReportRuntime:
+          Default: "(Optional) Send the runtime report (resources, settings, environment), shown on the Executors page. Default true. Set false to turn it off."
         OnlineSmartAssertionsEnabled:
           Default: "(Optional) Enable online smart assertions. Default true."
         SmartFreshnessQueryGatingEnabled:
@@ -149,6 +155,14 @@ Parameters:
     Type: "String"
     Description: "(Optional) Ingestion queue signal polling interval. Warning - do not change this without consulting with your Acryl rep."
     Default: ""
+  StatusDetailsEnabled:
+    Type: "String"
+    Description: "(Optional) Send the detailed status (work intake, task slots, running tasks) with each heartbeat, shown on the Executors page. Default true. Set false to turn it off."
+    Default: "true"
+  ReportRuntime:
+    Type: "String"
+    Description: "(Optional) Send the runtime report (resources, settings, environment), shown on the Executors page. Default true. Set false to turn it off."
+    Default: "true"
   OnlineSmartAssertionsEnabled:
     Type: "String"
     Description: "(Optional) Enable online smart assertions in the executor. Default true. Warning - do not change this without consulting with your Acryl rep."
@@ -325,6 +339,8 @@ Conditions:
   UseDataHubIngestionsMaxWorkers: !Not [!Equals [!Ref DataHubIngestionsMaxWorkers, ""]]
   UseDataHubMonitorsMaxWorkers: !Not [!Equals [!Ref DataHubMonitorsMaxWorkers, ""]]
   UseDataHubIngestionsSignalPollInterval: !Not [!Equals [!Ref DataHubIngestionsSignalPollInterval, ""]]
+  UseStatusDetailsEnabled: !Not [!Equals [!Ref StatusDetailsEnabled, ""]]
+  UseReportRuntime: !Not [!Equals [!Ref ReportRuntime, ""]]
   UseOnlineSmartAssertionsEnabled: !Not [!Equals [!Ref OnlineSmartAssertionsEnabled, ""]]
   UseSmartFreshnessQueryGatingEnabled: !Not [!Equals [!Ref SmartFreshnessQueryGatingEnabled, ""]]
   UseObserveModelsEnabled: !Not [!Equals [!Ref ObserveModelsEnabled, ""]]
@@ -687,6 +703,16 @@ Resources:
               - UseDataHubIngestionsSignalPollInterval
               - Name: DATAHUB_EXECUTOR_INGESTION_SIGNAL_POLL_INTERVAL
                 Value: !Ref DataHubIngestionsSignalPollInterval
+              - !Ref "AWS::NoValue"
+            - !If
+              - UseStatusDetailsEnabled
+              - Name: DATAHUB_EXECUTOR_STATUS_DETAILS_ENABLED
+                Value: !Ref StatusDetailsEnabled
+              - !Ref "AWS::NoValue"
+            - !If
+              - UseReportRuntime
+              - Name: DATAHUB_EXECUTOR_REPORT_RUNTIME
+                Value: !Ref ReportRuntime
               - !Ref "AWS::NoValue"
             - !If
               - UseOnlineSmartAssertionsEnabled
