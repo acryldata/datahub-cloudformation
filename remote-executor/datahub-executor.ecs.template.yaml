@@ -25,6 +25,7 @@ Metadata:
             - DataHubIngestionsSignalPollInterval
             - ReportingStatusDetailsEnabled
             - ReportingRuntimeDetailsEnabled
+            - DataHubIngestionsPrintSubprocessLogs
             - OptionalSecrets
             - OptionalEnvVars
         - Label:
@@ -75,6 +76,8 @@ Metadata:
           Default: "(Optional) Send the detailed status (work intake, task slots, running tasks) with each heartbeat, shown on the Executors page. Default true. Set false to turn it off."
         ReportingRuntimeDetailsEnabled:
           Default: "(Optional) Send the runtime report (resources, settings, environment), shown on the Executors page. Default true. Set false to turn it off."
+        DataHubIngestionsPrintSubprocessLogs:
+          Default: "(Optional) Copy each ingestion run's log lines into the executor container log, prefixed with the execution id. The run log shown in DataHub is not affected. Default true. Set false to turn it off."
         OnlineSmartAssertionsEnabled:
           Default: "(Optional) Enable online smart assertions. Default true."
         SmartFreshnessQueryGatingEnabled:
@@ -162,6 +165,10 @@ Parameters:
   ReportingRuntimeDetailsEnabled:
     Type: "String"
     Description: "(Optional) Send the runtime report (resources, settings, environment), shown on the Executors page. Default true. Set false to turn it off."
+    Default: "true"
+  DataHubIngestionsPrintSubprocessLogs:
+    Type: "String"
+    Description: "(Optional) Copy each ingestion run's log lines into the executor container log, prefixed with the execution id. The run log shown in DataHub is not affected. Default true. Set false to turn it off."
     Default: "true"
   OnlineSmartAssertionsEnabled:
     Type: "String"
@@ -341,6 +348,7 @@ Conditions:
   UseDataHubIngestionsSignalPollInterval: !Not [!Equals [!Ref DataHubIngestionsSignalPollInterval, ""]]
   UseReportingStatusDetailsEnabled: !Not [!Equals [!Ref ReportingStatusDetailsEnabled, ""]]
   UseReportingRuntimeDetailsEnabled: !Not [!Equals [!Ref ReportingRuntimeDetailsEnabled, ""]]
+  UseDataHubIngestionsPrintSubprocessLogs: !Not [!Equals [!Ref DataHubIngestionsPrintSubprocessLogs, ""]]
   UseOnlineSmartAssertionsEnabled: !Not [!Equals [!Ref OnlineSmartAssertionsEnabled, ""]]
   UseSmartFreshnessQueryGatingEnabled: !Not [!Equals [!Ref SmartFreshnessQueryGatingEnabled, ""]]
   UseObserveModelsEnabled: !Not [!Equals [!Ref ObserveModelsEnabled, ""]]
@@ -713,6 +721,11 @@ Resources:
               - UseReportingRuntimeDetailsEnabled
               - Name: DATAHUB_EXECUTOR_REPORT_RUNTIME
                 Value: !Ref ReportingRuntimeDetailsEnabled
+              - !Ref "AWS::NoValue"
+            - !If
+              - UseDataHubIngestionsPrintSubprocessLogs
+              - Name: DATAHUB_EXECUTOR_PRINT_SUBPROCESS_LOGS
+                Value: !Ref DataHubIngestionsPrintSubprocessLogs
               - !Ref "AWS::NoValue"
             - !If
               - UseOnlineSmartAssertionsEnabled
