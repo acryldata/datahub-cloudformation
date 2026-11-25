@@ -49,6 +49,16 @@ Metadata:
             - TaskCpu
             - TaskMemory
             - TaskEphemeralStorageSizeInGiB
+        - Label:
+            default: Container Customization (Advanced)
+          Parameters:
+            - OptionalVolumes
+            - CustomCommand
+            - CustomHealthCheckCommand
+            - CustomHealthCheckInterval
+            - CustomHealthCheckTimeout
+            - CustomHealthCheckRetries
+            - CustomHealthCheckStartPeriod
 
       ParameterLabels:
         SubnetID: 
@@ -113,6 +123,20 @@ Metadata:
           Default: "The ECS Task Memory value, check https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-cpu-memory-error.html"
         TaskEphemeralStorageSizeInGiB:
           Default: "The amount of ephemeral storage to allocate for the task"
+        OptionalVolumes:
+          Default: "(Optional) EFS volumes to mount into the container, as name=fsId:accessPointId:containerPath:readOnly (comma-separated, up to 5)."
+        CustomCommand:
+          Default: "(Optional) Override the container command. Leave empty to use the image's start script."
+        CustomHealthCheckCommand:
+          Default: "(Optional) Add a container health check (CMD-SHELL). Leave empty for no health check."
+        CustomHealthCheckInterval:
+          Default: "(Optional) Health check interval in seconds. Only used with CustomHealthCheckCommand."
+        CustomHealthCheckTimeout:
+          Default: "(Optional) Health check timeout in seconds. Only used with CustomHealthCheckCommand."
+        CustomHealthCheckRetries:
+          Default: "(Optional) Health check retries. Only used with CustomHealthCheckCommand."
+        CustomHealthCheckStartPeriod:
+          Default: "(Optional) Health check start period in seconds. Only used with CustomHealthCheckCommand."
 Parameters:
   SubnetID:
     Type: "AWS::EC2::Subnet::Id"
@@ -280,6 +304,42 @@ Parameters:
     Type: "String"
     Default: "21"
     Description: "The total amount, in GiB, of ephemeral storage to set for the task"
+  OptionalVolumes:
+    Type: "String"
+    Default: ""
+    Description: "A list of optional EFS-backed volumes to mount into the ECS task container, for example: myvol=fs-0123456789abcdef0:fsap-0123456789abcdef0:/mnt/mypath:false (NO SPACE; fields are name=filesystemId:accessPointId:containerPath:readOnly; readOnly is lowercase true or false; supports up to 5 volumes)"
+  CustomCommand:
+    Type: "String"
+    Default: ""
+    Description: "(Optional) Override the container's Command, as a string split on single spaces with no quoting (e.g. '/bin/bash /mnt/mypath/start.sh'); put anything more complex in a script. Leave empty to use the image's default entrypoint script."
+  CustomHealthCheckCommand:
+    Type: "String"
+    Default: ""
+    Description: "(Optional) Add an ECS container HealthCheck that runs this shell command (via CMD-SHELL). Leave empty for no health check; ECS ignores any HEALTHCHECK built into the image."
+  CustomHealthCheckInterval:
+    Type: "Number"
+    Default: 30
+    MinValue: 5
+    MaxValue: 300
+    Description: "(Optional) HealthCheck interval in seconds (5-300), only used when CustomHealthCheckCommand is set."
+  CustomHealthCheckTimeout:
+    Type: "Number"
+    Default: 10
+    MinValue: 2
+    MaxValue: 60
+    Description: "(Optional) HealthCheck timeout in seconds (2-60), only used when CustomHealthCheckCommand is set."
+  CustomHealthCheckRetries:
+    Type: "Number"
+    Default: 5
+    MinValue: 1
+    MaxValue: 10
+    Description: "(Optional) HealthCheck retries (1-10), only used when CustomHealthCheckCommand is set."
+  CustomHealthCheckStartPeriod:
+    Type: "Number"
+    Default: 120
+    MinValue: 0
+    MaxValue: 300
+    Description: "(Optional) HealthCheck start period in seconds (0-300), only used when CustomHealthCheckCommand is set."
 Conditions:
   UseAwsRegion: !Not [!Equals [!Ref AwsRegion, ""]]
   UseExistingDataHubAccessTokenSecret: !Not [!Equals [!Ref ExistingDataHubAccessTokenSecretArn, ""]]
@@ -401,6 +461,33 @@ Conditions:
   UseOptionalEnvVar10: !And
     - !Equals [Fn::Length: !Split [",", !Ref OptionalEnvVars], 10]
     - !Condition NonEmptyOptionalEnvVars
+
+  UseCustomCommand: !Not [!Equals [!Ref CustomCommand, ""]]
+  UseCustomHealthCheck: !Not [!Equals [!Ref CustomHealthCheckCommand, ""]]
+  NonEmptyOptionalVolumes: !Not [!Equals [!Ref OptionalVolumes, ""]]
+  UseOptionalVolume01: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalVolumes], 1]
+      - !Condition NonEmptyOptionalVolumes
+    - !Condition UseOptionalVolume02
+  UseOptionalVolume02: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalVolumes], 2]
+      - !Condition NonEmptyOptionalVolumes
+    - !Condition UseOptionalVolume03
+  UseOptionalVolume03: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalVolumes], 3]
+      - !Condition NonEmptyOptionalVolumes
+    - !Condition UseOptionalVolume04
+  UseOptionalVolume04: !Or
+    - !And
+      - !Equals [Fn::Length: !Split [",", !Ref OptionalVolumes], 4]
+      - !Condition NonEmptyOptionalVolumes
+    - !Condition UseOptionalVolume05
+  UseOptionalVolume05: !And
+    - !Equals [Fn::Length: !Split [",", !Ref OptionalVolumes], 5]
+    - !Condition NonEmptyOptionalVolumes
 
 Resources:
   DataHubAccessTokenSecret:
@@ -591,13 +678,111 @@ Resources:
       TaskRoleArn: !Ref TaskRole
       NetworkMode: awsvpc
       ExecutionRoleArn: !GetAtt ExecutionRole.Arn
+      Volumes:
+        - !If
+          - UseOptionalVolume01
+          - Name: !Select [0, !Split ["=", !Select [0, !Split [",", !Ref OptionalVolumes]]]]
+            EFSVolumeConfiguration:
+              FilesystemId: !Select [0, !Split [":", !Select [1, !Split ["=", !Select [0, !Split [",", !Ref OptionalVolumes]]]]]]
+              TransitEncryption: ENABLED
+              AuthorizationConfig:
+                AccessPointId: !Select [1, !Split [":", !Select [1, !Split ["=", !Select [0, !Split [",", !Ref OptionalVolumes]]]]]]
+                IAM: DISABLED
+          - !Ref "AWS::NoValue"
+        - !If
+          - UseOptionalVolume02
+          - Name: !Select [0, !Split ["=", !Select [1, !Split [",", !Ref OptionalVolumes]]]]
+            EFSVolumeConfiguration:
+              FilesystemId: !Select [0, !Split [":", !Select [1, !Split ["=", !Select [1, !Split [",", !Ref OptionalVolumes]]]]]]
+              TransitEncryption: ENABLED
+              AuthorizationConfig:
+                AccessPointId: !Select [1, !Split [":", !Select [1, !Split ["=", !Select [1, !Split [",", !Ref OptionalVolumes]]]]]]
+                IAM: DISABLED
+          - !Ref "AWS::NoValue"
+        - !If
+          - UseOptionalVolume03
+          - Name: !Select [0, !Split ["=", !Select [2, !Split [",", !Ref OptionalVolumes]]]]
+            EFSVolumeConfiguration:
+              FilesystemId: !Select [0, !Split [":", !Select [1, !Split ["=", !Select [2, !Split [",", !Ref OptionalVolumes]]]]]]
+              TransitEncryption: ENABLED
+              AuthorizationConfig:
+                AccessPointId: !Select [1, !Split [":", !Select [1, !Split ["=", !Select [2, !Split [",", !Ref OptionalVolumes]]]]]]
+                IAM: DISABLED
+          - !Ref "AWS::NoValue"
+        - !If
+          - UseOptionalVolume04
+          - Name: !Select [0, !Split ["=", !Select [3, !Split [",", !Ref OptionalVolumes]]]]
+            EFSVolumeConfiguration:
+              FilesystemId: !Select [0, !Split [":", !Select [1, !Split ["=", !Select [3, !Split [",", !Ref OptionalVolumes]]]]]]
+              TransitEncryption: ENABLED
+              AuthorizationConfig:
+                AccessPointId: !Select [1, !Split [":", !Select [1, !Split ["=", !Select [3, !Split [",", !Ref OptionalVolumes]]]]]]
+                IAM: DISABLED
+          - !Ref "AWS::NoValue"
+        - !If
+          - UseOptionalVolume05
+          - Name: !Select [0, !Split ["=", !Select [4, !Split [",", !Ref OptionalVolumes]]]]
+            EFSVolumeConfiguration:
+              FilesystemId: !Select [0, !Split [":", !Select [1, !Split ["=", !Select [4, !Split [",", !Ref OptionalVolumes]]]]]]
+              TransitEncryption: ENABLED
+              AuthorizationConfig:
+                AccessPointId: !Select [1, !Split [":", !Select [1, !Split ["=", !Select [4, !Split [",", !Ref OptionalVolumes]]]]]]
+                IAM: DISABLED
+          - !Ref "AWS::NoValue"
       ContainerDefinitions:
         - Name: !Sub "${AWS::StackName}-container"
+          Essential: true
           Image: !If 
             - UseImageTag
             - !Join [":", [ "795586375822.dkr.ecr.us-west-2.amazonaws.com/datahub-executor", !Ref ImageTag]]
             - 795586375822.dkr.ecr.us-west-2.amazonaws.com/datahub-executor
-          Command: ["/start_datahub_executor.sh"]
+          Command: !If
+            - UseCustomCommand
+            - !Split [" ", !Ref CustomCommand]
+            - ["/start_datahub_executor.sh"]
+          # ReadOnly passes the "true"/"false" string straight through, which
+          # CloudFormation converts to a boolean; Fn::Equals is only valid in Conditions.
+          MountPoints:
+            - !If
+              - UseOptionalVolume01
+              - SourceVolume: !Select [0, !Split ["=", !Select [0, !Split [",", !Ref OptionalVolumes]]]]
+                ContainerPath: !Select [2, !Split [":", !Select [1, !Split ["=", !Select [0, !Split [",", !Ref OptionalVolumes]]]]]]
+                ReadOnly: !Select [3, !Split [":", !Select [1, !Split ["=", !Select [0, !Split [",", !Ref OptionalVolumes]]]]]]
+              - !Ref "AWS::NoValue"
+            - !If
+              - UseOptionalVolume02
+              - SourceVolume: !Select [0, !Split ["=", !Select [1, !Split [",", !Ref OptionalVolumes]]]]
+                ContainerPath: !Select [2, !Split [":", !Select [1, !Split ["=", !Select [1, !Split [",", !Ref OptionalVolumes]]]]]]
+                ReadOnly: !Select [3, !Split [":", !Select [1, !Split ["=", !Select [1, !Split [",", !Ref OptionalVolumes]]]]]]
+              - !Ref "AWS::NoValue"
+            - !If
+              - UseOptionalVolume03
+              - SourceVolume: !Select [0, !Split ["=", !Select [2, !Split [",", !Ref OptionalVolumes]]]]
+                ContainerPath: !Select [2, !Split [":", !Select [1, !Split ["=", !Select [2, !Split [",", !Ref OptionalVolumes]]]]]]
+                ReadOnly: !Select [3, !Split [":", !Select [1, !Split ["=", !Select [2, !Split [",", !Ref OptionalVolumes]]]]]]
+              - !Ref "AWS::NoValue"
+            - !If
+              - UseOptionalVolume04
+              - SourceVolume: !Select [0, !Split ["=", !Select [3, !Split [",", !Ref OptionalVolumes]]]]
+                ContainerPath: !Select [2, !Split [":", !Select [1, !Split ["=", !Select [3, !Split [",", !Ref OptionalVolumes]]]]]]
+                ReadOnly: !Select [3, !Split [":", !Select [1, !Split ["=", !Select [3, !Split [",", !Ref OptionalVolumes]]]]]]
+              - !Ref "AWS::NoValue"
+            - !If
+              - UseOptionalVolume05
+              - SourceVolume: !Select [0, !Split ["=", !Select [4, !Split [",", !Ref OptionalVolumes]]]]
+                ContainerPath: !Select [2, !Split [":", !Select [1, !Split ["=", !Select [4, !Split [",", !Ref OptionalVolumes]]]]]]
+                ReadOnly: !Select [3, !Split [":", !Select [1, !Split ["=", !Select [4, !Split [",", !Ref OptionalVolumes]]]]]]
+              - !Ref "AWS::NoValue"
+          HealthCheck: !If
+            - UseCustomHealthCheck
+            - Command:
+                - "CMD-SHELL"
+                - !Ref CustomHealthCheckCommand
+              Interval: !Ref CustomHealthCheckInterval
+              Timeout: !Ref CustomHealthCheckTimeout
+              Retries: !Ref CustomHealthCheckRetries
+              StartPeriod: !Ref CustomHealthCheckStartPeriod
+            - !Ref "AWS::NoValue"
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -850,3 +1035,6 @@ Outputs:
   ServiceName:
     Description: Name of ECS Service
     Value: !GetAtt ECSService.Name
+  ContainerSecurityGroupId:
+    Description: Security group of the executor tasks, e.g. to allow NFS (TCP 2049) from it to EFS used by OptionalVolumes
+    Value: !GetAtt ContainerSecurityGroup.GroupId
